@@ -242,8 +242,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,0,0,412
- PRODUCTVERSION 1,0,0,412
+ FILEVERSION 1,0,0,414
+ PRODUCTVERSION 1,0,0,414
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -260,12 +260,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "WimsWorld"
             VALUE "FileDescription", "WimTiVoClient"
-            VALUE "FileVersion", "1.0.0.412"
+            VALUE "FileVersion", "1.0.0.414"
             VALUE "InternalName", "WimTiVoClient.exe"
             VALUE "LegalCopyright", "Copyright © 2013 William C Bonner.  All rights reserved."
             VALUE "OriginalFilename", "WimTiVoClient.exe"
             VALUE "ProductName", "WimTiVoClient"
-            VALUE "ProductVersion", "1.0.0.412"
+            VALUE "ProductVersion", "1.0.0.414"
         END
     END
     BLOCK "VarFileInfo"
@@ -289,6 +289,14 @@ BEGIN
         RIGHTMARGIN, 302
         TOPMARGIN, 7
         BOTTOMMARGIN, 170
+    END
+
+    IDD_TIVO_MAK, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 136
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 58
     END
 END
 #endif    // APSTUDIO_INVOKED
@@ -316,6 +324,17 @@ BEGIN
     EDITTEXT        IDC_PROGRAM_INFO,7,7,295,147,ES_MULTILINE | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | NOT WS_TABSTOP
     CONTROL         "Check for Update",IDC_CHECKFORUPDATE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,157,72,10
     CONTROL         "Update Not Available",IDC_LINKTOUPDATE,"MfcLink",WS_TABSTOP,93,156,74,14
+END
+
+IDD_TIVO_MAK DIALOGEX 0, 0, 143, 65
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "TiVo Media Access Key"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,86,44,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,7,44,50,14
+    EDITTEXT        IDC_MEDIA_ACCESS_KEY,7,20,128,14,ES_AUTOHSCROLL
+    LTEXT           "Enter TiVo Media Access Key (MAK)",IDC_STATIC,7,7,114,8
 END
 
 

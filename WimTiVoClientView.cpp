@@ -21,6 +21,7 @@
 
 #include "WimTiVoClientDoc.h"
 #include "WimTiVoClientView.h"
+#include "TiVoMAKDlg.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -36,7 +37,6 @@ BEGIN_MESSAGE_MAP(CWimTiVoClientView, CListView)
 	ON_COMMAND(ID_TIVI_NOWPLAYING, &CWimTiVoClientView::OnTiviNowplaying)
 	ON_COMMAND(ID_TIVO_BEACON, &CWimTiVoClientView::OnTivoBeacon)
 	ON_UPDATE_COMMAND_UI(ID_TIVO_BEACON, &CWimTiVoClientView::OnUpdateTivoBeacon)
-	ON_UPDATE_COMMAND_UI(ID_TIVO_MAK, &CWimTiVoClientView::OnUpdateTivoMak)
 	ON_COMMAND(ID_TIVO_LIST, &CWimTiVoClientView::OnTivoList)
 	ON_NOTIFY_REFLECT(LVN_COLUMNCLICK, &CWimTiVoClientView::OnLvnColumnclick)
 	ON_UPDATE_COMMAND_UI(ID_TIVODECODE, &CWimTiVoClientView::OnUpdateTiVoDecode)
@@ -91,6 +91,13 @@ void CWimTiVoClientView::OnInitialUpdate()
 					TiVoList->SelectItem(0);
 			pDoc->m_TiVoServerName = TiVoList->GetItem(TiVoList->GetCurSel());
 		}
+		// I really want to right align most of the numbers in the edit bozes, but when I use the following code it causes the desriptive label to disapear.
+		//CMFCRibbonEdit* pEditTotalSize = DYNAMIC_DOWNCAST(CMFCRibbonEdit, pRibbon->FindByID(ID_TIVO_TOTAL_SIZE));
+		//if (pEditTotalSize)
+		//{
+		//	int TextAlignment = pEditTotalSize->GetTextAlign();
+		//	pEditTotalSize->SetTextAlign(ES_RIGHT);
+		//}
 	}
 
 	//  its list control through a call to GetListCtrl().
@@ -109,6 +116,11 @@ void CWimTiVoClientView::OnInitialUpdate()
 	ListCtrl.InsertColumn(5, _T("Duration"), LVCFMT_LEFT, 55, 5);
 	ListCtrl.InsertColumn(6, _T("Estimated Size"), LVCFMT_RIGHT, 90, 6);
 
+	if (pDoc)
+	{
+		pDoc->m_TiVoBeaconListenThreadStopRequested = false;
+		AfxBeginThread(pDoc->TiVoBeaconListenThread, (LPVOID) GetSafeHwnd());
+	}
 	CListView::OnInitialUpdate(); // This needed to be moved to the end because it call's Update, and that manipulated the ListCtrl.
 	TRACE(__FUNCTION__ " Exiting\n");
 }
@@ -222,8 +234,23 @@ void CWimTiVoClientView::OnTiviNowplaying()
 {
 	TRACE(__FUNCTION__ "\n");
 	CWimTiVoClientDoc * pDoc = GetDocument();
-	pDoc->GetNowPlaying();
-	pDoc->UpdateAllViews(NULL);
+	if (pDoc)
+	{
+		cTiVoServer SearchServer;
+		SearchServer.m_machine = CStringA(pDoc->m_TiVoServerName);
+		auto pServer = std::find(pDoc->m_TiVoServers.begin(), pDoc->m_TiVoServers.end(), SearchServer);
+		if (pServer != pDoc->m_TiVoServers.end())
+		{
+			if (pServer->m_MAK.empty())
+			{
+				CTiVoMAKDlg myDlg;
+				if (IDOK == myDlg.DoModal())
+					pServer->m_MAK = CStringA(myDlg.m_csMediaAccessKey).GetString();
+			}
+			pDoc->GetNowPlaying();
+		}
+		pDoc->UpdateAllViews(NULL);
+	}
 	TRACE(__FUNCTION__ " Exiting\n");
 }
 void CWimTiVoClientView::OnTivoBeacon()
@@ -264,20 +291,6 @@ void CWimTiVoClientView::OnUpdateTivoBeacon(CCmdUI *pCmdUI)
 	CWimTiVoClientDoc * pDoc = GetDocument();
 	if (pDoc)
 		pCmdUI->SetCheck(pDoc->m_TiVoBeaconListenThreadRunning);
-}
-void CWimTiVoClientView::OnUpdateTivoMak(CCmdUI *pCmdUI)
-{
-	CWimTiVoClientDoc * pDoc = GetDocument();
-	if (pDoc)
-	{
-		CMFCRibbonBar* pRibbon = ((CFrameWndEx*) GetTopLevelFrame())->GetRibbonBar();
-		if (pRibbon)
-		{
-			CMFCRibbonEdit* pEdit = DYNAMIC_DOWNCAST(CMFCRibbonEdit, pRibbon->FindByID(pCmdUI->m_nID));
-			if (pEdit)
-				pEdit->SetEditText(pDoc->m_csTiVoMAK);
-		}
-	}
 }
 void CWimTiVoClientView::OnTivoList()
 {
@@ -538,5 +551,5 @@ void CWimTiVoClientView::OnTimer(UINT_PTR nIDEvent)
 		}
 	}
 	else
-		CListView::OnTimer(nIDEvent);
+		CListView::OnTimer(nIDEvent); // If you pass your own timer event to the parent class it will kill off the timer.
 }

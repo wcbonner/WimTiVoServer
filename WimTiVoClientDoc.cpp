@@ -83,7 +83,6 @@ CWimTiVoClientDoc::CWimTiVoClientDoc()
 	m_CurrentFileSize = 0;
 	m_CurrentFileSpeed = 0;
 
-	m_csTiVoMAK = AfxGetApp()->GetProfileString(_T("TiVo"),_T("MAK"),_T(""));
 	m_TiVoServerName = AfxGetApp()->GetProfileString(_T("TiVo"),_T("TiVoServerName"),_T(""));
 	m_TiVoTotalSize = 0;
 	m_csFFMPEGPath = FindEXEFromPath(_T("ffmpeg.exe"));
@@ -128,6 +127,8 @@ CWimTiVoClientDoc::CWimTiVoClientDoc()
 					myServer.m_services = CStringA(csValue);
 				else if (!csKey.CompareNoCase(_T("swversion")))
 					myServer.m_swversion = CStringA(csValue);
+				else if (!csKey.CompareNoCase(_T("MAK")))
+					myServer.m_MAK = CStringA(csValue);
 				csSect = regTiVo.Tokenize(_T("\t"), SectPos);
 			}
 			m_TiVoServers.push_back(myServer);
@@ -146,7 +147,6 @@ CWimTiVoClientDoc::~CWimTiVoClientDoc()
 		m_TiVoConvertFileThreadStopRequested = true;
 		Sleep(500);
 	}
-	AfxGetApp()->WriteProfileString(_T("TiVo"), _T("MAK"), m_csTiVoMAK);
 	AfxGetApp()->WriteProfileString(_T("TiVo"), _T("TiVoServerName"), m_TiVoServerName);
 	AfxGetApp()->WriteProfileInt(_T("TiVo"), _T("FFMPEG"), m_bFFMPEG);
 	AfxGetApp()->WriteProfileInt(_T("TiVo"), _T("TiVoDecode"), m_bTiVoDecode);
@@ -156,13 +156,14 @@ CWimTiVoClientDoc::~CWimTiVoClientDoc()
 		ssKey << "TiVo-" << (TiVo - m_TiVoServers.begin());
 		std::stringstream ssValue;
 		ssValue << "address=" << TiVo->m_address;
+		if (!TiVo->m_machine.empty()) ssValue << "\tmachine=" << TiVo->m_machine;
+		if (!TiVo->m_identity.empty()) ssValue << "\tidentity=" << TiVo->m_identity;
+		if (!TiVo->m_method.empty()) ssValue << "\tmethod=" << TiVo->m_method;
+		if (!TiVo->m_platform.empty()) ssValue << "\tplatform=" << TiVo->m_platform;
+		if (!TiVo->m_services.empty()) ssValue << "\tservices=" << TiVo->m_services;
+		if (!TiVo->m_swversion.empty()) ssValue << "\tswversion=" << TiVo->m_swversion;
+		if (!TiVo->m_MAK.empty()) ssValue << "\tMAK=" << TiVo->m_MAK;
 		ssValue << "\ttivoconnect=1";
-		ssValue << "\tmachine=" << TiVo->m_machine;
-		ssValue << "\tidentity=" << TiVo->m_identity;
-		ssValue << "\tmethod=" << TiVo->m_method;
-		ssValue << "\tplatform=" << TiVo->m_platform;
-		ssValue << "\tservices=" << TiVo->m_services;
-		ssValue << "\tswversion=" << TiVo->m_swversion;
 		AfxGetApp()->WriteProfileString(_T("TiVo"), CString(ssKey.str().c_str()), CString(ssValue.str().c_str()));
 	}
 	AfxGetApp()->WriteProfileString(_T("TiVo"),_T("TiVoFileDestination"),m_csTiVoFileDestination);
@@ -286,9 +287,10 @@ bool CWimTiVoClientDoc::GetNowPlaying(void)
 		auto pServer = std::find(m_TiVoServers.begin(), m_TiVoServers.end(), myServer);
 		if (pServer != m_TiVoServers.end())
 		{
+			myServer = *pServer;
 			ss << CStringA(crackedURL.lpszScheme).GetString() << "://";
-			ss << "tivo:" << CStringA(m_csTiVoMAK).GetString() << "@";
-			ss << pServer->m_address << ":" << crackedURL.nPort;
+			ss << "tivo:" << myServer.m_MAK << "@";
+			ss << myServer.m_address << ":" << crackedURL.nPort;
 			ss << CStringA(crackedURL.lpszUrlPath).GetString() << CStringA(crackedURL.lpszExtraInfo).GetString();
 		}
 		else
@@ -300,7 +302,7 @@ bool CWimTiVoClientDoc::GetNowPlaying(void)
 		}
 		csURL = CString(ss.str().c_str());
 
-		XML_Parse_TiVoNowPlaying(csURL, m_TiVoFiles, m_InternetSession);
+		XML_Parse_TiVoNowPlaying(csURL, CString(myServer.m_MAK.c_str()), m_TiVoFiles, m_InternetSession);
 
 		m_TiVoTotalTime = CTimeSpan::CTimeSpan();
 		m_TiVoTotalSize = 0;
@@ -453,7 +455,7 @@ bool CWimTiVoClientDoc::GetTiVoFile(const cTiVoFile & TiVoFile) //, CInternetSes
 	CString strPassword; 
 	AfxParseURLEx(TiVoFile.GetURL().GetString(), dwServiceType, strServer, strObject, nPort, strUsername, strPassword);
 	strUsername = _T("tivo");
-	strPassword = m_csTiVoMAK;
+	strPassword = TiVoFile.GetMAK();
 	std::unique_ptr<CHttpConnection> serverConnection(m_InternetSession.GetHttpConnection(strServer,nPort,strUsername,strPassword));
 	if (NULL != serverConnection)
 	{
@@ -645,7 +647,7 @@ UINT CWimTiVoClientDoc::TiVoConvertFileThread(LPVOID lvp)
 					if ((pDoc->m_bTiVoDecode) && (TRUE != CFile::GetStatus(csMPEGPathName, status)))
 					{
 						if (!pDoc->m_csTDCatPath.IsEmpty())
-							if (-1 == _tspawnl(_P_WAIT, pDoc->m_csTDCatPath.GetString(), pDoc->m_csTDCatPath.GetString(), _T("--mak"), pDoc->m_csTiVoMAK.GetString(), _T("--out"), csXMLPathName.GetString(), _T("--chunk-2"), QuoteFileName(csTiVoFileName).GetString(), NULL))
+							if (-1 == _tspawnl(_P_WAIT, pDoc->m_csTDCatPath.GetString(), pDoc->m_csTDCatPath.GetString(), _T("--mak"), TiVoFile.GetMAK(), _T("--out"), csXMLPathName.GetString(), _T("--chunk-2"), QuoteFileName(csTiVoFileName).GetString(), NULL))
 								std::cout << "[                   ]  _tspawnlp failed: " /* << strerror(errno) */ << std::endl;
 						if (TRUE == CFile::GetStatus(csXMLPathName, status))
 						{
@@ -653,7 +655,7 @@ UINT CWimTiVoClientDoc::TiVoConvertFileThread(LPVOID lvp)
 							CFile::SetStatus(csXMLPathName, status);
 						}
 
-						if (-1 == _tspawnl(_P_WAIT, pDoc->m_csTiVoDecodePath.GetString(), pDoc->m_csTiVoDecodePath.GetString(), _T("--mak"), pDoc->m_csTiVoMAK.GetString(), _T("--out"), QuoteFileName(csMPEGPathName).GetString(), QuoteFileName(csTiVoFileName).GetString(), NULL))
+						if (-1 == _tspawnl(_P_WAIT, pDoc->m_csTiVoDecodePath.GetString(), pDoc->m_csTiVoDecodePath.GetString(), _T("--mak"), TiVoFile.GetMAK(), _T("--out"), QuoteFileName(csMPEGPathName).GetString(), QuoteFileName(csTiVoFileName).GetString(), NULL))
 							std::cout << "[                   ]  _tspawnlp failed: " /* << strerror(errno) */ << std::endl;
 						if (TRUE == CFile::GetStatus(csMPEGPathName, status))
 						{
