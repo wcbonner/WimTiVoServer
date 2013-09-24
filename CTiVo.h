@@ -33,6 +33,7 @@ public:
     m_Duration(0)
 	{
 	}
+	bool operator==(const cTiVoFile & other) const;
 	// Simple Sorting Routines
 	friend bool cTiVoFileCompareDate(const cTiVoFile & a, const cTiVoFile & b);
 	friend bool cTiVoFileCompareDateReverse(const cTiVoFile & a, const cTiVoFile & b);
