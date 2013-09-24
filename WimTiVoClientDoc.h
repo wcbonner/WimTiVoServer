@@ -22,7 +22,8 @@ protected: // create from serialization only
 
 // Attributes
 public:
-	std::vector<CTiVoContainer> m_TiVoTiVoContainers;
+	CCriticalSection m_ccTiVoContainers;
+	std::vector<CTiVoContainer> m_TiVoContainers;
 	std::vector<cTiVoFile> m_TiVoFiles;
 	CCriticalSection m_ccTiVoServers;
 	std::vector<cTiVoServer> m_TiVoServers;	// List of servers, populated either from the registry or listening for TiVo UDP Beacons

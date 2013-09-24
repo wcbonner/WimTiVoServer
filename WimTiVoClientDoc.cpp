@@ -177,6 +177,20 @@ CWimTiVoClientDoc::CWimTiVoClientDoc()
 			m_TiVoServer = *pServer;
 		m_ccTiVoServers.Unlock();
 	}
+	for (auto index = 0; index < 16; index++)
+	{
+		std::stringstream ssKey;
+		ssKey << "Container-" << index;
+		CString regTiVo(AfxGetApp()->GetProfileString(_T("TiVo"),CString(ssKey.str().c_str()),_T("")));
+		if (!regTiVo.IsEmpty())
+		{
+			CTiVoContainer myContainer;
+			myContainer.ReadTXT(CStringA(regTiVo).GetString());
+			m_ccTiVoContainers.Lock();
+			m_TiVoContainers.push_back(myContainer);
+			m_ccTiVoContainers.Unlock();
+		}
+	}
 
 	//PWSTR pszPath[MAX_PATH];
 	//SHGetKnownFolderPath(FOLDERID_Videos, 0, NULL, pszPath); // This is the new format of this command.
@@ -231,6 +245,14 @@ CWimTiVoClientDoc::~CWimTiVoClientDoc()
 		AfxGetApp()->WriteProfileString(_T("TiVo"), CString(ssKey.str().c_str()), CString(TiVo->WriteTXT().c_str()));
 	}
 	m_ccTiVoServers.Unlock();
+	m_ccTiVoContainers.Lock();
+	for (auto Container = m_TiVoContainers.begin(); Container != m_TiVoContainers.end(); Container++)
+	{
+		std::stringstream ssKey;
+		ssKey << "Container-" << (Container - m_TiVoContainers.begin());
+		AfxGetApp()->WriteProfileString(_T("TiVo"), CString(ssKey.str().c_str()), CString(Container->WriteTXT().c_str()));
+	}
+	m_ccTiVoContainers.Unlock();
 	AfxGetApp()->WriteProfileString(_T("TiVo"), _T("TiVoServerName"), CString(m_TiVoServer.m_machine.c_str()));
 	AfxGetApp()->WriteProfileString(_T("TiVo"),_T("TiVoFileDestination"),m_csTiVoFileDestination);
 	AfxGetApp()->WriteProfileInt(_T("TiVo"), _T("LogFile"), LogFileClose());
@@ -381,10 +403,12 @@ bool CWimTiVoClientDoc::GetNowPlaying(void)
 	csURL = CString(ss.str().c_str());
 
 	if (m_LogFile.is_open())
-		m_LogFile << "[" << getTimeISO8601() << "] XML_Parse_TiVoNowPlaying: " << CStringA(csURL).GetString() << std::endl;
+		m_LogFile << "[" << getTimeISO8601() << "] XML_Parse_TiVoNowPlaying: " << CStringA(csURL).GetString() << " ContainerCount: " << m_TiVoContainers.size() << std::endl;
 
 	m_TiVoFiles.clear();
-	XML_Parse_TiVoNowPlaying(csURL, CString(m_TiVoServer.m_MAK.c_str()), m_TiVoFiles, m_TiVoTiVoContainers, m_InternetSession);
+	m_ccTiVoContainers.Lock();
+	XML_Parse_TiVoNowPlaying(csURL, CString(m_TiVoServer.m_MAK.c_str()), m_TiVoFiles, m_TiVoContainers, m_InternetSession);
+	m_ccTiVoContainers.Unlock();
 
 	m_TiVoTotalTime = CTimeSpan::CTimeSpan();
 	m_TiVoTotalSize = 0;
@@ -395,7 +419,7 @@ bool CWimTiVoClientDoc::GetNowPlaying(void)
 	}
 
 	if (m_LogFile.is_open())
-		m_LogFile << "[" << getTimeISO8601() << "] TiVoNowPlaying Details: Total Time: " << CStringA(m_TiVoTotalTime.Format(_T("%D Days, %H:%M:%S"))).GetString() << " Total Size: " << m_TiVoTotalSize << std::endl;
+		m_LogFile << "[" << getTimeISO8601() << "] TiVoNowPlaying Details: Total Time: " << CStringA(m_TiVoTotalTime.Format(_T("%D Days, %H:%M:%S"))).GetString() << " Total Size: " << m_TiVoTotalSize << " ContainerCount: " << m_TiVoContainers.size() << std::endl;
 	TRACE(__FUNCTION__ " Exiting\n");
 	return false;
 }
@@ -488,9 +512,14 @@ UINT CWimTiVoClientDoc::TiVoBeaconListenThread(LPVOID lvp)
 								csURL.Append(csMediaServerPort);
 								csURL.Append(_T("/TiVoConnect?Command=QueryContainer&Container=%2F"));
 								TRACE(_T("URL: %s\n"), csURL.GetString());
-								TRACE(_T("Container Count: %d\n"),pDoc->m_TiVoTiVoContainers.size());
-								XML_Parse_TiVoNowPlaying(csURL, CString(myServer.m_MAK.c_str()), pDoc->m_TiVoFiles, pDoc->m_TiVoTiVoContainers, pDoc->m_InternetSession);
-								TRACE(_T("Container Count: %d\n"),pDoc->m_TiVoTiVoContainers.size());
+								pDoc->m_ccTiVoContainers.Lock();
+								TRACE(_T("Container Count: %d\n"),pDoc->m_TiVoContainers.size());
+								XML_Parse_TiVoNowPlaying(csURL, CString(myServer.m_MAK.c_str()), pDoc->m_TiVoFiles, pDoc->m_TiVoContainers, pDoc->m_InternetSession);
+								TRACE(_T("Container Count: %d\n"),pDoc->m_TiVoContainers.size());
+								if (pDoc->m_LogFile.is_open())
+									for (auto Container = pDoc->m_TiVoContainers.begin(); Container != pDoc->m_TiVoContainers.end(); Container++)
+										pDoc->m_LogFile << "[                   ] " << Container->WriteTXT().c_str() << std::endl;
+								pDoc->m_ccTiVoContainers.Unlock();
 							}
 						}
 					}

@@ -24,6 +24,9 @@ public:
 	std::string m_MAK;
 	std::string m_ContentType;
 	std::string m_SourceFormat;
+	bool operator==(const CTiVoContainer & other) const;
+	std::string WriteTXT(const char seperator = '\t') const;
+	bool ReadTXT(const std::string & text, const char seperator = '\t');
 };
 class cTiVoFile
 {

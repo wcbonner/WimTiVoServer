@@ -610,7 +610,6 @@ void CWimTiVoClientView::OnTimer(UINT_PTR nIDEvent)
 	else
 		CListView::OnTimer(nIDEvent); // If you pass your own timer event to the parent class it will kill off the timer.
 }
-
 void CWimTiVoClientView::OnTransferLog()
 {
 	CWimTiVoClientDoc * pDoc = GetDocument();
@@ -626,10 +625,33 @@ void CWimTiVoClientView::OnUpdateTransferLog(CCmdUI *pCmdUI)
 	if (pDoc)
 		pCmdUI->SetCheck(pDoc->m_LogFile.is_open());
 }
-
-
 void CWimTiVoClientView::OnTivoFileLocation()
 {
+	//BROWSEINFO bi;
+	//ZeroMemory(&bi, sizeof(BROWSEINFO));
+	//bi.hwndOwner = m_hWnd;
+	//bi.ulFlags   = BIF_RETURNONLYFSDIRS;
+	//LPITEMIDLIST pidl = SHBrowseForFolder(&bi);
+	//BOOL bRet = FALSE;
+	//TCHAR szFolder[MAX_PATH*2];
+	////SHGetFolderPath(NULL, CSIDL_MYVIDEO, NULL, 0, szFolder);
+	//szFolder[0] = _T('\0');
+	//if (pidl)
+	//{
+	//	if (SHGetPathFromIDList(pidl, szFolder))
+	//	{
+	//		bRet = TRUE;
+	//	}
+	//	IMalloc *pMalloc = NULL; 
+	//	if (SUCCEEDED(SHGetMalloc(&pMalloc)) && pMalloc) 
+	//	{  
+	//		pMalloc->Free(pidl);  
+	//		pMalloc->Release(); 
+	//	}
+	//}
+	////Return value is kept in szFolder.
+	//AfxMessageBox(szFolder);
+
 	//CFolderPickerDlg 
 	//CFileDialog myDlg(TRUE,0,0,FOS_PICKFOLDERS);
 	//myDlg.
