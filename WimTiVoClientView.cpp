@@ -33,6 +33,9 @@ IMPLEMENT_DYNCREATE(CWimTiVoClientView, CListView)
 BEGIN_MESSAGE_MAP(CWimTiVoClientView, CListView)
 	ON_WM_CONTEXTMENU()
 	ON_WM_RBUTTONUP()
+	ON_COMMAND(ID_TIVI_NOWPLAYING, &CWimTiVoClientView::OnTiviNowplaying)
+	ON_COMMAND(ID_TIVO_BEACON, &CWimTiVoClientView::OnTivoBeacon)
+	ON_UPDATE_COMMAND_UI(ID_TIVO_BEACON, &CWimTiVoClientView::OnUpdateTivoBeacon)
 END_MESSAGE_MAP()
 
 // CWimTiVoClientView construction/destruction
@@ -126,7 +129,7 @@ void CWimTiVoClientView::OnUpdate(CView* pSender, LPARAM lHint, CObject* pHint)
 		for(auto TiVoFile = pDoc->FilesToGetFromTiVo.begin(); TiVoFile != pDoc->FilesToGetFromTiVo.end(); TiVoFile++)
 		{
 			int nItem = ListCtrl.InsertItem(
-				LVIF_TEXT | LVIF_STATE, // LVIF_IMAGE | 
+				LVIF_TEXT | LVIF_STATE,
 				TiVoFile-pDoc->FilesToGetFromTiVo.begin(), 
 				TiVoFile->GetPathName(), 
 				INDEXTOSTATEIMAGEMASK(1), 
@@ -142,4 +145,44 @@ void CWimTiVoClientView::OnUpdate(CView* pSender, LPARAM lHint, CObject* pHint)
 	}
 	CListView::OnUpdate(pSender, lHint, pHint);
 	TRACE(__FUNCTION__ " Exiting\n");
+}
+
+void CWimTiVoClientView::OnTiviNowplaying()
+{
+	TRACE(__FUNCTION__ "\n");
+	CWimTiVoClientDoc * pDoc = GetDocument();
+	pDoc->GetNowPlaying();
+	// TODO: Add your specialized code here and/or call the base class
+	CListCtrl& ListCtrl = GetListCtrl();
+	if (0 != ListCtrl.DeleteAllItems())
+	{
+		ASSERT(ListCtrl.GetItemCount() == 0);
+		for(auto TiVoFile = pDoc->FilesToGetFromTiVo.begin(); TiVoFile != pDoc->FilesToGetFromTiVo.end(); TiVoFile++)
+		{
+			int nItem = ListCtrl.InsertItem(
+				LVIF_TEXT | LVIF_STATE,
+				TiVoFile-pDoc->FilesToGetFromTiVo.begin(), 
+				TiVoFile->GetPathName(), 
+				INDEXTOSTATEIMAGEMASK(1), 
+				LVIS_STATEIMAGEMASK, 
+				0,
+				NULL);
+			ListCtrl.SetItemText(nItem, 1, TiVoFile->GetTitle());
+			ListCtrl.SetItemText(nItem, 2, TiVoFile->GetEpisodeTitle());
+			ListCtrl.SetItemText(nItem, 3, TiVoFile->GetDescription());
+			ListCtrl.SetItemText(nItem, 4, TiVoFile->GetCaptureDate().Format(_T("%c")));
+			ListCtrl.SetItemText(nItem, 5, CTimeSpan(TiVoFile->GetDuration()/1000).Format(_T("%H:%M:%S")));
+		}
+	}
+	TRACE(__FUNCTION__ " Exiting\n");
+}
+
+void CWimTiVoClientView::OnTivoBeacon()
+{
+	// TODO: Add your command handler code here
+}
+
+void CWimTiVoClientView::OnUpdateTivoBeacon(CCmdUI *pCmdUI)
+{
+	// TODO: Add your command update UI handler code here
 }

@@ -50,6 +50,10 @@ protected:
 	afx_msg void OnContextMenu(CWnd* pWnd, CPoint point);
 	DECLARE_MESSAGE_MAP()
 	virtual void OnUpdate(CView* /*pSender*/, LPARAM /*lHint*/, CObject* /*pHint*/);
+public:
+	afx_msg void OnTiviNowplaying();
+	afx_msg void OnTivoBeacon();
+	afx_msg void OnUpdateTivoBeacon(CCmdUI *pCmdUI);
 };
 
 #ifndef _DEBUG  // debug version in WimTiVoClientView.cpp
