@@ -136,7 +136,7 @@ void cTiVoFile::SetPathName(const CFileFind & csNewPath)
 	wcout << L"[                   ] " << setw(20) << right << L"m_CaptureDate" << L" : " << m_CaptureDate.Format(_T("%c")).GetString() << endl;
 	wcout << L"[                   ] " << setw(20) << right << L"URL" << L" : " << m_csURL.GetString() << endl;
 }
-void cTiVoFile::SetFromTiVoItem(const CString &csTitle, const CString &csEpisodeTitle, const CString &csDescription, const CString &csSourceStation, const CString &csContentURL, const CTime &ctCaptureDate, const CTimeSpan &ctsDuration)
+void cTiVoFile::SetFromTiVoItem(const CString &csTitle, const CString &csEpisodeTitle, const CString &csDescription, const CString &csSourceStation, const CString &csContentURL, const CTime &ctCaptureDate, const CTimeSpan &ctsDuration, const unsigned long long llSourceSize)
 {
 	m_Title = csTitle;
 	m_EpisodeTitle = csEpisodeTitle;
@@ -144,11 +144,13 @@ void cTiVoFile::SetFromTiVoItem(const CString &csTitle, const CString &csEpisode
 	m_csURL = csContentURL;
 	m_CaptureDate = ctCaptureDate;
 	m_Duration = 1000 * ctsDuration.GetTotalSeconds();
+	m_SourceSize = llSourceSize;
+	m_SourceStation = csSourceStation;
 	std::wstringstream ssFileName(std::stringstream::in | std::stringstream::out);
 	ssFileName << csTitle.GetString();
 	if (!csEpisodeTitle.IsEmpty())
 		ssFileName << L" - ''" << csEpisodeTitle.GetString() << L"''";
-	ssFileName << L" (Recorded " << ctCaptureDate.Format(_T("%b %d, %Y, ")).GetString() << csSourceStation.GetString() << L").TiVo";
+	ssFileName << L" (Recorded " << m_CaptureDate.Format(_T("%b %d, %Y, ")).GetString() << m_SourceStation.GetString() << L").TiVo";
 	m_csPathName = ssFileName.str().c_str();
 }
 #ifdef AVCODEC_AVCODEC_H
@@ -364,8 +366,14 @@ void cTiVoFile::GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const
 	pWriter->WriteElementString(NULL, L"startTime", NULL, L"2010-03-27T01:59:58Z");
 	pWriter->WriteElementString(NULL, L"stopTime", NULL, L"2010-03-27T02:30:00Z");
 }
+/////////////////////////////////////////////////////////////////////////////
+// Simple Sorting Routines
 bool cTiVoFileCompareDate(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_CaptureDate > b.m_CaptureDate); }
 bool cTiVoFileCompareDateReverse(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_CaptureDate < b.m_CaptureDate); }
+bool cTiVoFileComparePath(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_csPathName >b.m_csPathName); }
+bool cTiVoFileComparePathReverse(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_csPathName < b.m_csPathName); }
+bool cTiVoFileCompareSize(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_SourceSize > b.m_SourceSize); }
+bool cTiVoFileCompareSizeReverse(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_SourceSize < b.m_SourceSize); }
 /////////////////////////////////////////////////////////////////////////////
 void XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, std::vector<cTiVoFile> & TiVoFileList)
 {
@@ -393,6 +401,7 @@ void XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, std::vector<cTiVoFile>
 				const CString ccsItem(_T("Item"));
 				const CString ccsTitle(_T("Title"));
 				const CString ccsDuration(_T("Duration"));
+				const CString ccsSourceSize(_T("SourceSize"));
 				const CString ccsCaptureDate(_T("CaptureDate"));
 				const CString ccsEpisodeTitle(_T("EpisodeTitle"));
 				const CString ccsDescription(_T("Description"));
@@ -411,6 +420,7 @@ void XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, std::vector<cTiVoFile>
 				CString csContentURL;
 				CTime ctCaptureDate;
 				CTimeSpan ctsDuration;
+				unsigned long long llSourceSize;
 				//read until there are no more nodes 
 				while (S_OK == (hr = pReader->Read(&nodeType))) 
 				{ 
@@ -470,12 +480,18 @@ void XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, std::vector<cTiVoFile>
 												auto tempDuration = _wtoi(pwszValue);
 												ctsDuration = CTimeSpan(0,0,0,tempDuration/1000);
 											}
+											else if (!ccsSourceSize.Compare(pwszLocalName))
+											{
+												std::wstringstream ss;
+												ss << pwszValue;
+												ss >> llSourceSize;
+											}
 											else if (!ccsCaptureDate.Compare(pwszLocalName))
 											{
-												std::wstringstream ss(std::stringstream::in | std::stringstream::out);
+												std::wstringstream ss;
 												ss << pwszValue;
 												ss << showbase << hex;
-												long long SecondsSinceEpoch = 0;
+												long long SecondsSinceEpoch;
 												ss >> SecondsSinceEpoch;
 												long SecondsFromUTC;
 												_get_timezone(&SecondsFromUTC);
@@ -525,7 +541,7 @@ void XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, std::vector<cTiVoFile>
 									std::wcout << L"[                   ] FileName: " << ssFileName.str().c_str() << endl;
 									#endif
 									cTiVoFile MyFile;
-									MyFile.SetFromTiVoItem(csTitle, csEpisodeTitle, csDescription, csSourceStation, csContentURL, ctCaptureDate, ctsDuration);
+									MyFile.SetFromTiVoItem(csTitle, csEpisodeTitle, csDescription, csSourceStation, csContentURL, ctCaptureDate, ctsDuration, llSourceSize);
 									TiVoFileList.push_back(MyFile);
 								}
 							}
