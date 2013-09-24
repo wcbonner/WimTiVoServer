@@ -668,7 +668,9 @@ public:
 			{
 				while (tag = av_dict_get(fmt_ctx->metadata, "", tag, AV_DICT_IGNORE_SUFFIX))
 				{
-					// cout << "[                   ] " << setw(20) << right << tag->key << " : " << tag->value << endl;
+					#ifdef _DEBUG
+					cout << "[                   ] " << setw(20) << right << tag->key << " : " << tag->value << endl;
+					#endif
 					if (_stricmp("title", tag->key) == 0)
 						Title = CString(tag->value);
 					if (_stricmp("WM/SubTitle", tag->key) == 0)
@@ -699,10 +701,9 @@ public:
 			wcout << L"[                   ] " << setw(20) << right << L"fname" << L" : " << fname << endl;
 			wcout << L"[                   ] " << setw(20) << right << L"ext" << L" : " << ext << endl;
 			csURL = _T("/TiVoConnect/TivoNowPlaying/");
-			csURL.Append(drive);
-			csURL.Append(dir);
-			csURL.Append(fname);
-			csURL.Append(ext);
+			_tmakepath_s(path_buffer, _MAX_PATH, drive, dir, fname, ext);
+			csURL.Append(path_buffer);
+			csURL.Replace(_T("\\"), _T("/"));
 			// see WinHttpCreateUrl for useful info http://msdn.microsoft.com/en-us/library/windows/desktop/aa384093(v=vs.85).aspx
 			if (Title.IsEmpty())
 				Title = fname;
@@ -1937,15 +1938,15 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 				ZeroMemory(buffer, dwSize);
 			}
 
-			//std::vector<cTiVoFile> TiVoFileList;
-			PopulateTiVoFileList(TiVoFileList);
-
 			if (S_OK == CoInitializeEx(0, COINIT_MULTITHREADED)) // COINIT_APARTMENTTHREADED
 			{
 				//XML_Test_Read_ElementsOnly();
 				//XML_Test_Read();
 				//XML_Test_Write();
 				//XML_Test_Write_InMemory();
+
+				//std::vector<cTiVoFile> TiVoFileList;
+				PopulateTiVoFileList(TiVoFileList);
 
 				std::vector<CString> myURLS;
 				myURLS.push_back(CString(_T("http://192.168.0.108/TiVoConnect?Command=QueryContainer&Container=/")));
