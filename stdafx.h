@@ -37,7 +37,7 @@
 #include <vector>
 //#include <deque>
 //#include <map>
-//#include <algorithm>
+#include <algorithm>
 #include <signal.h>
 #include <memory> // for smart pointers
 #include <xmllite.h>
