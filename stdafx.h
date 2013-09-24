@@ -29,14 +29,17 @@
 
 // TODO: reference additional headers your program requires here
 #include <afxsock.h>		// MFC socket extensions
+#include <afxinet.h>
 #include <iostream>
 #include <iomanip>
 #include <fstream>
 #include <sstream>
-//#include <vector>
+#include <vector>
 //#include <deque>
 //#include <map>
 //#include <algorithm>
 #include <signal.h>
+#include <xmllite.h>
+#pragma comment(lib, "xmllite")
 
 #include "WimTiVoServerEventLog.h"

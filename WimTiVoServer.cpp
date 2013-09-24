@@ -12,8 +12,16 @@
 // ffmpeg getting started: http://ffmpeg.org/trac/ffmpeg/wiki/Using%20libav*
 // some possible settings info: http://pytivo.sourceforge.net/forum/hd-tivo-ideal-settings-t40.html
 
-// Wim's TiVoHD (MAK) Media Access Key: 1760168186
 // Logon to Tivo with username: "tivo" password: MAK
+// Wim's TiVoHD (MAK) Media Access Key: 1760168186
+// Mom & Dad's TiVoHD (MAK) Media Access Key: 9371539867
+// [2012-12-26T03:10:42] 192.168.1.11 tivoconnect=1 swversion=11.0k-01-2-652 method=broadcast identity=6520201806EEAAE machine=Living Room platform=tcd/Series3 services=TiVoMediaServer:80/http
+// [2012-12-26T06:32:43] 192.168.1.48 TiVoConnect=1 Machine=HPQUAD Identity={E2C4F367-F194-4C8D-84B6-EBDF47CCF26E} Method=Broadcast Platform=pc/WinNT:6.1.7601 Services=TiVoMediaServer:8080/http
+// [2013-01-26T03:47:21] 192.168.0.5 TiVoConnect=1 Machine=INSPIRON Identity={9DA17E3D-FEC4-4533-9F0F-E2DB35EAA9B1} Method=Broadcast Platform=pc/WinNT:6.1.7601 Services=TiVoMediaServer:8080/http
+// [2013-01-26T03:47:21] 192.168.0.108 tivoconnect=1 swversion=11.0k-01-2-652 method=broadcast identity=6520001802E00C3 machine=TivoHD platform=tcd/Series3 services=TiVoMediaServer:80/http
+
+// STL Reference I like to use: http://cplusplus.com/reference/fstream/ofstream/ofstream/
+// I'm going to try to use XMLLite for XML Processing. http://msdn.microsoft.com/en-us/library/windows/desktop/ms752864(v=vs.85).aspx
 
 #include "stdafx.h"
 #include "WimTiVoServer.h"
@@ -175,32 +183,125 @@ int GetTiVoConnect(SOCKET DataSocket)
 	char MyHostName[255] = {0}; // winsock hostname used for data recordkeeping
 	gethostname(MyHostName,sizeof(MyHostName)); 
 	char XMLDataBuff[1024*11];
-	strcpy(XMLDataBuff,"<?xml version=\"1.0\" encoding=\"iso-8859-1\" ?>\n");
-	strcat(XMLDataBuff,"<TiVoContainer>\n");
-	strcat(XMLDataBuff,"  <Details>\n");
-	strcat(XMLDataBuff,"    <Title>"); strcat(XMLDataBuff, MyHostName); strcat(XMLDataBuff,"</Title>\n");
-	strcat(XMLDataBuff,"    <ContentType>x-tivo-container/tivo-server</ContentType>\n");
-	strcat(XMLDataBuff,"    <SourceFormat>x-tivo-container/folder</SourceFormat>\n");
-	strcat(XMLDataBuff,"    <TotalItems>1</TotalItems>\n");
-	strcat(XMLDataBuff,"  </Details>\n");
-	strcat(XMLDataBuff,"  <Item>\n");
-	strcat(XMLDataBuff,"    <Details>\n");
-	strcat(XMLDataBuff,"      <Title>"); strcat(XMLDataBuff, MyHostName); strcat(XMLDataBuff," (WimTiVoServer)</Title>\n");
-	strcat(XMLDataBuff,"      <ContentType>x-tivo-container/tivo-videos</ContentType>\n");
-	strcat(XMLDataBuff,"      <SourceFormat>x-tivo-container/folder</SourceFormat>\n");
-	strcat(XMLDataBuff,"    </Details>\n");
-	strcat(XMLDataBuff,"    <Links>\n");
-	strcat(XMLDataBuff,"      <Content>\n");
-	strcat(XMLDataBuff,"        <Url>/TiVoConnect?Command=QueryContainer&amp;Container=%2FTivoNowPlaying</Url>\n");
-	strcat(XMLDataBuff,"        <ContentType>x-tivo-container/tivo-videos</ContentType>\n");
-	strcat(XMLDataBuff,"      </Content>\n");
-	strcat(XMLDataBuff,"    </Links>\n");
-	strcat(XMLDataBuff,"  </Item>\n");
-	strcat(XMLDataBuff,"  <ItemStart>0</ItemStart>\n");
-	strcat(XMLDataBuff,"  <ItemCount>1</ItemCount>\n");
-	strcat(XMLDataBuff,"</TiVoContainer>\n");
-//	strcat(XMLDataBuff,"<!-- Copyright © 2003-2010 TiVo Inc.-->\n");
 
+	CComPtr<IXmlWriter> pWriter;
+	CreateXmlWriter(__uuidof(IXmlWriter), (void**) &pWriter, NULL);
+	// from: http://stackoverflow.com/questions/3037946/how-can-i-store-xml-in-buffer-using-xmlite
+	CComPtr<IStream> spMemoryStream;
+	// Opens writeable output stream.
+	spMemoryStream.Attach(::SHCreateMemStream(NULL, 0));
+	if (spMemoryStream != NULL)
+	{
+		CComPtr<IXmlWriterOutput> pWriterOutput;
+		CreateXmlWriterOutputWithEncodingName(spMemoryStream, NULL, L"UTF-8", &pWriterOutput);
+		pWriter->SetOutput(pWriterOutput);
+		pWriter->SetProperty(XmlWriterProperty_Indent, TRUE);
+		pWriter->WriteStartDocument(XmlStandalone_Omit);
+			pWriter->WriteStartElement(NULL,_T("TiVoContainer"),_T("http://www.tivo.com/developer/calypso-protocol-1.6/"));
+
+				pWriter->WriteStartElement(NULL,_T("Details"),NULL);
+					pWriter->WriteStartElement(NULL,_T("ContentType"),NULL);
+						pWriter->WriteString(_T("x-tivo-container/tivo-server"));
+					pWriter->WriteFullEndElement();
+					pWriter->WriteStartElement(NULL,_T("SourceFormat"),NULL);
+						pWriter->WriteString(_T("x-tivo-container/tivo-dvr"));
+					pWriter->WriteFullEndElement();
+					pWriter->WriteStartElement(NULL,_T("Title"),NULL);
+						pWriter->WriteString(CString(MyHostName).GetString());
+					pWriter->WriteFullEndElement();
+					pWriter->WriteStartElement(NULL,_T("TotalItems"),NULL);
+						pWriter->WriteString(_T("1"));
+					pWriter->WriteFullEndElement();
+				pWriter->WriteFullEndElement();	// Details
+
+				pWriter->WriteStartElement(NULL,_T("Item"),NULL);
+					pWriter->WriteStartElement(NULL,_T("Details"),NULL);
+						pWriter->WriteStartElement(NULL,_T("ContentType"),NULL);
+							pWriter->WriteString(_T("x-tivo-container/tivo-videos"));
+						pWriter->WriteFullEndElement();
+						pWriter->WriteStartElement(NULL,_T("SourceFormat"),NULL);
+							pWriter->WriteString(_T("x-tivo-container/tivo-dvr"));
+						pWriter->WriteFullEndElement();
+						pWriter->WriteStartElement(NULL,_T("Title"),NULL);
+							pWriter->WriteString(CString(MyHostName).GetString());
+						pWriter->WriteFullEndElement();
+						pWriter->WriteStartElement(NULL,_T("UniqueId"),NULL);
+							pWriter->WriteString(_T("TivoHD"));
+						pWriter->WriteFullEndElement();
+					pWriter->WriteFullEndElement();	// Details
+					pWriter->WriteStartElement(NULL,_T("Links"),NULL);
+						pWriter->WriteStartElement(NULL,_T("Content"),NULL);
+							pWriter->WriteStartElement(NULL,_T("Url"),NULL);
+								pWriter->WriteString(_T("/TiVoConnect?Command=QueryContainer&Container=%2FNowPlaying"));
+								//pWriter->WriteString(_T("https://192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=%2FNowPlaying"));
+							pWriter->WriteFullEndElement();
+							pWriter->WriteStartElement(NULL,_T("ContentType"),NULL);
+								pWriter->WriteString(_T("x-tivo-container/tivo-videos"));
+							pWriter->WriteFullEndElement();
+						pWriter->WriteFullEndElement();	// Content
+					pWriter->WriteFullEndElement();	// Links
+				pWriter->WriteFullEndElement();	// Item
+
+				pWriter->WriteStartElement(NULL,_T("ItemStart"),NULL);
+					pWriter->WriteString(_T("0"));
+				pWriter->WriteFullEndElement();
+				pWriter->WriteStartElement(NULL,_T("ItemCount"),NULL);
+					pWriter->WriteString(_T("1"));
+				pWriter->WriteFullEndElement();
+
+			pWriter->WriteFullEndElement();	// TiVoContainer
+		pWriter->WriteEndDocument();
+		pWriter->Flush();
+
+		// Allocates enough memeory for the xml content.
+		STATSTG ssStreamData = {0};
+		spMemoryStream->Stat(&ssStreamData, STATFLAG_NONAME);
+		SIZE_T cbSize = ssStreamData.cbSize.LowPart;
+
+		if (cbSize >= sizeof(XMLDataBuff))
+			cbSize = sizeof(XMLDataBuff)-1;
+
+		LPWSTR pwszContent = (WCHAR*) new BYTE[cbSize + sizeof(WCHAR)];
+		if (pwszContent == NULL)
+			return E_OUTOFMEMORY;
+
+		// Copies the content from the stream to the buffer.
+		LARGE_INTEGER position;
+		position.QuadPart = 0;
+		spMemoryStream->Seek(position, STREAM_SEEK_SET, NULL);
+
+		ULONG cbRead;
+		spMemoryStream->Read(XMLDataBuff, cbSize, &cbRead);
+		XMLDataBuff[cbSize] = '\0';
+	}
+	else
+	{
+		strcpy(XMLDataBuff,"<?xml version=\"1.0\" encoding=\"iso-8859-1\" ?>\n");
+		strcat(XMLDataBuff,"<TiVoContainer>\n");
+		strcat(XMLDataBuff,"  <Details>\n");
+		strcat(XMLDataBuff,"    <Title>"); strcat(XMLDataBuff, MyHostName); strcat(XMLDataBuff,"</Title>\n");
+		strcat(XMLDataBuff,"    <ContentType>x-tivo-container/tivo-server</ContentType>\n");
+		strcat(XMLDataBuff,"    <SourceFormat>x-tivo-container/folder</SourceFormat>\n");
+		strcat(XMLDataBuff,"    <TotalItems>1</TotalItems>\n");
+		strcat(XMLDataBuff,"  </Details>\n");
+		strcat(XMLDataBuff,"  <Item>\n");
+		strcat(XMLDataBuff,"    <Details>\n");
+		strcat(XMLDataBuff,"      <Title>"); strcat(XMLDataBuff, MyHostName); strcat(XMLDataBuff," (WimTiVoServer)</Title>\n");
+		strcat(XMLDataBuff,"      <ContentType>x-tivo-container/tivo-videos</ContentType>\n");
+		strcat(XMLDataBuff,"      <SourceFormat>x-tivo-container/folder</SourceFormat>\n");
+		strcat(XMLDataBuff,"    </Details>\n");
+		strcat(XMLDataBuff,"    <Links>\n");
+		strcat(XMLDataBuff,"      <Content>\n");
+		strcat(XMLDataBuff,"        <Url>/TiVoConnect?Command=QueryContainer&amp;Container=%2FTivoNowPlaying</Url>\n");
+		strcat(XMLDataBuff,"        <ContentType>x-tivo-container/tivo-videos</ContentType>\n");
+		strcat(XMLDataBuff,"      </Content>\n");
+		strcat(XMLDataBuff,"    </Links>\n");
+		strcat(XMLDataBuff,"  </Item>\n");
+		strcat(XMLDataBuff,"  <ItemStart>0</ItemStart>\n");
+		strcat(XMLDataBuff,"  <ItemCount>1</ItemCount>\n");
+		strcat(XMLDataBuff,"</TiVoContainer>\n");
+		//strcat(XMLDataBuff,"<!-- Copyright © 2003-2010 TiVo Inc.-->\n");
+	}
 	/* Create HTTP Header */
 	char tmpBuff[1024];
 	char HttpResponse[1024];
@@ -264,12 +365,37 @@ int GetTiVoQueryFormats(SOCKET DataSocket)
 	nRet = send(DataSocket, XMLDataBuff, strlen(XMLDataBuff),0);
 	return(0);
 }
+string TiVoFileItemtoXML(void)
+{
+	ostringstream XMLItem;
+	XMLItem << "<Item>\n";
+
+	//time_t timer = TheTime;
+	//struct tm * UTC = gmtime(&timer);
+	//if (UTC != NULL)
+	//{
+	//	ISOTime.fill('0');
+	//	ISOTime << UTC->tm_year+1900 << "-";
+	//	ISOTime.width(2);
+	//	ISOTime << UTC->tm_mon+1 << "-";
+	//	ISOTime.width(2);
+	//	ISOTime << UTC->tm_mday << " ";
+	//	ISOTime.width(2);
+	//	ISOTime << UTC->tm_hour << ":";
+	//	ISOTime.width(2);
+	//	ISOTime << UTC->tm_min << ":";
+	//	ISOTime.width(2);
+	//	ISOTime << UTC->tm_sec;
+	//}
+	XMLItem << "</Item>\n";
+	return(XMLItem.str());
+}
 int GetTivoNowPlaying(SOCKET DataSocket)
 {
 	TRACE(__FUNCTION__ "\n");
 	int rval = 0;
 	char MyHostName[255] = {0}; // winsock hostname used for data recordkeeping
-	gethostname(MyHostName,sizeof(MyHostName)); 
+	gethostname(MyHostName,sizeof(MyHostName));
 	char XMLDataBuff[1024*11];
 	strcpy(XMLDataBuff,"<?xml version=\"1.0\" encoding=\"iso-8859-1\" ?>\n");
 	strcat(XMLDataBuff,"<TiVoContainer>\n");
@@ -337,7 +463,6 @@ int GetTivoNowPlaying(SOCKET DataSocket)
 	strcat(XMLDataBuff,"      </TiVoVideoDetails>\n");
 	strcat(XMLDataBuff,"    </Links>\n");
 	strcat(XMLDataBuff,"  </Item>\n");
-
 
 	strcat(XMLDataBuff,"</TiVoContainer>\n");
 
@@ -1203,11 +1328,60 @@ VOID ServiceMain(DWORD argc, LPTSTR * argv)
 	}
 }
 /////////////////////////////////////////////////////////////////////////////
+HRESULT WriteAttributes(IXmlReader* pReader) 
+{ 
+    const WCHAR* pwszPrefix; 
+    const WCHAR* pwszLocalName; 
+    const WCHAR* pwszValue; 
+    HRESULT hr = pReader->MoveToFirstAttribute(); 
+ 
+    if (S_FALSE == hr) 
+        return hr; 
+    if (S_OK != hr) 
+    { 
+        wprintf(L"Error moving to first attribute, error is %08.8lx", hr); 
+        return hr; 
+    } 
+    else 
+    { 
+        while (TRUE) 
+        { 
+            if (!pReader->IsDefault()) 
+            { 
+                UINT cwchPrefix; 
+                if (FAILED(hr = pReader->GetPrefix(&pwszPrefix, &cwchPrefix))) 
+                { 
+                    wprintf(L"Error getting prefix, error is %08.8lx", hr); 
+                    return hr; 
+                } 
+                if (FAILED(hr = pReader->GetLocalName(&pwszLocalName, NULL))) 
+                { 
+                    wprintf(L"Error getting local name, error is %08.8lx", hr); 
+                    return hr; 
+                } 
+                if (FAILED(hr = pReader->GetValue(&pwszValue, NULL))) 
+                { 
+                    wprintf(L"Error getting value, error is %08.8lx", hr); 
+                    return hr; 
+                } 
+                if (cwchPrefix > 0) 
+                    wprintf(L"Attr: %s:%s=\"%s\" \n", pwszPrefix, pwszLocalName, pwszValue); 
+                else 
+                    wprintf(L"Attr: %s=\"%s\" \n", pwszLocalName, pwszValue); 
+            } 
+ 
+            if (S_OK != pReader->MoveToNextAttribute()) 
+                break; 
+        } 
+    } 
+    return hr; 
+} 
+/////////////////////////////////////////////////////////////////////////////
 volatile bool bRun = true;
 void SignalHandler(int signal)
 {
 	bRun = false;
-	cerr << "[" << getTimeISO8601() << "] SIGINT: Caught Ctrl-C, cleaning up and quitting." << endl;
+	cerr << "[" << getTimeISO8601() << "] SIGINT: Caught Ctrl-C, cleaning up and moving on." << endl;
 	CStringA csTiVoPacket("tivoconnect=0\r\n");
 	TiVoBeaconSend(csTiVoPacket);
 }
@@ -1481,6 +1655,522 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 					ZeroMemory(buffer, dwSize);
 				}
 
+				if (S_OK == CoInitializeEx(0, COINIT_MULTITHREADED)) // COINIT_APARTMENTTHREADED
+				{
+					//#define SAFE_RELEASE(I)         do { if (I){ I->Release(); } I = NULL; } while(0) 
+					//HRESULT hr = S_OK;
+					//IXmlReader *pReader = NULL; 
+					//if (FAILED(hr = CreateXmlReader(__uuidof(IXmlReader), (void**) &pReader, NULL))) 
+					//	cout << "[" << getTimeISO8601() << "] Error creating xml reader, error is: " << hex << hr << endl;
+					//	//wprintf(L"Error creating xml reader, error is %08.8lx", hr); 
+					//else
+					//{
+					//	if (FAILED(hr = pReader->SetProperty(XmlReaderProperty_DtdProcessing, DtdProcessing_Prohibit))) 
+					//		cout << "[" << getTimeISO8601() << "] Error setting XmlReaderProperty_DtdProcessing, error is: " << hex << hr << endl;
+					//	else
+					//	{
+					//		//Open read-only input stream 
+					//		IStream *pFileStream = NULL; 
+					//		if (FAILED(hr = SHCreateStreamOnFile(_T("WimTivoServer.0.xml"), STGM_READ, &pFileStream))) 
+					//		//if (FAILED(hr = SHCreateStreamOnFile(_T("Stocks.xml"), STGM_READ, &pFileStream))) 
+					//			cout << "[" << getTimeISO8601() << "] Error creating file reader, error is: " << hex << hr << endl;
+					//		else
+					//		{
+					//			if (FAILED(hr = pReader->SetInput(pFileStream))) 
+					//				cout << "[" << getTimeISO8601() << "] Error setting input for reader, error is: " << hex << hr << endl;
+					//			else
+					//			{
+					// 				XmlNodeType nodeType; 
+					//				const WCHAR* pwszPrefix; 
+					//				const WCHAR* pwszLocalName; 
+					//				const WCHAR* pwszValue; 
+					//				UINT cwchPrefix; 
+					//				//read until there are no more nodes 
+					//				while (S_OK == (hr = pReader->Read(&nodeType))) 
+					//				{ 
+					//					switch (nodeType) 
+					//					{ 
+					//					case XmlNodeType_XmlDeclaration: 
+					//						wprintf(L"XmlDeclaration\n"); 
+					//						if (FAILED(hr = WriteAttributes(pReader))) 
+					//							wprintf(L"Error writing attributes, error is %08.8lx", hr); 
+					//						break; 
+					//					case XmlNodeType_Element: 
+					//						if (FAILED(hr = pReader->GetPrefix(&pwszPrefix, &cwchPrefix))) 
+					//							wprintf(L"Error getting prefix, error is %08.8lx", hr); 
+					//						if (FAILED(hr = pReader->GetLocalName(&pwszLocalName, NULL))) 
+					//							wprintf(L"Error getting local name, error is %08.8lx", hr); 
+					//						if (cwchPrefix > 0) 
+					//							wprintf(L"Element: %s:%s\n", pwszPrefix, pwszLocalName); 
+					//						else 
+					//							wprintf(L"Element: %s\n", pwszLocalName); 
+ 
+					//						if (FAILED(hr = WriteAttributes(pReader))) 
+					//							wprintf(L"Error writing attributes, error is %08.8lx", hr); 
+	
+					//						if (pReader->IsEmptyElement() ) 
+					//							wprintf(L" (empty)"); 
+					//						break; 
+					//					case XmlNodeType_EndElement: 
+					//						if (FAILED(hr = pReader->GetPrefix(&pwszPrefix, &cwchPrefix))) 
+					//							wprintf(L"Error getting prefix, error is %08.8lx", hr); 
+					//						if (FAILED(hr = pReader->GetLocalName(&pwszLocalName, NULL))) 
+					//							wprintf(L"Error getting local name, error is %08.8lx", hr); 
+					//						if (cwchPrefix > 0) 
+					//							wprintf(L"End Element: %s:%s\n", pwszPrefix, pwszLocalName); 
+					//						else 
+					//							wprintf(L"End Element: %s\n", pwszLocalName); 
+					//						break; 
+					//					case XmlNodeType_Text: 
+					//					case XmlNodeType_Whitespace: 
+					//						if (FAILED(hr = pReader->GetValue(&pwszValue, NULL))) 
+					//							wprintf(L"Error getting value, error is %08.8lx", hr); 
+					//						wprintf(L"Text: >%s<\n", pwszValue); 
+					//						break; 
+					//					case XmlNodeType_CDATA: 
+					//						if (FAILED(hr = pReader->GetValue(&pwszValue, NULL))) 
+					//							wprintf(L"Error getting value, error is %08.8lx", hr); 
+					//						wprintf(L"CDATA: %s\n", pwszValue); 
+					//						break; 
+					//					case XmlNodeType_ProcessingInstruction: 
+					//						if (FAILED(hr = pReader->GetLocalName(&pwszLocalName, NULL))) 
+					//							wprintf(L"Error getting name, error is %08.8lx", hr); 
+					//						if (FAILED(hr = pReader->GetValue(&pwszValue, NULL))) 
+					//							wprintf(L"Error getting value, error is %08.8lx", hr); 
+					//						wprintf(L"Processing Instruction name:%s value:%s\n", pwszLocalName, pwszValue); 
+					//						break; 
+					//					case XmlNodeType_Comment: 
+					//						if (FAILED(hr = pReader->GetValue(&pwszValue, NULL))) 
+					//							wprintf(L"Error getting value, error is %08.8lx", hr); 
+					//						wprintf(L"Comment: %s\n", pwszValue); 
+					//						break; 
+					//					case XmlNodeType_DocumentType: 
+					//						wprintf(L"DOCTYPE is not printed\n"); 
+					//						break; 
+					//					} 
+					//				} 
+					//			}
+					//		}
+					//		SAFE_RELEASE(pFileStream); 
+					//	}
+					//}
+					//SAFE_RELEASE(pReader); 
+
+					//IXmlWriter *pWriter = NULL; 
+					//if (FAILED(hr = CreateXmlWriter(__uuidof(IXmlWriter), (void**) &pWriter, NULL))) 
+					//	cout << "[" << getTimeISO8601() << "] Error creating xml writer, error is: " << hex << hr << endl;
+					//else
+					//{
+					//	// from: http://stackoverflow.com/questions/3037946/how-can-i-store-xml-in-buffer-using-xmlite
+					//	CComPtr<IStream> spMemoryStream;
+					//	// Opens writeable output stream.
+					//	spMemoryStream.Attach(::SHCreateMemStream(NULL, 0));
+					//	if (spMemoryStream != NULL)
+					//	{
+					//		CComPtr<IXmlWriterOutput> pWriterOutput;
+					//		CreateXmlWriterOutputWithEncodingName(spMemoryStream, NULL, L"utf-16", &pWriterOutput);
+					//		pWriter->SetOutput(pWriterOutput);
+					//		pWriter->SetProperty(XmlWriterProperty_Indent, TRUE);
+					//		pWriter->WriteStartDocument(XmlStandalone_Omit);
+					//			pWriter->WriteStartElement(NULL,_T("TiVoContainer"),_T("http://www.tivo.com/developer/calypso-protocol-1.6/"));
+					//				pWriter->WriteStartElement(NULL,_T("Details"),NULL);
+					//					pWriter->WriteStartElement(NULL,_T("ContentType"),NULL);
+					//						pWriter->WriteString(_T("x-tivo-container/tivo-server"));
+					//					pWriter->WriteFullEndElement();
+					//					pWriter->WriteStartElement(NULL,_T("SourceFormat"),NULL);
+					//						pWriter->WriteString(_T("x-tivo-container/tivo-dvr"));
+					//					pWriter->WriteFullEndElement();
+					//					pWriter->WriteStartElement(NULL,_T("Title"),NULL);
+					//						pWriter->WriteString(_T("TivoHD"));
+					//					pWriter->WriteFullEndElement();
+					//					pWriter->WriteStartElement(NULL,_T("TotalItems"),NULL);
+					//						pWriter->WriteString(_T("1"));
+					//					pWriter->WriteFullEndElement();
+					//				pWriter->WriteFullEndElement();	// Details
+
+					//				pWriter->WriteStartElement(NULL,_T("ItemStart"),NULL);
+					//					pWriter->WriteString(_T("0"));
+					//				pWriter->WriteFullEndElement();
+					//				pWriter->WriteStartElement(NULL,_T("ItemCount"),NULL);
+					//					pWriter->WriteString(_T("1"));
+					//				pWriter->WriteFullEndElement();
+
+					//				pWriter->WriteStartElement(NULL,_T("Item"),NULL);
+					//					pWriter->WriteStartElement(NULL,_T("Details"),NULL);
+					//						pWriter->WriteStartElement(NULL,_T("ContentType"),NULL);
+					//							pWriter->WriteString(_T("x-tivo-container/tivo-videos"));
+					//						pWriter->WriteFullEndElement();
+					//						pWriter->WriteStartElement(NULL,_T("SourceFormat"),NULL);
+					//							pWriter->WriteString(_T("x-tivo-container/tivo-dvr"));
+					//						pWriter->WriteFullEndElement();
+					//						pWriter->WriteStartElement(NULL,_T("Title"),NULL);
+					//							pWriter->WriteString(_T("TivoHD"));
+					//						pWriter->WriteFullEndElement();
+					//						pWriter->WriteStartElement(NULL,_T("UniqueId"),NULL);
+					//							pWriter->WriteString(_T("TivoHD"));
+					//						pWriter->WriteFullEndElement();
+					//					pWriter->WriteFullEndElement();	// Details
+					//					pWriter->WriteStartElement(NULL,_T("Links"),NULL);
+					//						pWriter->WriteStartElement(NULL,_T("Content"),NULL);
+					//							pWriter->WriteStartElement(NULL,_T("Url"),NULL);
+					//								pWriter->WriteString(_T("https://192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=%2FNowPlaying"));
+					//							pWriter->WriteFullEndElement();
+					//							pWriter->WriteStartElement(NULL,_T("ContentType"),NULL);
+					//								pWriter->WriteString(_T("x-tivo-container/tivo-videos"));
+					//							pWriter->WriteFullEndElement();
+					//						pWriter->WriteFullEndElement();	// Content
+					//					pWriter->WriteFullEndElement();	// Links
+					//				pWriter->WriteFullEndElement();	// Item
+					//			pWriter->WriteFullEndElement();	// TiVoContainer
+					//		pWriter->WriteEndDocument();
+					//		pWriter->Flush();
+
+					//		// Allocates enough memeory for the xml content.
+					//		STATSTG ssStreamData = {0};
+					//		spMemoryStream->Stat(&ssStreamData, STATFLAG_NONAME);
+					//		SIZE_T cbSize = ssStreamData.cbSize.LowPart;
+					//		LPWSTR pwszContent = (WCHAR*) new BYTE[cbSize + sizeof(WCHAR)];
+					//		if (pwszContent == NULL)
+					//			return E_OUTOFMEMORY;
+
+					//		// Copies the content from the stream to the buffer.
+					//		LARGE_INTEGER position;
+					//		position.QuadPart = 0;
+					//		spMemoryStream->Seek(position, STREAM_SEEK_SET, NULL);
+					//		ULONG cbRead;
+					//		spMemoryStream->Read(pwszContent, cbSize, &cbRead);
+					//		pwszContent[cbSize / sizeof(WCHAR)] = L'\0';
+
+					//		wprintf(L"%s", pwszContent);
+					//		// Next I'm going to follow http://stackoverflow.com/questions/8804687/unable-to-read-xml-string-with-xmllite-using-memory-buffer
+					//		// and figure out how to read the XML out of an internal memory buffer.
+					//	}
+
+ 				//		//Open writeable output stream 
+					//	IStream *pOutFileStream = NULL; 
+					//	if (FAILED(hr = SHCreateStreamOnFile(_T("WimTivoServer.8.xml"), STGM_CREATE | STGM_WRITE, &pOutFileStream))) 
+					//		cout << "[" << getTimeISO8601() << "] Error creating file writer, error is: " << hex << hr << endl;
+					//	else
+					//	{ 
+					//		if (FAILED(hr = pWriter->SetOutput(pOutFileStream))) 
+					//			wprintf(L"Error, Method: SetOutput, error is %08.8lx", hr); 
+					//		else
+					//		{
+					//			if (FAILED(hr = pWriter->SetProperty(XmlWriterProperty_Indent, TRUE))) 
+					//				wprintf(L"Error, Method: SetProperty XmlWriterProperty_Indent, error is %08.8lx", hr); 
+					//			else
+					//			{
+					//				if (FAILED(hr = pWriter->WriteStartDocument(XmlStandalone_Omit))) 
+					//					wprintf(L"Error, Method: WriteStartDocument, error is %08.8lx", hr); 
+					//				else
+					//				{
+					//					pWriter->WriteStartElement(NULL,_T("TiVoContainer"),_T("http://www.tivo.com/developer/calypso-protocol-1.6/"));
+					//						pWriter->WriteStartElement(NULL,_T("Details"),NULL);
+					//							pWriter->WriteStartElement(NULL,_T("ContentType"),NULL);
+					//								pWriter->WriteString(_T("x-tivo-container/tivo-server"));
+					//							pWriter->WriteFullEndElement();
+					//							pWriter->WriteStartElement(NULL,_T("SourceFormat"),NULL);
+					//								pWriter->WriteString(_T("x-tivo-container/tivo-dvr"));
+					//							pWriter->WriteFullEndElement();
+					//							pWriter->WriteStartElement(NULL,_T("Title"),NULL);
+					//								pWriter->WriteString(_T("TivoHD"));
+					//							pWriter->WriteFullEndElement();
+					//							pWriter->WriteStartElement(NULL,_T("TotalItems"),NULL);
+					//								pWriter->WriteString(_T("1"));
+					//							pWriter->WriteFullEndElement();
+					//						pWriter->WriteFullEndElement();	// Details
+
+					//						pWriter->WriteStartElement(NULL,_T("ItemStart"),NULL);
+					//							pWriter->WriteString(_T("0"));
+					//						pWriter->WriteFullEndElement();
+					//						pWriter->WriteStartElement(NULL,_T("ItemCount"),NULL);
+					//							pWriter->WriteString(_T("1"));
+					//						pWriter->WriteFullEndElement();
+
+					//						pWriter->WriteStartElement(NULL,_T("Item"),NULL);
+					//							pWriter->WriteStartElement(NULL,_T("Details"),NULL);
+					//								pWriter->WriteStartElement(NULL,_T("ContentType"),NULL);
+					//									pWriter->WriteString(_T("x-tivo-container/tivo-videos"));
+					//								pWriter->WriteFullEndElement();
+					//								pWriter->WriteStartElement(NULL,_T("SourceFormat"),NULL);
+					//									pWriter->WriteString(_T("x-tivo-container/tivo-dvr"));
+					//								pWriter->WriteFullEndElement();
+					//								pWriter->WriteStartElement(NULL,_T("Title"),NULL);
+					//									pWriter->WriteString(_T("TivoHD"));
+					//								pWriter->WriteFullEndElement();
+					//								pWriter->WriteStartElement(NULL,_T("UniqueId"),NULL);
+					//									pWriter->WriteString(_T("TivoHD"));
+					//								pWriter->WriteFullEndElement();
+					//							pWriter->WriteFullEndElement();	// Details
+					//							pWriter->WriteStartElement(NULL,_T("Links"),NULL);
+					//								pWriter->WriteStartElement(NULL,_T("Content"),NULL);
+					//									pWriter->WriteStartElement(NULL,_T("Url"),NULL);
+					//										pWriter->WriteString(_T("https://192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=%2FNowPlaying"));
+					//									pWriter->WriteFullEndElement();
+					//									pWriter->WriteStartElement(NULL,_T("ContentType"),NULL);
+					//										pWriter->WriteString(_T("x-tivo-container/tivo-videos"));
+					//									pWriter->WriteFullEndElement();
+					//								pWriter->WriteFullEndElement();	// Content
+					//							pWriter->WriteFullEndElement();	// Links
+					//						pWriter->WriteFullEndElement();	// Item
+					//					pWriter->WriteFullEndElement();	// TiVoContainer
+
+					//					// WriteEndDocument closes any open elements or attributes 
+					//					if (FAILED(hr = pWriter->WriteEndDocument())) 
+					//						wprintf(L"Error, Method: WriteEndDocument, error is %08.8lx", hr); 
+
+					//					if (FAILED(hr = pWriter->Flush())) 
+					//						wprintf(L"Error, Method: Flush, error is %08.8lx", hr); 
+
+					//					// if you want to use a DTD using either the SYSTEM or PUBLIC identifiers, 
+					//					// or if you want to use an internal DTD subset, you can modify the following 
+					//					// call to WriteDocType. 
+					//					//if (FAILED(hr = pWriter->WriteDocType(L"root", NULL, NULL, NULL))) 
+					//					//	wprintf(L"Error, Method: WriteDocType, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteProcessingInstruction(L"xml-stylesheet", 
+					//					//	L"href=\"mystyle.css\" title=\"Compact\" type=\"text/css\""))) 
+					//					//	wprintf(L"Error, Method: WriteProcessingInstruction, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteStartElement(NULL, L"root", NULL))) 
+					//					//	wprintf(L"Error, Method: WriteStartElement, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteStartElement(NULL, L"sub", NULL))) 
+					//					//	wprintf(L"Error, Method: WriteStartElement, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteAttributeString(NULL, L"myAttr", NULL, 
+					//					//												L"1234"))) 
+					//					//	wprintf(L"Error, Method: WriteAttributeString, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteString( 
+					//					//			L"Markup is <escaped> for this string"))) 
+					//					//	wprintf(L"Error, Method: WriteString, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteFullEndElement())) 
+					//					//	wprintf(L"Error, Method: WriteFullEndElement, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteStartElement(NULL, L"anotherChild", NULL))) 
+					//					//	wprintf(L"Error, Method: WriteStartElement, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteString(L"some text"))) 
+					//					//	wprintf(L"Error, Method: WriteString, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteFullEndElement())) 
+					//					//	wprintf(L"Error, Method: WriteFullEndElement, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
+					//					//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteCData(L"This is CDATA text."))) 
+					//					//	wprintf(L"Error, Method: WriteCData, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
+					//					//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteStartElement(NULL, L"containsCharacterEntity", NULL))) 
+					//					//	wprintf(L"Error, Method: WriteStartElement, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteCharEntity(L'a'))) 
+					//					//	wprintf(L"Error, Method: WriteCharEntity, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteFullEndElement())) 
+					//					//	wprintf(L"Error, Method: WriteFullEndElement, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
+					//					//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteStartElement(NULL, L"containsChars", NULL))) 
+					//					//	wprintf(L"Error, Method: WriteStartElement, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteChars(L"abcdefghijklm", 5))) 
+					//					//	wprintf(L"Error, Method: WriteChars, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteFullEndElement())) 
+					//					//	wprintf(L"Error, Method: WriteFullEndElement, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
+					//					//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteStartElement(NULL, L"containsEntity", NULL))) 
+					//					//	wprintf(L"Error, Method: WriteStartElement, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteEntityRef(L"myEntity"))) 
+					//					//	wprintf(L"Error, Method: WriteEntityRef, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteEndElement())) 
+					//					//	wprintf(L"Error, Method: WriteEndElement, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
+					//					//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteStartElement(NULL, L"containsName", NULL))) 
+					//					//	wprintf(L"Error, Method: WriteStartElement, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteName(L"myName"))) 
+					//					//	wprintf(L"Error, Method: WriteName, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteEndElement())) 
+					//					//	wprintf(L"Error, Method: WriteEndElement, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
+					//					//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteStartElement(NULL, L"containsNmToken", NULL))) 
+					//					//	wprintf(L"Error, Method: WriteStartElement, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteNmToken(L"myNmToken"))) 
+					//					//	wprintf(L"Error, Method: WriteNmToken, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteEndElement())) 
+					//					//	wprintf(L"Error, Method: WriteEndElement, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
+					//					//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteComment(L"This is a comment"))) 
+					//					//	wprintf(L"Error, Method: WriteComment, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
+					//					//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteRaw(L"<elementWrittenRaw/>"))) 
+					//					//	wprintf(L"Error, Method: WriteRaw, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
+					//					//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteRawChars(L"<rawCharacters/>", 16))) 
+					//					//	wprintf(L"Error, Method: WriteRawChars, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
+					//					//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteElementString(NULL, L"myElement", NULL, L"myValue"))) 
+					//					//	wprintf(L"Error, Method: WriteElementString, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteFullEndElement())) 
+					//					//	wprintf(L"Error, Method: WriteFullEndElement, error is %08.8lx", hr); 
+					//					//else 
+					//					//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
+					//					//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
+
+					//					//// WriteEndDocument closes any open elements or attributes 
+					//					//if (FAILED(hr = pWriter->WriteEndDocument())) 
+					//					//	wprintf(L"Error, Method: WriteEndDocument, error is %08.8lx", hr); 
+
+					//					//if (FAILED(hr = pWriter->Flush())) 
+					//					//	wprintf(L"Error, Method: Flush, error is %08.8lx", hr); 
+					//				}
+					//			}
+					//		}
+					//	} 
+					//	SAFE_RELEASE(pOutFileStream); 
+					//} 
+					//SAFE_RELEASE(pWriter); 
+
+					std::vector<CString> myURLS;
+					myURLS.push_back(CString(_T("http://192.168.0.5:8080/TiVoConnect?Command=QueryContainer&Container=/")));
+					myURLS.push_back(CString(_T("http://192.168.0.108/TiVoConnect?Command=QueryContainer&Container=/")));
+					myURLS.push_back(CString(_T("https://192.168.0.5:4430/TiVoConnect?Command=QueryContainer&Container=/TivoNowPlaying")));
+					myURLS.push_back(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying")));
+					int FileIndex = 0;
+					CInternetSession serverSession; //(NULL,1,PRE_CONFIG_INTERNET_ACCESS,NULL,NULL,INTERNET_FLAG_EXISTING_CONNECT);
+					for (auto csURL = myURLS.begin(); csURL != myURLS.end(); csURL++)
+					{
+						int BadCertErrorCount = 0;
+						AGAIN:
+						//DWORD dwOption = INTERNET_OPTION_SECURITY_FLAGS;
+						//DWORD dwValue;
+						//if (serverSession.QueryOption(dwOption, dwValue))
+						//{
+						//	dwValue |= SECURITY_FLAG_IGNORE_UNKNOWN_CA;
+						//	dwValue |= SECURITY_FLAG_IGNORE_CERT_CN_INVALID;
+						//	dwValue |= SECURITY_FLAG_IGNORE_CERT_DATE_INVALID;
+						//	serverSession.SetOption(dwOption, dwValue);
+						//}
+						//else
+						//{
+						//	DWORD dw = GetLastError(); 
+						//	LPVOID lpMsgBuf;
+						//	FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, dw, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR) &lpMsgBuf, 0, NULL );
+						//	cout << "[" << getTimeISO8601() << "] error(" << dw << ") " << CStringA((LPCTSTR)lpMsgBuf).GetString() << endl;							
+						//	LocalFree(lpMsgBuf);
+						//}
+						CHttpFile* serverFile = NULL;
+						try 
+						{
+							cout << "[" << getTimeISO8601() << "] Attempting: " << CStringA(*csURL).GetString() << endl;
+							DWORD dwServiceType;
+							CString strServer;
+							CString strObject; 
+							INTERNET_PORT nPort; 
+							CString strUsername; 
+							CString strPassword; 
+							AfxParseURLEx(csURL->GetString(), dwServiceType, strServer, strObject, nPort, strUsername, strPassword);
+							serverFile = (CHttpFile*) serverSession.OpenURL(*csURL);
+							if (serverFile != NULL)
+							{
+								serverFile->SendRequest();
+								DWORD dwRet;
+								serverFile->QueryInfoStatusCode(dwRet);
+								if(dwRet == HTTP_STATUS_OK)
+								{
+									std::stringstream OutPutFileName;
+									OutPutFileName << "WimTivoServer." << FileIndex++ << ".xml";
+									std::ofstream OutputFile(OutPutFileName.str());
+									cout << "[" << getTimeISO8601() << "] file contents: **--**" << endl;
+									char ittybittybuffer;
+									while (0 < serverFile->Read(&ittybittybuffer, sizeof(ittybittybuffer)))
+									{
+										cout << ittybittybuffer;
+										if (OutputFile.is_open())
+											OutputFile << ittybittybuffer;
+									}
+									cout << "**--**" << endl;
+									OutputFile.close();
+								}
+								serverFile->Close();
+							}
+						}
+						catch(CInternetException *e)
+						{
+							TCHAR   szCause[255];
+							e->GetErrorMessage(szCause,sizeof(szCause)/sizeof(TCHAR));
+							CStringA csErrorMessage(szCause);
+							csErrorMessage.Trim();
+							cout << "[" << getTimeISO8601() << "] InternetException: " <<  csErrorMessage.GetString() << " (" << e->m_dwError << ") " << endl;
+							DWORD dw = GetLastError();
+							LPVOID lpMsgBuf;
+							int fmrval = FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, dw, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR) &lpMsgBuf, 0, NULL );
+							CStringA csgotLastErr((LPCTSTR)lpMsgBuf);
+							LocalFree(lpMsgBuf);
+							csgotLastErr.Trim();
+							cout << "[" << getTimeISO8601() << "] error(" << dw << ") " << csgotLastErr.GetString() << endl;							
+							if ((e->m_dwError == ERROR_INTERNET_INVALID_CA) || 
+								(e->m_dwError == ERROR_INTERNET_SEC_CERT_CN_INVALID) ||
+								(e->m_dwError == ERROR_INTERNET_SEC_CERT_DATE_INVALID) ||
+								(e->m_dwError == ERROR_INTERNET_SEC_INVALID_CERT) )
+							{
+								DWORD dwOption = INTERNET_OPTION_SECURITY_FLAGS;
+								DWORD dwValue;
+								if (serverSession.QueryOption(dwOption, dwValue))
+								{
+									dwValue |= SECURITY_FLAG_IGNORE_UNKNOWN_CA;
+									dwValue |= SECURITY_FLAG_IGNORE_CERT_CN_INVALID;
+									dwValue |= SECURITY_FLAG_IGNORE_CERT_DATE_INVALID;
+									dwValue |= SECURITY_SET_MASK; // This is a catchall that I'm trying.
+									serverSession.SetOption(dwOption, dwValue);
+									if (BadCertErrorCount++ < 2)
+										goto AGAIN;
+								}
+							}
+						}
+						if (serverFile != NULL)
+							delete serverFile;
+					}
+				}
+				CoUninitialize();
+
 				cout << "[" << getTimeISO8601() << "] Listening for TiVo Broadcast packets on UDP port 2190" << endl;
 
 				// Set up CTR-C signal handler
@@ -1529,7 +2219,7 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 						//csTiVoPacket.AppendFormat(_T("services=<name>[:<port>][/<protocol>], ...\r\n"));
 						csTiVoPacket.Append("swversion=");csTiVoPacket.Append(CStringA(csBuildDateTime));csTiVoPacket.Append("\n");
 						cout << csTiVoPacket.GetString();
-						for (auto index = 600; index > 0; --index)
+						for (auto index = 300; index > 0; --index)
 						{
 							CStringA csTiVoPacket("tivoconnect=1\n");
 							csTiVoPacket.AppendFormat("method=%s\n",true?"broadcast":"connect");
@@ -1546,10 +2236,8 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 								struct sockaddr_in * saServer = (sockaddr_in *)&addr;
 								csTiVoPacket.AppendFormat("services=TiVoMediaServer:%hu/http\n",ntohs(saServer->sin_port));
 							}
-							else
-								csTiVoPacket.AppendFormat("services=TiVoMediaServer:%d/http\n",2190);
 							//csTiVoPacket.AppendFormat(_T("services=<name>[:<port>][/<protocol>], ...\r\n"));
-							//csTiVoPacket.AppendFormat(_T("swversion=<string>\r\n"));
+							csTiVoPacket.Append("swversion="); csTiVoPacket.Append(CStringA(csBuildDateTime));csTiVoPacket.Append("\n");
 							TiVoBeaconSend(csTiVoPacket);
 							csTiVoPacket.Replace("\n", " ");
 							csTiVoPacket.Trim();
