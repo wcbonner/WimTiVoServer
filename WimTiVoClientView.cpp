@@ -181,19 +181,19 @@ void CWimTiVoClientView::OnUpdate(CView* pSender, LPARAM lHint, CObject* pHint)
 			CMFCRibbonComboBox * TiVoList = DYNAMIC_DOWNCAST(CMFCRibbonComboBox, pRibbon->FindByID(ID_TIVO_LIST));
 			if (TiVoList)
 			{
-				for (auto TiVo = pDoc->m_TiVoServers.begin(); TiVo != pDoc->m_TiVoServers.end(); TiVo++)
-					TiVoList->AddItem(CString(TiVo->m_machine.c_str()));
-				TiVoList->SelectItem(CString(pDoc->m_TiVoServer.m_machine.c_str()));
-				// Make sure that something is selected, in case that m_PortName didn't match anything in the list.
+				pDoc->m_ccTiVoContainers.Lock();
+				for (auto TiVo = pDoc->m_TiVoContainers.begin(); TiVo != pDoc->m_TiVoContainers.end(); TiVo++)
+					TiVoList->AddItem(CString(TiVo->m_title.c_str()));
+				TiVoList->SelectItem(CString(pDoc->m_TiVoContainer.m_title.c_str()));
+				// Make sure that something is selected, in case that we didn't match anything in the list.
 				if (TiVoList->GetCurSel() == LB_ERR)
 					if (TiVoList->GetCount() > 0)
 						TiVoList->SelectItem(0);
-				pDoc->m_TiVoServer.m_machine = CStringA(TiVoList->GetItem(TiVoList->GetCurSel())).GetString();
-				pDoc->m_ccTiVoServers.Lock();
-				auto pServer = std::find(pDoc->m_TiVoServers.begin(), pDoc->m_TiVoServers.end(), pDoc->m_TiVoServer);
-				if (pServer != pDoc->m_TiVoServers.end())
-					pDoc->m_TiVoServer = *pServer;
-				pDoc->m_ccTiVoServers.Unlock();
+				pDoc->m_TiVoContainer.m_title = CStringA(TiVoList->GetItem(TiVoList->GetCurSel())).GetString();
+				auto pServer = std::find(pDoc->m_TiVoContainers.begin(), pDoc->m_TiVoContainers.end(), pDoc->m_TiVoContainer);
+				if (pServer != pDoc->m_TiVoContainers.end())
+					pDoc->m_TiVoContainer = *pServer;
+				pDoc->m_ccTiVoContainers.Unlock();
 			}
 			CMFCRibbonEdit* pEditTotalTime = DYNAMIC_DOWNCAST(CMFCRibbonEdit, pRibbon->FindByID(ID_TIVO_TOTAL_TIME));
 			if (pEditTotalTime)
@@ -223,21 +223,21 @@ void CWimTiVoClientView::OnTiviNowplaying()
 	CWimTiVoClientDoc * pDoc = GetDocument();
 	if (pDoc)
 	{
-		if (pDoc->m_TiVoServer.m_MAK.empty())
+		if (pDoc->m_TiVoContainer.m_MAK.empty())
 		{
 			CTiVoMAKDlg myDlg;
 			if (IDOK == myDlg.DoModal())
 			{
 				myDlg.m_csMediaAccessKey.Trim();
-				pDoc->m_TiVoServer.m_MAK = CStringA(myDlg.m_csMediaAccessKey).GetString();
-				pDoc->m_ccTiVoServers.Lock();
-				auto pServer = std::find(pDoc->m_TiVoServers.begin(), pDoc->m_TiVoServers.end(), pDoc->m_TiVoServer);
-				if (pServer != pDoc->m_TiVoServers.end())
-					*pServer = pDoc->m_TiVoServer;
-				pDoc->m_ccTiVoServers.Unlock();
+				pDoc->m_TiVoContainer.m_MAK = CStringA(myDlg.m_csMediaAccessKey).GetString();
+				pDoc->m_ccTiVoContainers.Lock();
+				auto pContainer = std::find(pDoc->m_TiVoContainers.begin(), pDoc->m_TiVoContainers.end(), pDoc->m_TiVoContainer);
+				if (pContainer != pDoc->m_TiVoContainers.end())
+					*pContainer = pDoc->m_TiVoContainer;
+				pDoc->m_ccTiVoContainers.Unlock();
 			}
 		}
-		if (!pDoc->m_TiVoServer.m_MAK.empty())
+		if (!pDoc->m_TiVoContainer.m_MAK.empty())
 		{
 			CWaitCursor wait;
 			pDoc->GetNowPlaying();
@@ -303,14 +303,14 @@ void CWimTiVoClientView::OnTivoList()
 			if (PortList)
 			{
 				CString csNewItem(PortList->GetItem(PortList->GetCurSel()));
-				if (pDoc->m_TiVoServer.m_machine != CStringA(csNewItem).GetString())
+				if (pDoc->m_TiVoContainer.m_title != CStringA(csNewItem).GetString())
 				{
-					pDoc->m_TiVoServer.m_machine = CStringA(csNewItem).GetString();
-					pDoc->m_ccTiVoServers.Lock();
-					auto pServer = std::find(pDoc->m_TiVoServers.begin(), pDoc->m_TiVoServers.end(), pDoc->m_TiVoServer);
-					if (pServer != pDoc->m_TiVoServers.end())
-						pDoc->m_TiVoServer = *pServer;
-					pDoc->m_ccTiVoServers.Unlock();
+					pDoc->m_TiVoContainer.m_title = CStringA(csNewItem).GetString();
+					pDoc->m_ccTiVoContainers.Lock();
+					auto pContainer = std::find(pDoc->m_TiVoContainers.begin(), pDoc->m_TiVoContainers.end(), pDoc->m_TiVoContainer);
+					if (pContainer != pDoc->m_TiVoContainers.end())
+						pDoc->m_TiVoContainer = *pContainer;
+					pDoc->m_ccTiVoContainers.Unlock();
 				}
 			}
 		}

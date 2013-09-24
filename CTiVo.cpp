@@ -76,11 +76,11 @@ bool cTiVoServer::operator==(const cTiVoServer & other) const
 		//(m_address == other.m_address) && 
 		//(m_swversion == other.m_swversion) && 
 		//(m_method == other.m_method) && 
-		//(m_identity == other.m_identity) && 
+		m_identity == other.m_identity
 		//(m_machine == other.m_machine) && 
 		//(m_platform == other.m_platform) && 
 		//(m_services == other.m_services)
-		m_machine == other.m_machine
+		//m_machine == other.m_machine
 		);
 }
 std::string cTiVoServer::WriteTXT(const char seperator) const
@@ -141,8 +141,8 @@ std::string CTiVoContainer::WriteTXT(const char seperator) const
 	ssValue << "title=" << m_title;
 	if (!m_url.empty()) ssValue << seperator << "url=" << m_url;
 	if (!m_MAK.empty()) ssValue << seperator << "MAK=" << m_MAK;
-	if (!m_ContentType.empty()) ssValue << seperator << "ContentType=" << m_ContentType;
-	if (!m_SourceFormat.empty()) ssValue << seperator << "SourceFormat=" << m_SourceFormat;
+	//if (!m_ContentType.empty()) ssValue << seperator << "ContentType=" << m_ContentType;
+	//if (!m_SourceFormat.empty()) ssValue << seperator << "SourceFormat=" << m_SourceFormat;
 	return(ssValue.str());
 }
 bool CTiVoContainer::ReadTXT(const std::string & text, const char seperator)
@@ -153,19 +153,22 @@ bool CTiVoContainer::ReadTXT(const std::string & text, const char seperator)
 	CString csSect(csText.Tokenize(CString(seperator), SectPos));
 	while (csSect != _T(""))
 	{
-		int KeyPos = 0;
-		CString csKey(csSect.Tokenize(_T("="),KeyPos));
-		CString csValue(csSect.Tokenize(_T("="),KeyPos));
-		if (!csKey.CompareNoCase(_T("title")))
-			m_title = CStringA(csValue);
-		else if (!csKey.CompareNoCase(_T("url")))
-			m_url = CStringA(csValue);
-		else if (!csKey.CompareNoCase(_T("MAK")))
-			m_MAK = CStringA(csValue);
-		else if (!csKey.CompareNoCase(_T("ContentType")))
-			m_ContentType = CStringA(csValue);
-		else if (!csKey.CompareNoCase(_T("SourceFormat")))
-			m_SourceFormat = CStringA(csValue);
+		int KeyPos = csSect.Find(_T("="));
+		if (KeyPos > 0)
+		{
+			CString csKey(csSect.Left(KeyPos));
+			CString csValue(csSect.Right(csSect.GetLength() - (KeyPos+1)));
+			if (!csKey.CompareNoCase(_T("title")))
+				m_title = CStringA(csValue);
+			else if (!csKey.CompareNoCase(_T("url")))
+				m_url = CStringA(csValue);
+			else if (!csKey.CompareNoCase(_T("MAK")))
+				m_MAK = CStringA(csValue);
+			else if (!csKey.CompareNoCase(_T("ContentType")))
+				m_ContentType = CStringA(csValue);
+			else if (!csKey.CompareNoCase(_T("SourceFormat")))
+				m_SourceFormat = CStringA(csValue);
+		}
 		csSect = csText.Tokenize(CString(seperator), SectPos);
 	}
 	return(rval);
@@ -691,7 +694,10 @@ void XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, const CString & csMAK,
 									myContainer.m_MAK = CStringA(csMAK).GetString();
 									myContainer.m_ContentType = CStringA(csContentType).GetString();
 									//myContainer.m_SourceFormat;
-									TiVoTiVoContainers.push_back(myContainer);
+									// Only add the container if it doesn't already exist
+									auto pContainer = std::find(TiVoTiVoContainers.begin(), TiVoTiVoContainers.end(), myContainer);
+									if (pContainer == TiVoTiVoContainers.end())
+										TiVoTiVoContainers.push_back(myContainer);
 								}
 							}
 							else if (bIsItemDetails && !ccsDetails.Compare(pwszLocalName))
@@ -713,7 +719,7 @@ void XML_Parse_TiVoNowPlaying(const CString & Source, const CString & csMAK, std
 	if (SUCCEEDED(SHCreateStreamOnFile(Source.GetString(), STGM_READ, &spFileStream)))
 		XML_Parse_TiVoNowPlaying(spFileStream, csMAK, TiVoFileList, TiVoTiVoContainers);
 }
-bool XML_Parse_TiVoNowPlaying(const CString & Source, const CString & csMAK, std::vector<cTiVoFile> & TiVoFileList, std::vector<CTiVoContainer> & TiVoTiVoContainers, CInternetSession & serverSession)
+bool XML_Parse_TiVoNowPlaying(const CString & Source, std::vector<cTiVoFile> & TiVoFileList, std::vector<CTiVoContainer> & TiVoTiVoContainers, CInternetSession & serverSession)
 {
 	bool rval = true;
 	std::cout << "[" << getTimeISO8601() << "] Attempting: " << CStringA(Source).GetString() << endl;
@@ -794,7 +800,7 @@ bool XML_Parse_TiVoNowPlaying(const CString & Source, const CString & csMAK, std
 							LARGE_INTEGER position;
 							position.QuadPart = 0;
 							spMemoryStreamOne->Seek(position, STREAM_SEEK_SET, NULL);
-							XML_Parse_TiVoNowPlaying(spMemoryStreamOne, csMAK, TiVoFileList, TiVoTiVoContainers);
+							XML_Parse_TiVoNowPlaying(spMemoryStreamOne, strPassword, TiVoFileList, TiVoTiVoContainers);
 						}
 					}
 					else
