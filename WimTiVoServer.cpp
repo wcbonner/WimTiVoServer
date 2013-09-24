@@ -440,6 +440,7 @@ int GetTiVoQueryFormats(SOCKET DataSocket, const char * InBuffer)
 }
 UINT PopulateTiVoFileList(LPVOID lvp)
 {
+	HANDLE LocalTerminationEventHandle = lvp;
 	if (ApplicationLogHandle != NULL) 
 	{
 		CString csSubstitutionText(__FUNCTION__);
@@ -487,7 +488,7 @@ UINT PopulateTiVoFileList(LPVOID lvp)
 			LPCTSTR lpStrings[] = { csSubstitutionText.GetString(), NULL };
 			ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
 		}
-	} while (WAIT_TIMEOUT == WaitForSingleObject(terminateEvent_populate, 15*60*1000));
+	} while (WAIT_TIMEOUT == WaitForSingleObject(LocalTerminationEventHandle, 15*60*1000));
 	if (ApplicationLogHandle != NULL) 
 	{
 		CString csSubstitutionText(__FUNCTION__);
@@ -1280,6 +1281,7 @@ UINT HTTPChild(LPVOID lvp)
 }
 UINT HTTPMain(LPVOID lvp)
 {
+	HANDLE LocalTerminationEventHandle = lvp;
 	if (ApplicationLogHandle != NULL) 
 	{
 		CString csSubstitutionText(__FUNCTION__);
@@ -1306,10 +1308,10 @@ UINT HTTPMain(LPVOID lvp)
 		else
 		{
 			DWORD on = TRUE;
-			DWORD off = FALSE;
+			//DWORD off = FALSE;
 			//DWORD BigBuffSize = 0x8000;
 			setsockopt(ControlSocket, SOL_SOCKET, SO_REUSEADDR, (char *)&on, sizeof(on));
-			setsockopt(ControlSocket, SOL_SOCKET, SO_KEEPALIVE, (char *)&off, sizeof(off));	// Attempt to see if this is related to why many of my transfers are failing.
+			//setsockopt(ControlSocket, SOL_SOCKET, SO_KEEPALIVE, (char *)&off, sizeof(off));	// Attempt to see if this is related to why many of my transfers are failing.
 			//setsockopt(ControlSocket, SOL_SOCKET, SO_SNDBUF, (char *)&BigBuffSize, sizeof(BigBuffSize));	// Attempt to see if this is related to why many of my transfers are failing.
 			//setsockopt(ControlSocket, SOL_SOCKET, SO_RCVBUF, (char *)&BigBuffSize, sizeof(BigBuffSize));	// Attempt to see if this is related to why many of my transfers are failing.
 			//setsockopt(ControlSocket, IPPROTO_TCP, TCP_EXPEDITED_1122, (char *)&on, sizeof(on));	// Attempt to see if this is related to why many of my transfers are failing.
@@ -1352,13 +1354,43 @@ UINT HTTPMain(LPVOID lvp)
 					std::stringstream ss;
 					ss << "TiVoMediaServer:" << ntohs(saServer->sin_port) << "/http";
 					myServer.m_services = ss.str();
+					long errCode;
 					HKEY hKey;
-					if (ERROR_SUCCESS == RegCreateKeyEx(HKEY_LOCAL_MACHINE, csRegKey, 0, NULL, REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL, &hKey, NULL))
+					if (ERROR_SUCCESS == (errCode = RegCreateKeyEx(HKEY_LOCAL_MACHINE, csRegKey, 0, NULL, REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL, &hKey, NULL)))
 					{
 						vData = ntohs(saServer->sin_port);
 						cbData = sizeof(vData);
 						RegSetValueEx(hKey, _T("TCPPort"), 0, REG_DWORD, (const BYTE *)vData, cbData);
 						RegCloseKey(hKey);
+					}
+					else
+					{
+						LPTSTR errString = NULL;  // will be allocated and filled by FormatMessage  
+						int size = FormatMessage( FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, // use windows internal message table
+							0,			// 0 since source is internal message table
+							errCode,	// this is the error code returned by WSAGetLastError()
+										// Could just as well have been an error code from generic
+										// Windows errors from GetLastError()
+							MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),	// auto-determine language to use
+							(LPTSTR)&errString, // this is WHERE we want FormatMessage
+										// to plunk the error string.  Note the
+										// peculiar pass format:  Even though
+										// errString is already a pointer, we
+										// pass &errString (which is really type LPSTR* now)
+										// and then CAST IT to (LPSTR).  This is a really weird
+										// trip up.. but its how they do it on msdn:
+										// http://msdn.microsoft.com/en-us/library/ms679351(VS.85).aspx
+							0,			// min size for buffer
+							NULL );		// 0, since getting message from system tables
+						std::stringstream ss;
+						ss << "[" << getTimeISO8601() << "] " << __FUNCTION__ << " RegCreateKeyEx() Error code: " << errCode << " " << CStringA(errString, size).Trim().GetString() << std::endl;
+						LocalFree(errString);	// if you don't do this, you will get an
+												// ever so slight memory leak, since we asked
+												// FormatMessage to FORMAT_MESSAGE_ALLOCATE_BUFFER,
+												// and it does so using LocalAlloc
+												// Gotcha!  I guess.
+						TRACE(ss.str().c_str());
+						std::cout << ss.str().c_str();
 					}
 				}
 				/* Set the socket to listen */
@@ -1381,7 +1413,7 @@ UINT HTTPMain(LPVOID lvp)
 			}
 		}
 	}
-	SetEvent(terminateEvent_http);
+	SetEvent(LocalTerminationEventHandle);
 	if (ApplicationLogHandle != NULL) 
 	{
 		CString csSubstitutionText(__FUNCTION__);
@@ -1431,6 +1463,7 @@ bool TiVoBeaconSend(const std::string csServerBroadcast)
 }
 UINT TiVoBeaconSendThread(LPVOID lvp)
 {
+	HANDLE LocalTerminationEventHandle = lvp;
 	if (ApplicationLogHandle != NULL) 
 	{
 		CString csSubstitutionText(__FUNCTION__);
@@ -1506,7 +1539,7 @@ UINT TiVoBeaconSendThread(LPVOID lvp)
 
 	do {
 		TiVoBeaconSend(myServer.WriteTXT('\n'));
-	} while (WAIT_TIMEOUT == WaitForSingleObject(terminateEvent_beacon, 60*1000));
+	} while (WAIT_TIMEOUT == WaitForSingleObject(LocalTerminationEventHandle, 60*1000));
 	if (ApplicationLogHandle != NULL) 
 	{
 		CString csSubstitutionText(__FUNCTION__);
@@ -1634,11 +1667,11 @@ VOID ServiceMain(DWORD argc, LPTSTR * argv)
 					av_register_all(); // FFMPEG initialization
 					ApplicationLogHandle = RegisterEventSource(NULL, theApp.m_pszAppName);
 					terminateEvent_populate = CreateEvent(0,TRUE,FALSE,0);
-					AfxBeginThread(PopulateTiVoFileList, NULL);
+					AfxBeginThread(PopulateTiVoFileList, terminateEvent_populate);
 					terminateEvent_beacon = CreateEvent(0,TRUE,FALSE,0);
-					AfxBeginThread(TiVoBeaconSendThread, NULL);
+					AfxBeginThread(TiVoBeaconSendThread, terminateEvent_beacon);
 					//threadHandle = AfxBeginThread(HTTPMain, NULL, THREAD_PRIORITY_NORMAL, 0, CREATE_SUSPENDED);
-					threadHandle = AfxBeginThread(HTTPMain, NULL);
+					threadHandle = AfxBeginThread(HTTPMain, terminateEvent_http);
 					if (threadHandle != NULL)
 					{
 						//threadHandle->m_bAutoDelete = false;
@@ -1881,7 +1914,7 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 				av_register_all(); // FFMPEG initialization
 
 				terminateEvent_populate = CreateEvent(0,TRUE,FALSE,0);
-				AfxBeginThread(PopulateTiVoFileList, NULL);
+				AfxBeginThread(PopulateTiVoFileList, terminateEvent_populate);
 
 				ccTiVoFileListCritSec.Lock();
 				std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate);
@@ -1891,11 +1924,11 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 				terminateEvent_http = CreateEvent(0,TRUE,FALSE,0);
 				if (terminateEvent_http != NULL) 
 				{
-					threadHandle = AfxBeginThread(HTTPMain, NULL);
+					threadHandle = AfxBeginThread(HTTPMain, terminateEvent_http);
 					if (threadHandle != NULL)
 					{
 						terminateEvent_beacon = CreateEvent(0,TRUE,FALSE,0);
-						AfxBeginThread(TiVoBeaconSendThread, NULL);
+						AfxBeginThread(TiVoBeaconSendThread, terminateEvent_beacon);
 						#ifdef _DEBUG
 						std::cout << "[" << getTimeISO8601() << "] Running for 30 minutes" << std::endl;
 						Sleep(30 * 60 * 1000); // Sleep 30 minutes
