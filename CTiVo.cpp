@@ -82,6 +82,51 @@ bool cTiVoServer::operator==(const cTiVoServer & other) const
 		m_machine == other.m_machine
 		);
 }
+std::string cTiVoServer::WriteTXT(const char seperator) const
+{
+	std::stringstream ssValue;
+	ssValue << "machine=" << m_machine;
+	ssValue << seperator << "address=" << m_address;
+	if (!m_identity.empty()) ssValue << seperator << "identity=" << m_identity;
+	if (!m_method.empty()) ssValue << seperator << "method=" << m_method;
+	if (!m_platform.empty()) ssValue << seperator << "platform=" << m_platform;
+	if (!m_services.empty()) ssValue << seperator << "services=" << m_services;
+	if (!m_swversion.empty()) ssValue << seperator << "swversion=" << m_swversion;
+	ssValue << seperator << "tivoconnect=1";
+	if (!m_MAK.empty()) ssValue << seperator << "MAK=" << m_MAK;
+	return(ssValue.str());
+}
+bool cTiVoServer::ReadTXT(const std::string & text, const char seperator)
+{
+	bool rval = true;
+	CString csText(text.c_str());
+	int SectPos = 0;
+	CString csSect(csText.Tokenize(CString(seperator), SectPos));
+	while (csSect != _T(""))
+	{
+		int KeyPos = 0;
+		CString csKey(csSect.Tokenize(_T("="),KeyPos));
+		CString csValue(csSect.Tokenize(_T("="),KeyPos));
+		if (!csKey.CompareNoCase(_T("address")))
+			m_address = CStringA(csValue);
+		else if (!csKey.CompareNoCase(_T("identity")))
+			m_identity = CStringA(csValue);
+		else if (!csKey.CompareNoCase(_T("machine")))
+			m_machine = CStringA(csValue);
+		else if (!csKey.CompareNoCase(_T("method")))
+			m_method = CStringA(csValue);
+		else if (!csKey.CompareNoCase(_T("platform")))
+			m_platform = CStringA(csValue);
+		else if (!csKey.CompareNoCase(_T("services")))
+			m_services = CStringA(csValue);
+		else if (!csKey.CompareNoCase(_T("swversion")))
+			m_swversion = CStringA(csValue);
+		else if (!csKey.CompareNoCase(_T("MAK")))
+			m_MAK = CStringA(csValue);
+		csSect = csText.Tokenize(CString(seperator), SectPos);
+	}
+	return(rval);
+}
 bool cTiVoFile::operator==(const cTiVoFile & other) const
 {
 	return(
@@ -199,6 +244,7 @@ void cTiVoFile::SetFromTiVoItem(const CString &csTitle, const CString &csEpisode
 	m_csPathName = ssFileName.str().c_str();
 	m_csPathName.Replace(_T(":"),_T("_")); // http://msdn.microsoft.com/en-us/library/system.io.path.getinvalidfilenamechars.aspx should be further examined
 }
+
 #ifdef AVCODEC_AVCODEC_H
 void cTiVoFile::PopulateFromFFMPEG(void)
 {
@@ -424,7 +470,7 @@ bool cTiVoFileComparePathReverse(const cTiVoFile & a, const cTiVoFile & b) { ret
 bool cTiVoFileCompareSize(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_SourceSize > b.m_SourceSize); }
 bool cTiVoFileCompareSizeReverse(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_SourceSize < b.m_SourceSize); }
 /////////////////////////////////////////////////////////////////////////////
-void XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, const CString & csMAK, std::vector<cTiVoFile> & TiVoFileList)
+void XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, const CString & csMAK, std::vector<cTiVoFile> & TiVoFileList, std::vector<CTiVoContainer> & TiVoTiVoContainers)
 {
 	HRESULT hr = S_OK;
 	CComPtr<IXmlReader> pReader; 
@@ -581,14 +627,6 @@ void XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, const CString & csMAK,
 									std::wcout << L" " << ctsDuration.Format(_T("%H:%M:%S")).GetString();
 									std::wcout << endl;
 									#endif
-									std::wstringstream ssFileName(std::stringstream::in | std::stringstream::out);
-									ssFileName << csTitle.GetString();
-									if (!csEpisodeTitle.IsEmpty())
-										ssFileName << L" - ''" << csEpisodeTitle.GetString() << L"''";
-									ssFileName << L" (Recorded " << ctCaptureDate.Format(_T("%b %d, %Y, ")).GetString() << csSourceStation.GetString() << L").TiVo";
-									#ifdef _DEBUG
-									std::wcout << L"[                   ] FileName: " << ssFileName.str().c_str() << endl;
-									#endif
 									cTiVoFile MyFile;
 									MyFile.SetFromTiVoItem(csTitle, csEpisodeTitle, csDescription, csSourceStation, csContentURL, ctCaptureDate, ctsDuration, csMAK, llSourceSize);
 									TiVoFileList.push_back(MyFile);
@@ -607,13 +645,13 @@ void XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, const CString & csMAK,
 		}
 	}
 }
-void XML_Parse_TiVoNowPlaying(const CString & Source, const CString & csMAK, std::vector<cTiVoFile> & TiVoFileList)
+void XML_Parse_TiVoNowPlaying(const CString & Source, const CString & csMAK, std::vector<cTiVoFile> & TiVoFileList, std::vector<CTiVoContainer> & TiVoTiVoContainers)
 {
 	CComPtr<IStream> spFileStream;
 	if (SUCCEEDED(SHCreateStreamOnFile(Source.GetString(), STGM_READ, &spFileStream)))
-		XML_Parse_TiVoNowPlaying(spFileStream, csMAK, TiVoFileList);
+		XML_Parse_TiVoNowPlaying(spFileStream, csMAK, TiVoFileList, TiVoTiVoContainers);
 }
-bool XML_Parse_TiVoNowPlaying(const CString & Source, const CString & csMAK, std::vector<cTiVoFile> & TiVoFileList, CInternetSession & serverSession)
+bool XML_Parse_TiVoNowPlaying(const CString & Source, const CString & csMAK, std::vector<cTiVoFile> & TiVoFileList, std::vector<CTiVoContainer> & TiVoTiVoContainers, CInternetSession & serverSession)
 {
 	bool rval = true;
 	std::cout << "[" << getTimeISO8601() << "] Attempting: " << CStringA(Source).GetString() << endl;
@@ -694,7 +732,7 @@ bool XML_Parse_TiVoNowPlaying(const CString & Source, const CString & csMAK, std
 							LARGE_INTEGER position;
 							position.QuadPart = 0;
 							spMemoryStreamOne->Seek(position, STREAM_SEEK_SET, NULL);
-							XML_Parse_TiVoNowPlaying(spMemoryStreamOne, csMAK, TiVoFileList);
+							XML_Parse_TiVoNowPlaying(spMemoryStreamOne, csMAK, TiVoFileList, TiVoTiVoContainers);
 						}
 					}
 					else
