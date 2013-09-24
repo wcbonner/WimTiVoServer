@@ -76,19 +76,12 @@ void CWimTiVoClientView::OnInitialUpdate()
 		{
 			for (auto TiVo = pDoc->m_TiVoServers.begin(); TiVo != pDoc->m_TiVoServers.end(); TiVo++)
 				TiVoList->AddItem(CString(TiVo->m_machine.c_str()));
-			//CUIntArray ports;
-			//if (CEnumerateSerial::UsingQueryDosDevice(ports))
-			//	for (int i = 0; i < ports.GetSize(); i++)
-			//	{
-			//		text.Format(_T("\\\\.\\COM%d"), ports[i]);
-			//		Model501PortList->AddItem( text );
-			//	}
-			//Model501PortList->SelectItem(pDoc->m_Model501PortName);
+			TiVoList->SelectItem(pDoc->m_TiVoServerName);
 			// Make sure that something is selected, in case that m_PortName didn't match anything in the list.
 			if (TiVoList->GetCurSel() == LB_ERR)
 				if (TiVoList->GetCount() > 0)
 					TiVoList->SelectItem(0);
-			//pDoc->m_Model501PortName = Model501PortList->GetItem(Model501PortList->GetCurSel());
+			pDoc->m_TiVoServerName = TiVoList->GetItem(TiVoList->GetCurSel());
 		}
 	}
 
@@ -151,37 +144,55 @@ void CWimTiVoClientView::OnUpdate(CView* pSender, LPARAM lHint, CObject* pHint)
 {
 	TRACE(__FUNCTION__ "\n");
 	// TODO: Add your specialized code here and/or call the base class
-	CListCtrl& ListCtrl = GetListCtrl();
-	if (0 != ListCtrl.DeleteAllItems())
+	CWimTiVoClientDoc * pDoc = GetDocument();
+	if (pDoc)
 	{
-		ASSERT(ListCtrl.GetItemCount() == 0);
-		CWimTiVoClientDoc * pDoc = GetDocument();
-		for(auto TiVoFile = pDoc->m_FilesToGetFromTiVo.begin(); TiVoFile != pDoc->m_FilesToGetFromTiVo.end(); TiVoFile++)
+		CListCtrl& ListCtrl = GetListCtrl();
+		if (0 != ListCtrl.DeleteAllItems())
 		{
-			int nItem = ListCtrl.InsertItem(
-				LVIF_TEXT | LVIF_STATE,
-				TiVoFile-pDoc->m_FilesToGetFromTiVo.begin(), 
-				TiVoFile->GetPathName(), 
-				INDEXTOSTATEIMAGEMASK(1), 
-				LVIS_STATEIMAGEMASK, 
-				0,
-				NULL);
-			ListCtrl.SetItemText(nItem, 1, TiVoFile->GetTitle());
-			ListCtrl.SetItemText(nItem, 2, TiVoFile->GetEpisodeTitle());
-			ListCtrl.SetItemText(nItem, 3, TiVoFile->GetDescription());
-			ListCtrl.SetItemText(nItem, 4, TiVoFile->GetCaptureDate().Format(_T("%c")));
-			ListCtrl.SetItemText(nItem, 5, CTimeSpan(TiVoFile->GetDuration()/1000).Format(_T("%H:%M:%S")));
-			std::stringstream ss;
-			std::locale mylocale("");   // get global locale
-			ss.imbue(mylocale);  // imbue global locale
-			ss << TiVoFile->GetSourceSize();
-			ListCtrl.SetItemText(nItem, 6, CString(ss.str().c_str()));
+			ASSERT(ListCtrl.GetItemCount() == 0);
+			for(auto TiVoFile = pDoc->m_FilesToGetFromTiVo.begin(); TiVoFile != pDoc->m_FilesToGetFromTiVo.end(); TiVoFile++)
+			{
+				int nItem = ListCtrl.InsertItem(
+					LVIF_TEXT | LVIF_STATE,
+					TiVoFile-pDoc->m_FilesToGetFromTiVo.begin(), 
+					TiVoFile->GetPathName(), 
+					INDEXTOSTATEIMAGEMASK(1), 
+					LVIS_STATEIMAGEMASK, 
+					0,
+					NULL);
+				ListCtrl.SetItemText(nItem, 1, TiVoFile->GetTitle());
+				ListCtrl.SetItemText(nItem, 2, TiVoFile->GetEpisodeTitle());
+				ListCtrl.SetItemText(nItem, 3, TiVoFile->GetDescription());
+				ListCtrl.SetItemText(nItem, 4, TiVoFile->GetCaptureDate().Format(_T("%c")));
+				ListCtrl.SetItemText(nItem, 5, CTimeSpan(TiVoFile->GetDuration()/1000).Format(_T("%H:%M:%S")));
+				std::stringstream ss;
+				std::locale mylocale("");   // get global locale
+				ss.imbue(mylocale);  // imbue global locale
+				ss << TiVoFile->GetSourceSize();
+				ListCtrl.SetItemText(nItem, 6, CString(ss.str().c_str()));
+			}
+		}
+		CMFCRibbonBar* pRibbon = ((CFrameWndEx*) GetTopLevelFrame())->GetRibbonBar();
+		if ((pRibbon) && (pDoc))
+		{
+			CMFCRibbonComboBox * TiVoList = DYNAMIC_DOWNCAST(CMFCRibbonComboBox, pRibbon->FindByID(ID_TIVO_LIST));
+			if (TiVoList)
+			{
+				for (auto TiVo = pDoc->m_TiVoServers.begin(); TiVo != pDoc->m_TiVoServers.end(); TiVo++)
+					TiVoList->AddItem(CString(TiVo->m_machine.c_str()));
+				TiVoList->SelectItem(pDoc->m_TiVoServerName);
+				// Make sure that something is selected, in case that m_PortName didn't match anything in the list.
+				if (TiVoList->GetCurSel() == LB_ERR)
+					if (TiVoList->GetCount() > 0)
+						TiVoList->SelectItem(0);
+				pDoc->m_TiVoServerName = TiVoList->GetItem(TiVoList->GetCurSel());
+			}
 		}
 	}
 	CListView::OnUpdate(pSender, lHint, pHint);
 	TRACE(__FUNCTION__ " Exiting\n");
 }
-
 void CWimTiVoClientView::OnTiviNowplaying()
 {
 	TRACE(__FUNCTION__ "\n");
@@ -190,7 +201,6 @@ void CWimTiVoClientView::OnTiviNowplaying()
 	pDoc->UpdateAllViews(NULL);
 	TRACE(__FUNCTION__ " Exiting\n");
 }
-
 void CWimTiVoClientView::OnTivoBeacon()
 {
 	CWimTiVoClientDoc * pDoc = GetDocument();
@@ -230,7 +240,6 @@ void CWimTiVoClientView::OnUpdateTivoBeacon(CCmdUI *pCmdUI)
 	if (pDoc)
 		pCmdUI->SetCheck(pDoc->m_TiVoBeaconListenThreadRunning);
 }
-
 void CWimTiVoClientView::OnUpdateTivoMak(CCmdUI *pCmdUI)
 {
 	CWimTiVoClientDoc * pDoc = GetDocument();
@@ -245,7 +254,6 @@ void CWimTiVoClientView::OnUpdateTivoMak(CCmdUI *pCmdUI)
 		}
 	}
 }
-
 void CWimTiVoClientView::OnTivoList()
 {
 	CWimTiVoClientDoc * pDoc = GetDocument();
@@ -258,14 +266,12 @@ void CWimTiVoClientView::OnTivoList()
 			if (PortList)
 			{
 				CString csNewItem(PortList->GetItem(PortList->GetCurSel()));
-				//if (pDoc->m_Model501PortName.Compare(csNewItem) != 0)
-				//	pDoc->m_Model501PortName = csNewItem;
+				if (pDoc->m_TiVoServerName.Compare(csNewItem) != 0)
+					pDoc->m_TiVoServerName = csNewItem;
 			}
 		}
 	}
 }
-
-
 void CWimTiVoClientView::OnLvnColumnclick(NMHDR *pNMHDR, LRESULT *pResult)
 {
 	TRACE(__FUNCTION__ "\n");

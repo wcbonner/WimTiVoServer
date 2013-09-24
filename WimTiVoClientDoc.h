@@ -24,6 +24,7 @@ protected: // create from serialization only
 public:
 	std::vector<cTiVoFile> m_FilesToGetFromTiVo;
 	std::vector<cTiVoServer> m_TiVoServers;
+	CString m_TiVoServerName;
 	CString m_csTiVoMAK;
 
 // Operations

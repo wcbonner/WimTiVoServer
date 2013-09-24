@@ -44,6 +44,7 @@ CWimTiVoClientDoc::CWimTiVoClientDoc()
 	m_TiVoBeaconListenThreadRunning = false;
 	m_TiVoBeaconListenThreadStopRequested = false;
 	m_csTiVoMAK = AfxGetApp()->GetProfileString(_T("TiVo"),_T("MAK"),_T(""));
+	m_TiVoServerName = AfxGetApp()->GetProfileString(_T("TiVo"),_T("TiVoServerName"),_T(""));
 	for (auto index = 0; index < 16; index++)
 	{
 		std::stringstream ssKey;
@@ -84,6 +85,7 @@ CWimTiVoClientDoc::~CWimTiVoClientDoc()
 {
 	TRACE(__FUNCTION__ "\n");
 	AfxGetApp()->WriteProfileString(_T("TiVo"),_T("MAK"),m_csTiVoMAK);
+	AfxGetApp()->WriteProfileString(_T("TiVo"),_T("TiVoServerName"),m_TiVoServerName);
 	for (auto TiVo = m_TiVoServers.begin(); TiVo != m_TiVoServers.end(); TiVo++)
 	{
 		std::stringstream ssKey;
@@ -213,14 +215,42 @@ bool CWimTiVoClientDoc::GetNowPlaying(void)
 		InternetCrackUrl(csURL.GetString(), csURL.GetLength(), ICU_DECODE, &crackedURL);
 
 		std::stringstream ss;
-		ss << CStringA(crackedURL.lpszScheme).GetString() << "://";
-		ss << CStringA(crackedURL.lpszUserName).GetString() << ":" << CStringA(crackedURL.lpszPassword).GetString() << "@";
-		ss << CStringA(crackedURL.lpszHostName).GetString() << ":" << crackedURL.nPort;
-		ss << CStringA(crackedURL.lpszUrlPath).GetString() << CStringA(crackedURL.lpszExtraInfo).GetString();
+		cTiVoServer myServer;
+		myServer.m_machine = CStringA(m_TiVoServerName);
+		auto pServer = std::find(m_TiVoServers.begin(), m_TiVoServers.end(), myServer);
+		if (pServer != m_TiVoServers.end())
+		{
+			ss << CStringA(crackedURL.lpszScheme).GetString() << "://";
+			ss << "tivo:" << CStringA(m_csTiVoMAK).GetString() << "@";
+			ss << pServer->m_address << ":" << crackedURL.nPort;
+			ss << CStringA(crackedURL.lpszUrlPath).GetString() << CStringA(crackedURL.lpszExtraInfo).GetString();
+		}
+		else
+		{
+			ss << CStringA(crackedURL.lpszScheme).GetString() << "://";
+			ss << CStringA(crackedURL.lpszUserName).GetString() << ":" << CStringA(crackedURL.lpszPassword).GetString() << "@";
+			ss << CStringA(crackedURL.lpszHostName).GetString() << ":" << crackedURL.nPort;
+			ss << CStringA(crackedURL.lpszUrlPath).GetString() << CStringA(crackedURL.lpszExtraInfo).GetString();
+		}
 		csURL = CString(ss.str().c_str());
 
 		CInternetSession serverSession0;
 		XML_Parse_TiVoNowPlaying(csURL, m_FilesToGetFromTiVo, serverSession0);
+
+		#ifdef _DEBUG
+		CTimeSpan TotalTime;
+		unsigned long long TotalSize = 0;
+		for (auto TiVoFile = m_FilesToGetFromTiVo.begin(); TiVoFile != m_FilesToGetFromTiVo.end(); TiVoFile++)
+		{
+			TotalTime += CTimeSpan(TiVoFile->GetDuration()/1000);
+			TotalSize += TiVoFile->GetSourceSize();
+		}
+		std::stringstream  junk;
+		std::locale mylocale("");   // get global locale
+		junk.imbue(mylocale);  // imbue global locale
+		junk << "TiVo Details: Total Time: " << CStringA(TotalTime.Format(_T("%D Days, %H:%M:%S"))).GetString() << " Total Size: " << TotalSize << std::endl;
+		TRACE(junk.str().c_str());
+		#endif
 	//}
 	//CoUninitialize();
 	return false;
@@ -288,7 +318,10 @@ UINT CWimTiVoClientDoc::TiVoBeaconListenThread(LPVOID lvp)
 						if (myServer.m_services.find("TiVoMediaServer") == 0)
 						{
 							if (pDoc->m_TiVoServers.end() == std::find(pDoc->m_TiVoServers.begin(), pDoc->m_TiVoServers.end(), myServer))
+							{
 								pDoc->m_TiVoServers.push_back(myServer);
+								pDoc->UpdateAllViews(NULL);
+							}
 						}
 					}
 				}
