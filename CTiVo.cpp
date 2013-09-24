@@ -392,7 +392,8 @@ void cTiVoFile::PopulateFromFFMPEG(void)
 				m_SourceFormat = CStringA(codec_type);
 				m_SourceFormat.Append(_T("/"));
 				m_SourceFormat.Append(CString(CStringA(codec_name)));
-				
+				if (fmt_ctx->streams[videoStream]->codec->width >= 1280)
+					m_VideoHighDefinition = true;
 				//if (fmt_ctx->streams[videoStream]->codec->codec_tag) 
 				//{
 				//	char tag_buf[32];
@@ -518,7 +519,10 @@ void cTiVoFile::GetTiVoItem(CComPtr<IXmlWriter> & pWriter) const
 			if (m_SourceSize > 0)
 			{
 				std::wstringstream ss;
-				ss << max(m_SourceSize, m_Duration * 1400);
+				if (m_VideoHighDefinition)
+					ss << max(m_SourceSize, m_Duration * 10000);
+				else
+					ss << max(m_SourceSize, m_Duration * 1400);
 				pWriter->WriteElementString(NULL, L"SourceSize", NULL, ss.str().c_str());
 			}
 			if (m_Duration > 0)

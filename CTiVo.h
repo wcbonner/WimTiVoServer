@@ -49,11 +49,13 @@ private:
 	CString m_csMAK;
 	bool m_AudioCompatible;
 	bool m_VideoCompatible;
+	bool m_VideoHighDefinition;
 	CString m_TvBusEnvelope;
 public:
 	cTiVoFile() : 
 	m_AudioCompatible(false),
 	m_VideoCompatible(false),
+	m_VideoHighDefinition(false),
 	m_SourceSize(0),
     m_Duration(0)
 	{
