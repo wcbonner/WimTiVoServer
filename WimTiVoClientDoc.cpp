@@ -169,7 +169,9 @@ CWimTiVoClientDoc::CWimTiVoClientDoc()
 					myServer.m_MAK = CStringA(csValue);
 				csSect = regTiVo.Tokenize(_T("\t"), SectPos);
 			}
+			m_ccTiVoServers.Lock();
 			m_TiVoServers.push_back(myServer);
+			m_ccTiVoServers.Unlock();
 		}
 	}
 
@@ -210,27 +212,49 @@ CWimTiVoClientDoc::~CWimTiVoClientDoc()
 		m_TiVoBeaconListenThreadStopRequested = true;
 		m_TiVoTransferFileThreadStopRequested = true;
 		m_TiVoConvertFileThreadStopRequested = true;
+		if (m_TiVoBeaconListenThreadRunning)
+		{
+			// Create a UDP/IP datagram socket
+			SOCKET theSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+			if (theSocket != INVALID_SOCKET)
+			{
+				BOOL bBroadcastSocket = TRUE;
+				int nRet = setsockopt(theSocket, SOL_SOCKET, SO_BROADCAST, (const char *)&bBroadcastSocket, sizeof(bBroadcastSocket));
+				if (nRet != SOCKET_ERROR) 
+				{
+					CStringA csServerBroadcast("tivoconnect=0\n"); // Garbage message that will make the thread accept a packet and check to see if it shoudl continue running.
+					SOCKADDR_IN saBroadCast;
+					saBroadCast.sin_family = AF_INET;
+					saBroadCast.sin_addr.S_un.S_addr = INADDR_BROADCAST;
+					saBroadCast.sin_port = htons(2190);	// Port number
+					nRet = sendto(theSocket, csServerBroadcast.GetString(), csServerBroadcast.GetLength(), 0, (LPSOCKADDR)&saBroadCast, sizeof(struct sockaddr));
+				}
+				closesocket(theSocket);
+			}
+		}
 		Sleep(500);
 	}
 	AfxGetApp()->WriteProfileString(_T("TiVo"), _T("TiVoServerName"), m_TiVoServerName);
 	AfxGetApp()->WriteProfileInt(_T("TiVo"), _T("FFMPEG"), m_bFFMPEG);
 	AfxGetApp()->WriteProfileInt(_T("TiVo"), _T("TiVoDecode"), m_bTiVoDecode);
+	m_ccTiVoServers.Lock();
 	for (auto TiVo = m_TiVoServers.begin(); TiVo != m_TiVoServers.end(); TiVo++)
 	{
 		std::stringstream ssKey;
 		ssKey << "TiVo-" << (TiVo - m_TiVoServers.begin());
 		std::stringstream ssValue;
-		ssValue << "address=" << TiVo->m_address;
-		if (!TiVo->m_machine.empty()) ssValue << "\tmachine=" << TiVo->m_machine;
+		ssValue << "machine=" << TiVo->m_machine;
+		ssValue << "\taddress=" << TiVo->m_address;
 		if (!TiVo->m_identity.empty()) ssValue << "\tidentity=" << TiVo->m_identity;
 		if (!TiVo->m_method.empty()) ssValue << "\tmethod=" << TiVo->m_method;
 		if (!TiVo->m_platform.empty()) ssValue << "\tplatform=" << TiVo->m_platform;
 		if (!TiVo->m_services.empty()) ssValue << "\tservices=" << TiVo->m_services;
 		if (!TiVo->m_swversion.empty()) ssValue << "\tswversion=" << TiVo->m_swversion;
-		if (!TiVo->m_MAK.empty()) ssValue << "\tMAK=" << TiVo->m_MAK;
 		ssValue << "\ttivoconnect=1";
+		if (!TiVo->m_MAK.empty()) ssValue << "\tMAK=" << TiVo->m_MAK;
 		AfxGetApp()->WriteProfileString(_T("TiVo"), CString(ssKey.str().c_str()), CString(ssValue.str().c_str()));
 	}
+	m_ccTiVoServers.Unlock();
 	AfxGetApp()->WriteProfileString(_T("TiVo"),_T("TiVoFileDestination"),m_csTiVoFileDestination);
 	if (m_LogFile.is_open())
 	{
@@ -340,7 +364,7 @@ bool CWimTiVoClientDoc::GetNowPlaying(void)
 	crackedURL.dwUrlPathLength = dwUrlPathLength;		// length of URL-path
 	crackedURL.lpszExtraInfo = szExtraInfo;				// pointer to extra information (e.g. ?foo or #foo)
 	crackedURL.dwExtraInfoLength = dwExtraInfoLength;	// length of extra information
-	CString csURL(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying&Recurse=Yes&SortOrder=!CaptureDate"));
+	CString csURL(_T("https://tivo:@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying&Recurse=Yes&SortOrder=!CaptureDate"));
 	InternetCrackUrl(csURL.GetString(), csURL.GetLength(), ICU_DECODE, &crackedURL);
 
 	cTiVoServer myServer;
@@ -359,6 +383,7 @@ bool CWimTiVoClientDoc::GetNowPlaying(void)
 		if (m_LogFile.is_open())
 			m_LogFile << "[" << getTimeISO8601() << "] XML_Parse_TiVoNowPlaying: " << CStringA(csURL).GetString() << std::endl;
 
+		m_TiVoFiles.clear();
 		XML_Parse_TiVoNowPlaying(csURL, CString(myServer.m_MAK.c_str()), m_TiVoFiles, m_InternetSession);
 
 		m_TiVoTotalTime = CTimeSpan::CTimeSpan();
@@ -437,11 +462,14 @@ UINT CWimTiVoClientDoc::TiVoBeaconListenThread(LPVOID lvp)
 						TRACE(ss.str().c_str());
 						if (myServer.m_services.find("TiVoMediaServer") == 0)
 						{
+							pDoc->m_ccTiVoServers.Lock();
 							if (pDoc->m_TiVoServers.end() == std::find(pDoc->m_TiVoServers.begin(), pDoc->m_TiVoServers.end(), myServer))
 							{
+								if (pDoc->m_LogFile.is_open())
+									pDoc->m_LogFile << "[                   ] " << inet_ntoa(saServer.sin_addr) << " " << csServerBroadcast.GetString() << std::endl;
 								pDoc->m_TiVoServers.push_back(myServer);
-								pDoc->UpdateAllViews(NULL);
 							}
+							pDoc->m_ccTiVoServers.Unlock();
 						}
 					}
 				}

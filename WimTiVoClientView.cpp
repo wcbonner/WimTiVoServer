@@ -203,8 +203,10 @@ void CWimTiVoClientView::OnUpdate(CView* pSender, LPARAM lHint, CObject* pHint)
 			CMFCRibbonComboBox * TiVoList = DYNAMIC_DOWNCAST(CMFCRibbonComboBox, pRibbon->FindByID(ID_TIVO_LIST));
 			if (TiVoList)
 			{
+				pDoc->m_ccTiVoServers.Lock();
 				for (auto TiVo = pDoc->m_TiVoServers.begin(); TiVo != pDoc->m_TiVoServers.end(); TiVo++)
 					TiVoList->AddItem(CString(TiVo->m_machine.c_str()));
+				pDoc->m_ccTiVoServers.Unlock();
 				TiVoList->SelectItem(pDoc->m_TiVoServerName);
 				// Make sure that something is selected, in case that m_PortName didn't match anything in the list.
 				if (TiVoList->GetCurSel() == LB_ERR)
@@ -249,7 +251,10 @@ void CWimTiVoClientView::OnTiviNowplaying()
 			{
 				CTiVoMAKDlg myDlg;
 				if (IDOK == myDlg.DoModal())
+				{
+					myDlg.m_csMediaAccessKey.Trim();
 					pServer->m_MAK = CStringA(myDlg.m_csMediaAccessKey).GetString();
+				}
 			}
 			CWaitCursor wait;
 			pDoc->GetNowPlaying();
