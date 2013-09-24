@@ -475,7 +475,13 @@ UINT CWimTiVoClientDoc::TiVoBeaconListenThread(LPVOID lvp)
 				saClient.sin_addr.s_addr = INADDR_ANY;
 				saClient.sin_port = htons(2190);
 				int nRet = bind(theSocket, (LPSOCKADDR)&saClient, sizeof(SOCKADDR_IN));
-				if (nRet != SOCKET_ERROR)
+				if (nRet == SOCKET_ERROR)
+				{
+					auto TheError = WSAGetLastError();
+					if (WSAEADDRINUSE == TheError)
+						pDoc->m_TiVoBeaconListenThreadStopRequested = true;
+				}
+				else
 				{
 					char szBuf[2048];
 					SOCKADDR_IN saServer;
@@ -711,7 +717,7 @@ bool CWimTiVoClientDoc::GetTiVoFile(const cTiVoFile & TiVoFile) //, CInternetSes
 						std::ofstream OutputFile(m_CurrentFileName, std::ios_base::binary);
 						if (OutputFile.is_open())
 						{
-							const size_t ReadWriteBufferSize = 1024*10;
+							const size_t ReadWriteBufferSize = 1024*100;
 							char ReadWriteBuffer[ReadWriteBufferSize];
 							m_CurrentFileSize = 0;
 							UINT uiRead;
@@ -742,11 +748,26 @@ bool CWimTiVoClientDoc::GetTiVoFile(const cTiVoFile & TiVoFile) //, CInternetSes
 								m_LogFile << "[" << getTimeISO8601() << "] Closing File: " << CStringA(QuoteFileName(TiVoFile.GetPathName())).GetString() << " Total Bytes: " << m_CurrentFileSize << " Transfer Time: " << CStringA(ctsTotal.Format(_T("%H:%M:%S"))).GetString() << " Transfer Speed: " << m_CurrentFileSpeed << " B/s" << std::endl;
 							m_CurrentFileEstimatedTimeRemaining = 0;
 							m_CurrentFileProgress = 100;
-							CFileStatus status;
-							if (TRUE == CFile::GetStatus(m_CurrentFileName, status))
+							try
 							{
-								status.m_ctime = status.m_mtime = TiVoFile.GetCaptureDate();
-								CFile::SetStatus(m_CurrentFileName, status);
+								CFileStatus status;
+								if (TRUE == CFile::GetStatus(m_CurrentFileName, status))
+								{
+									status.m_ctime = status.m_mtime = TiVoFile.GetCaptureDate();
+									CFile::SetStatus(m_CurrentFileName, status);
+								}
+							}
+							catch(CFileException *e)
+							{
+								TCHAR   szCause[512];
+								e->GetErrorMessage(szCause,sizeof(szCause)/sizeof(TCHAR));
+								CStringA csErrorMessage(szCause);
+								csErrorMessage.Trim();
+								std::stringstream ss;
+								ss << "[" << getTimeISO8601() << "] CFileException: (" << e->m_lOsError << ") " << csErrorMessage.GetString() << std::endl;
+								TRACE(ss.str().c_str());
+								if (m_LogFile.is_open())
+									m_LogFile << ss.str();
 							}
 						}
 						else if (m_LogFile.is_open())
@@ -755,7 +776,7 @@ bool CWimTiVoClientDoc::GetTiVoFile(const cTiVoFile & TiVoFile) //, CInternetSes
 					else
 					{
 						if (m_LogFile.is_open())
-							m_LogFile << "[                   ] not text/xml or video/x-tivo-mpeg" << std::endl;
+							m_LogFile << "[" << getTimeISO8601() << "] not text/xml or video/x-tivo-mpeg" << std::endl;
 						char ittybittybuffer;
 						while (0 < serverFile->Read(&ittybittybuffer, sizeof(ittybittybuffer)))
 							std::cout << ittybittybuffer;
@@ -835,14 +856,14 @@ UINT CWimTiVoClientDoc::TiVoConvertFileThread(LPVOID lvp)
 					{
 						CString csMPEGPathName(csTiVoFileName);
 						csMPEGPathName.Replace(_T(".TiVo"), _T(".mpeg"));
-						CString csXMLPathName(csTiVoFileName);
-						csXMLPathName.Replace(_T(".TiVo"), _T(".xml"));
 						CString csMP4PathName(csTiVoFileName);
 						csMP4PathName.Replace(_T(".TiVo"), _T(".mp4"));
 						if ((pDoc->m_bTiVoDecode) && (TRUE != CFile::GetStatus(csMPEGPathName, status)))
 						{
 							if (!pDoc->m_csTDCatPath.IsEmpty())
 							{
+								CString csXMLPathName(csTiVoFileName);
+								csXMLPathName.Replace(_T(".TiVo"), _T(".xml"));
 								TCHAR lpTempPathBuffer[MAX_PATH];
 								DWORD dwRetVal = GetTempPath(MAX_PATH, lpTempPathBuffer);
 								if (dwRetVal > MAX_PATH || (dwRetVal == 0))
@@ -888,6 +909,11 @@ UINT CWimTiVoClientDoc::TiVoConvertFileThread(LPVOID lvp)
 									}
 								}
 								DeleteFile(szTempFileName);	// I must delete this file because the zero in the unique field up above causes a file to be created.
+								if (TRUE == CFile::GetStatus(csXMLPathName, status))
+								{
+									status.m_ctime = status.m_mtime = TiVoFile.GetCaptureDate();
+									CFile::SetStatus(csXMLPathName, status);
+								}
 								#ifdef _DEBUG
 								{
 									csXMLPathName.Replace(_T(".xml"), _T(".chunk-1.xml"));
@@ -931,12 +957,12 @@ UINT CWimTiVoClientDoc::TiVoConvertFileThread(LPVOID lvp)
 									}
 									DeleteFile(szTempFileName);	// I must delete this file because the zero in the unique field up above causes a file to be created.
 								}
+								if (TRUE == CFile::GetStatus(csXMLPathName, status))
+								{
+									status.m_ctime = status.m_mtime = TiVoFile.GetCaptureDate();
+									CFile::SetStatus(csXMLPathName, status);
+								}
 								#endif
-							}
-							if (TRUE == CFile::GetStatus(csXMLPathName, status))
-							{
-								status.m_ctime = status.m_mtime = TiVoFile.GetCaptureDate();
-								CFile::SetStatus(csXMLPathName, status);
 							}
 
 							if (pDoc->m_LogFile.is_open())
