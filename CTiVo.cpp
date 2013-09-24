@@ -493,6 +493,7 @@ void XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, const CString & csMAK,
 				bool bIsItemLinksContent = false;
 				bool bIsItemVideo = false;
 				bool bCopyProtected = false;
+				bool bIsItemVideoContainer = false;
 				const CString ccsItem(_T("Item"));
 				const CString ccsTitle(_T("Title"));
 				const CString ccsDuration(_T("Duration"));
@@ -504,7 +505,8 @@ void XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, const CString & csMAK,
 				const CString ccsCopyProtected(_T("CopyProtected"));
 				const CString ccsUrl(_T("Url"));
 				const CString ccsContentType(_T("ContentType"));
-				const CString ccsContentTypeValue(_T("video/x-tivo-raw-tts"));
+				const CString ccsContentTypeVideo(_T("video/x-tivo-raw-tts"));
+				const CString ccsContentTypeContainer(_T("x-tivo-container/tivo-videos"));
 				const CString ccsDetails(_T("Details"));
 				const CString ccsLinks(_T("Links"));
 				const CString ccsContent(_T("Content"));
@@ -513,6 +515,7 @@ void XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, const CString & csMAK,
 				CString csDescription;
 				CString csSourceStation;
 				CString csContentURL;
+				CString csContentType;
 				CTime ctCaptureDate;
 				CTimeSpan ctsDuration;
 				unsigned long long llSourceSize;
@@ -532,11 +535,13 @@ void XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, const CString & csMAK,
 								bIsItemLinksContent = false;
 								bIsItemVideo = false;
 								bCopyProtected = false;
+								bIsItemVideoContainer = false;
 								csTitle.Empty();
 								csEpisodeTitle.Empty();
 								csDescription.Empty();
 								csSourceStation.Empty();
 								csContentURL.Empty();
+								csContentType.Empty();
 							}
 							else if (bIsItem && !ccsDetails.Compare(pwszLocalName))
 								bIsItemDetails = true;
@@ -555,10 +560,11 @@ void XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, const CString & csMAK,
 										{
 											if (!ccsContentType.Compare(pwszLocalName))
 											{
-												if (!ccsContentTypeValue.CompareNoCase(pwszValue))
+												csContentType = pwszValue;
+												if (!ccsContentTypeVideo.CompareNoCase(csContentType))
 													bIsItemVideo = true;
-												else
-													bIsItemVideo = false;
+												else if (!ccsContentTypeContainer.Compare(pwszValue))
+													bIsItemVideoContainer = true;
 											}
 											else if (!ccsTitle.Compare(pwszLocalName))
 												csTitle = pwszValue;
@@ -603,6 +609,9 @@ void XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, const CString & csMAK,
 										if (SUCCEEDED(hr = pReader->GetValue(&pwszValue, NULL)))
 											if (!ccsUrl.Compare(pwszLocalName))
 												csContentURL = pwszValue;
+											else if (!ccsContentType.Compare(pwszLocalName))
+												if (!ccsContentTypeContainer.Compare(pwszValue))
+													bIsItemVideoContainer = true;
 							}
 						}
 					}
@@ -630,6 +639,16 @@ void XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, const CString & csMAK,
 									cTiVoFile MyFile;
 									MyFile.SetFromTiVoItem(csTitle, csEpisodeTitle, csDescription, csSourceStation, csContentURL, ctCaptureDate, ctsDuration, csMAK, llSourceSize);
 									TiVoFileList.push_back(MyFile);
+								}
+								else if (bIsItemVideoContainer)
+								{
+									CTiVoContainer myContainer;
+									myContainer.m_title = CStringA(csTitle).GetString();
+									myContainer.m_url = CStringA(csContentURL).GetString();
+									myContainer.m_MAK = CStringA(csMAK).GetString();
+									myContainer.m_ContentType = CStringA(csContentType).GetString();
+									//myContainer.m_SourceFormat;
+									TiVoTiVoContainers.push_back(myContainer);
 								}
 							}
 							else if (bIsItemDetails && !ccsDetails.Compare(pwszLocalName))
