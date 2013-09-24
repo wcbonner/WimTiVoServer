@@ -253,9 +253,14 @@ void cTiVoFile::SetPathName(const CFileFind & csNewPath)
 	DWORD dwBufferLength = sizeof(lpszBuffer) / sizeof(TCHAR);
 	InternetCanonicalizeUrl(m_csURL.GetString(), lpszBuffer, &dwBufferLength, 0);
 	m_csURL = CString(lpszBuffer, dwBufferLength);
+	m_csURL.Replace(_T(":"), _T("%3A"));
+	if (!csNewPath.GetFileName().Right(5).CompareNoCase(_T(".tivo")))
+		m_SourceFormat = _T("video/x-tivo-mpeg");
 	#ifdef AVCODEC_AVCODEC_H
 	PopulateFromFFMPEG();
 	#endif
+	if (m_SourceSize == 0)
+		m_SourceSize = csNewPath.GetLength();
 	// Final Output of object values
 	wcout << L"[                   ] " << setw(20) << right << L"m_csPathName" << L" : " << m_csPathName.GetString() << endl;
 	wcout << L"[                   ] " << setw(20) << right << L"m_Title" << L" : " << m_Title.GetString() << endl;
@@ -278,6 +283,7 @@ void cTiVoFile::SetFromTiVoItem(const CString &csTitle, const CString &csEpisode
 	m_CaptureDate = ctCaptureDate;
 	m_Duration = 1000 * ctsDuration.GetTotalSeconds();
 	m_csMAK = csMAK;
+	m_SourceFormat = _T("video/x-tivo-mpeg");
 	m_SourceSize = llSourceSize;
 	m_SourceStation = csSourceStation;
 	std::wstringstream ssFileName(std::stringstream::in | std::stringstream::out);
@@ -406,6 +412,12 @@ const CString & cTiVoFile::SetURL(const CString & csURL)
 	m_csURL = csURL;
 	return(csrVal);
 }
+const CString & cTiVoFile::SetMAK(const CString & csMAK)
+{
+	CString csrVal(m_csMAK);
+	m_csMAK = csMAK;
+	return(csrVal);
+}
 void cTiVoFile::GetXML(CComPtr<IXmlWriter> & pWriter) const
 {
 	pWriter->WriteStartElement(NULL, L"Item", NULL);
@@ -416,6 +428,12 @@ void cTiVoFile::GetXML(CComPtr<IXmlWriter> & pWriter) const
 			if (!m_ContentType.IsEmpty()) pWriter->WriteElementString(NULL, L"ContentType", NULL, m_ContentType.GetString());
 			//if (!m_ContentType.IsEmpty()) pWriter->WriteElementString(NULL, L"SourceFormat", NULL, m_ContentType.GetString());
 			if (!m_SourceFormat.IsEmpty()) pWriter->WriteElementString(NULL, L"SourceFormat", NULL, m_SourceFormat.GetString());
+			if (m_SourceSize > 0)
+			{
+				std::wstringstream ss;
+				ss << m_SourceSize;
+				pWriter->WriteElementString(NULL, L"SourceSize", NULL, ss.str().c_str());
+			}
 			if (m_Duration > 0)
 			{
 				std::wstringstream ss(std::stringstream::in | std::stringstream::out);

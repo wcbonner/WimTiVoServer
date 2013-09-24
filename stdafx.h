@@ -36,6 +36,7 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
+#include <queue>
 //#include <deque>
 //#include <map>
 #include <algorithm>
