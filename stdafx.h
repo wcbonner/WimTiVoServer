@@ -39,6 +39,7 @@
 //#include <map>
 //#include <algorithm>
 #include <signal.h>
+#include <memory> // for smart pointers
 #include <xmllite.h>
 #pragma comment(lib, "xmllite")
 

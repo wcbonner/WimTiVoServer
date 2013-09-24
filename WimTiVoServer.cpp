@@ -2046,33 +2046,36 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 				} 
 
 				std::vector<CString> myURLS;
-				myURLS.push_back(CString(_T("http://192.168.0.5:8080/TiVoConnect?Command=QueryContainer&Container=/")));
 				myURLS.push_back(CString(_T("http://192.168.0.108/TiVoConnect?Command=QueryContainer&Container=/")));
-				myURLS.push_back(CString(_T("https://192.168.0.5:4430/TiVoConnect?Command=QueryContainer&Container=/TivoNowPlaying")));
 				myURLS.push_back(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying")));
+				myURLS.push_back(CString(_T("http://192.168.0.5:8080/TiVoConnect?Command=QueryContainer&Container=/")));
+				myURLS.push_back(CString(_T("https://tivo:1760168186@192.168.0.5:4430/TiVoConnect?Command=QueryContainer&Container=/TivoNowPlaying")));
 				int FileIndex = 0;
 				CInternetSession serverSession;
 				for (auto csURL = myURLS.begin(); csURL != myURLS.end(); csURL++)
 				{
-					int BadCertErrorCount = 0;
-					AGAIN:
-					try 
+					std::cout << "[" << getTimeISO8601() << "] Attempting: " << CStringA(*csURL).GetString() << endl;
+					DWORD dwServiceType;
+					CString strServer;
+					CString strObject; 
+					INTERNET_PORT nPort; 
+					CString strUsername; 
+					CString strPassword; 
+					AfxParseURLEx(csURL->GetString(), dwServiceType, strServer, strObject, nPort, strUsername, strPassword);
+					std::unique_ptr<CHttpConnection> serverConnection(serverSession.GetHttpConnection(strServer,nPort,strUsername,strPassword));
+					if (NULL != serverConnection)
 					{
-						std::cout << "[" << getTimeISO8601() << "] Attempting: " << CStringA(*csURL).GetString() << endl;
-						DWORD dwServiceType;
-						CString strServer;
-						CString strObject; 
-						INTERNET_PORT nPort; 
-						CString strUsername; 
-						CString strPassword; 
-						AfxParseURLEx(csURL->GetString(), dwServiceType, strServer, strObject, nPort, strUsername, strPassword);
-						//std::unique_ptr<CHttpConnection> serverConnection(serverSession.GetHttpConnection(strServer,nPort,strUsername,strPassword));
-						//if (NULL != serverConnection)
-						//{
-						//	std::unique_ptr<CHttpFile> serverFile(serverConnection->OpenRequest(1, strObject, NULL, 1, NULL, NULL, SECURITY_IGNORE_ERROR_MASK));
-							std::unique_ptr<CHttpFile> serverFile((CHttpFile*) serverSession.OpenURL(*csURL, 1, INTERNET_FLAG_TRANSFER_BINARY | SECURITY_IGNORE_ERROR_MASK));
-							if (serverFile != NULL)
+						DWORD dwFlags = INTERNET_FLAG_TRANSFER_BINARY | SECURITY_IGNORE_ERROR_MASK;
+						if (dwServiceType == AFX_INET_SERVICE_HTTPS)
+							dwFlags |= INTERNET_FLAG_SECURE;
+						std::unique_ptr<CHttpFile> serverFile(serverConnection->OpenRequest(1, strObject, NULL, 1, NULL, NULL, dwFlags));
+						if (serverFile != NULL)
+						{
+							int BadCertErrorCount = 0;
+							AGAIN:
+							try 
 							{
+								//std::unique_ptr<CHttpFile> serverFile((CHttpFile*) serverSession.OpenURL(*csURL, 1, INTERNET_FLAG_TRANSFER_BINARY));
 								serverFile->SendRequest();
 								DWORD dwRet;
 								serverFile->QueryInfoStatusCode(dwRet);
@@ -2094,38 +2097,22 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 								}
 								serverFile->Close();
 							}
-						//}
-					}
-					catch(CInternetException *e)
-					{
-						TCHAR   szCause[255];
-						e->GetErrorMessage(szCause,sizeof(szCause)/sizeof(TCHAR));
-						CStringA csErrorMessage(szCause);
-						csErrorMessage.Trim();
-						cout << "[" << getTimeISO8601() << "] InternetException: " <<  csErrorMessage.GetString() << " (" << e->m_dwError << ") " << endl;
-						DWORD dw = GetLastError();
-						LPVOID lpMsgBuf;
-						int fmrval = FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, dw, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR) &lpMsgBuf, 0, NULL );
-						CStringA csgotLastErr((LPCTSTR)lpMsgBuf);
-						LocalFree(lpMsgBuf);
-						csgotLastErr.Trim();
-						cout << "[" << getTimeISO8601() << "] error(" << dw << ") " << csgotLastErr.GetString() << endl;							
-						if ((e->m_dwError == ERROR_INTERNET_INVALID_CA) || 
-							(e->m_dwError == ERROR_INTERNET_SEC_CERT_CN_INVALID) ||
-							(e->m_dwError == ERROR_INTERNET_SEC_CERT_DATE_INVALID) ||
-							(e->m_dwError == ERROR_INTERNET_SEC_INVALID_CERT) )
-						{
-							DWORD dwOption = INTERNET_OPTION_SECURITY_FLAGS;
-							DWORD dwValue;
-							if (TRUE == serverSession.QueryOption(dwOption, dwValue))
+							catch(CInternetException *e)
 							{
-								dwValue |= SECURITY_FLAG_IGNORE_UNKNOWN_CA;
-								dwValue |= SECURITY_FLAG_IGNORE_CERT_CN_INVALID;
-								dwValue |= SECURITY_FLAG_IGNORE_CERT_DATE_INVALID;
-								dwValue |= SECURITY_SET_MASK; // This is a catchall that I'm trying.
-								serverSession.SetOption(dwOption, dwValue);
-								if (BadCertErrorCount++ < 2)
-									goto AGAIN;
+								TCHAR   szCause[255];
+								e->GetErrorMessage(szCause,sizeof(szCause)/sizeof(TCHAR));
+								CStringA csErrorMessage(szCause);
+								csErrorMessage.Trim();
+								std::cout << "[" << getTimeISO8601() << "] InternetException: " <<  csErrorMessage.GetString() << " (" << e->m_dwError << ") " << endl;
+								if ((e->m_dwError == ERROR_INTERNET_INVALID_CA) || 
+									(e->m_dwError == ERROR_INTERNET_SEC_CERT_CN_INVALID) ||
+									(e->m_dwError == ERROR_INTERNET_SEC_CERT_DATE_INVALID) ||
+									(e->m_dwError == ERROR_INTERNET_SEC_INVALID_CERT) )
+								{
+									serverFile->SetOption(INTERNET_OPTION_SECURITY_FLAGS, SECURITY_SET_MASK);
+									if (BadCertErrorCount++ < 2)
+										goto AGAIN;
+								}
 							}
 						}
 					}
