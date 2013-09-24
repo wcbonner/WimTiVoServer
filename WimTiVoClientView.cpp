@@ -35,6 +35,7 @@ BEGIN_MESSAGE_MAP(CWimTiVoClientView, CListView)
 	ON_WM_CONTEXTMENU()
 	ON_WM_RBUTTONUP()
 	ON_COMMAND(ID_TIVI_NOWPLAYING, &CWimTiVoClientView::OnTiviNowplaying)
+	ON_UPDATE_COMMAND_UI(ID_TIVI_NOWPLAYING, &CWimTiVoClientView::OnUpdateTiVoNowplaying)
 	ON_COMMAND(ID_TIVO_BEACON, &CWimTiVoClientView::OnTivoBeacon)
 	ON_UPDATE_COMMAND_UI(ID_TIVO_BEACON, &CWimTiVoClientView::OnUpdateTivoBeacon)
 	ON_COMMAND(ID_TIVO_LIST, &CWimTiVoClientView::OnTivoList)
@@ -171,27 +172,30 @@ void CWimTiVoClientView::OnUpdate(CView* pSender, LPARAM lHint, CObject* pHint)
 		if (0 != ListCtrl.DeleteAllItems())
 		{
 			ASSERT(ListCtrl.GetItemCount() == 0);
-			for(auto TiVoFile = pDoc->m_TiVoFiles.begin(); TiVoFile != pDoc->m_TiVoFiles.end(); TiVoFile++)
-			{
-				int nItem = ListCtrl.InsertItem(
-					LVIF_TEXT | LVIF_STATE,
-					TiVoFile-pDoc->m_TiVoFiles.begin(), 
-					TiVoFile->GetPathName(), 
-					INDEXTOSTATEIMAGEMASK(1), 
-					LVIS_STATEIMAGEMASK, 
-					0,
-					NULL);
-				ListCtrl.SetItemText(nItem, 1, TiVoFile->GetTitle());
-				ListCtrl.SetItemText(nItem, 2, TiVoFile->GetEpisodeTitle());
-				ListCtrl.SetItemText(nItem, 3, TiVoFile->GetDescription());
-				ListCtrl.SetItemText(nItem, 4, TiVoFile->GetCaptureDate().Format(_T("%c")));
-				ListCtrl.SetItemText(nItem, 5, CTimeSpan(TiVoFile->GetDuration()/1000).Format(_T("%H:%M:%S")));
-				std::stringstream ss;
-				std::locale mylocale("");   // get global locale
-				ss.imbue(mylocale);  // imbue global locale
-				ss << TiVoFile->GetSourceSize();
-				ListCtrl.SetItemText(nItem, 6, CString(ss.str().c_str()));
-			}
+			//if (!(pDoc->m_TiVoTransferFileThreadRunning || pDoc->m_TiVoConvertFileThreadRunning))
+			//{
+				for(auto TiVoFile = pDoc->m_TiVoFiles.begin(); TiVoFile != pDoc->m_TiVoFiles.end(); TiVoFile++)
+				{
+					int nItem = ListCtrl.InsertItem(
+						LVIF_TEXT | LVIF_STATE,
+						TiVoFile-pDoc->m_TiVoFiles.begin(), 
+						TiVoFile->GetPathName(), 
+						INDEXTOSTATEIMAGEMASK(1), 
+						LVIS_STATEIMAGEMASK, 
+						0,
+						NULL);
+					ListCtrl.SetItemText(nItem, 1, TiVoFile->GetTitle());
+					ListCtrl.SetItemText(nItem, 2, TiVoFile->GetEpisodeTitle());
+					ListCtrl.SetItemText(nItem, 3, TiVoFile->GetDescription());
+					ListCtrl.SetItemText(nItem, 4, TiVoFile->GetCaptureDate().Format(_T("%c")));
+					ListCtrl.SetItemText(nItem, 5, CTimeSpan(TiVoFile->GetDuration()/1000).Format(_T("%H:%M:%S")));
+					std::stringstream ss;
+					std::locale mylocale("");   // get global locale
+					ss.imbue(mylocale);  // imbue global locale
+					ss << TiVoFile->GetSourceSize();
+					ListCtrl.SetItemText(nItem, 6, CString(ss.str().c_str()));
+				}
+			//}
 		}
 		CMFCRibbonBar* pRibbon = ((CFrameWndEx*) GetTopLevelFrame())->GetRibbonBar();
 		if (pRibbon)
@@ -253,6 +257,12 @@ void CWimTiVoClientView::OnTiviNowplaying()
 		pDoc->UpdateAllViews(NULL);
 	}
 	TRACE(__FUNCTION__ " Exiting\n");
+}
+void CWimTiVoClientView::OnUpdateTiVoNowplaying(CCmdUI *pCmdUI)
+{
+	CWimTiVoClientDoc * pDoc = GetDocument();
+	if (pDoc)
+		pCmdUI->Enable(!(pDoc->m_TiVoTransferFileThreadRunning || pDoc->m_TiVoConvertFileThreadRunning));
 }
 void CWimTiVoClientView::OnTivoBeacon()
 {
@@ -454,13 +464,14 @@ void CWimTiVoClientView::OnTivoGetFiles()
 				pEditTransferSize->SetEditText(CString(junk.str().c_str()));
 			}
 		}
-		//CFrameWndEx* mainFrm = dynamic_cast<CFrameWndEx*>(GetTopLevelFrame());
-		//if (mainFrm)
-		//{
-		//	mainFrm->SetProgressBarState(TBPF_NORMAL);
-		//	mainFrm->SetProgressBarRange(0, 100);
-		//	mainFrm->SetProgressBarPosition(pDoc->m_CurrentFileProgress);
-		//}
+		CFrameWndEx* mainFrm = dynamic_cast<CFrameWndEx*>(GetTopLevelFrame());
+		if (mainFrm)
+		{
+			mainFrm->SetProgressBarState(TBPF_NORMAL);
+			mainFrm->SetProgressBarRange(0, 100);
+			mainFrm->SetProgressBarPosition(pDoc->m_CurrentFileProgress);
+		}
+		m_csOriginalTitle = ((CFrameWndEx*) GetTopLevelFrame())->GetTitle();
 		pDoc->m_TiVoTransferFileThreadStopRequested = false;
 		AfxBeginThread(pDoc->TiVoTransferFileThread, (LPVOID) GetSafeHwnd());
 		AfxBeginThread(pDoc->TiVoConvertFileThread, (LPVOID) GetSafeHwnd());
@@ -472,7 +483,7 @@ void CWimTiVoClientView::OnUpdateTivoGetFiles(CCmdUI *pCmdUI)
 {
 	CWimTiVoClientDoc * pDoc = GetDocument();
 	if (pDoc)
-		pCmdUI->Enable(!pDoc->m_TiVoTransferFileThreadRunning);
+		pCmdUI->Enable(!(pDoc->m_TiVoTransferFileThreadRunning || pDoc->m_TiVoConvertFileThreadRunning));
 }
 void CWimTiVoClientView::OnTimer(UINT_PTR nIDEvent)
 {
@@ -485,18 +496,21 @@ void CWimTiVoClientView::OnTimer(UINT_PTR nIDEvent)
 			if (!pDoc->m_TiVoTransferFileThreadRunning)
 			{
 				KillTimer(m_nWindowTimer);
-				//CFrameWndEx* mainFrm = dynamic_cast<CFrameWndEx*>(GetTopLevelFrame());
-				////CFrameWndEx* mainFrm = dynamic_cast<CFrameWndEx*>(AfxGetApp()->GetMainWnd());
-				//if (mainFrm)
-				//	mainFrm->SetProgressBarState(TBPF_NOPROGRESS);
+				((CFrameWndEx*) GetTopLevelFrame())->SetTitle(m_csOriginalTitle);
+
+				CFrameWndEx* mainFrm = dynamic_cast<CFrameWndEx*>(GetTopLevelFrame());
+				if (mainFrm)
+					mainFrm->SetProgressBarState(TBPF_NOPROGRESS);
 			}
-			//else
-			//{
-			//	//CFrameWndEx* mainFrm = dynamic_cast<CFrameWndEx*>(AfxGetApp()->GetMainWnd());
-			//	CFrameWndEx* mainFrm = dynamic_cast<CFrameWndEx*>(GetTopLevelFrame());
-			//	if (mainFrm)
-			//		mainFrm->SetProgressBarPosition(pDoc->m_CurrentFileProgress);
-			//}
+			else
+			{
+				CFrameWndEx* mainFrm = dynamic_cast<CFrameWndEx*>(GetTopLevelFrame());
+				if (mainFrm)
+					mainFrm->SetProgressBarPosition(pDoc->m_CurrentFileProgress);
+			}
+			CString csTitleBar(m_csOriginalTitle);
+			csTitleBar.AppendFormat(_T(" Transferring File: %s %ld %ld B/s"), pDoc->m_CurrentFileName.GetString(), pDoc->m_TiVoFilesToTransferTotalSize, pDoc->m_CurrentFileSpeed);
+			((CFrameWndEx*) GetTopLevelFrame())->SetTitle(csTitleBar);
 			CMFCRibbonBar* pRibbon = ((CFrameWndEx*) GetTopLevelFrame())->GetRibbonBar();
 			if (pRibbon)
 			{
@@ -527,6 +541,9 @@ void CWimTiVoClientView::OnTimer(UINT_PTR nIDEvent)
 				CMFCRibbonProgressBar* pEditCurrentFileProgress = DYNAMIC_DOWNCAST(CMFCRibbonProgressBar, pRibbon->FindByID(ID_TRANSFER_CURRENT_FILE_PROGRESS));
 				if (pEditCurrentFileProgress)
 					pEditCurrentFileProgress->SetPos(pDoc->m_CurrentFileProgress);
+				CMFCRibbonProgressBar* pEditTotalFileProgress = DYNAMIC_DOWNCAST(CMFCRibbonProgressBar, pRibbon->FindByID(ID_TRANSFER_TOTAL_FILE_PROGRESS));
+				if (pEditTotalFileProgress)
+					pEditTotalFileProgress->SetPos(pDoc->m_TotalFileProgress);				
 				CMFCRibbonEdit* pEditTransferCount = DYNAMIC_DOWNCAST(CMFCRibbonEdit, pRibbon->FindByID(ID_TRANSFER_COUNT));
 				if (pEditTransferCount)
 				{
@@ -554,3 +571,5 @@ void CWimTiVoClientView::OnTimer(UINT_PTR nIDEvent)
 	else
 		CListView::OnTimer(nIDEvent); // If you pass your own timer event to the parent class it will kill off the timer.
 }
+
+

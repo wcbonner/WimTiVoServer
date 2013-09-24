@@ -43,4 +43,8 @@ public:
 	DECLARE_MESSAGE_MAP()
 };
 
+CString GetFileVersion(const CString & filename);
+CString GetFileVersionString(const CString & filename, const CString & string);
+void DelimitedTextToVector(std::vector<CString> &record, const CString& line, TCHAR delimiter);
+
 extern CWimTiVoClientApp theApp;

@@ -189,7 +189,7 @@ BOOL CWimTiVoClientApp::InitInstance()
 		AfxMessageBox(IDP_OLE_INIT_FAILED);
 		return FALSE;
 	}
-	EnableTaskbarInteraction(FALSE);
+	EnableTaskbarInteraction(TRUE);
 
 	// AfxInitRichEdit2() is required to use RichEdit control	
 	// AfxInitRichEdit2();

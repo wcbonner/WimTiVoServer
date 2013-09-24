@@ -40,10 +40,12 @@ public:
 	CTimeSpan m_TotalFileEstimatedTimeRemaining;
 	CString m_CurrentFileName;
 	int m_CurrentFileProgress;
+	int m_TotalFileProgress;
 	unsigned long long m_CurrentFileSize;
 	unsigned long long m_CurrentFileSpeed;
 	CTimeSpan m_CurrentFileEstimatedTimeRemaining;
 	std::queue<cTiVoFile> m_TiVoFilesToConvert;
+	std::ofstream m_LogFile;
 
 // Operations
 public:

@@ -25,6 +25,7 @@ public:
 	CWimTiVoClientDoc* GetDocument() const;
 
 protected:
+	CString m_csOriginalTitle;
 	UINT_PTR m_nWindowTimer;
 // Operations
 public:
@@ -54,6 +55,7 @@ protected:
 	virtual void OnUpdate(CView* /*pSender*/, LPARAM /*lHint*/, CObject* /*pHint*/);
 public:
 	afx_msg void OnTiviNowplaying();
+	afx_msg void OnUpdateTiVoNowplaying(CCmdUI *pCmdUI);
 	afx_msg void OnTivoBeacon();
 	afx_msg void OnUpdateTivoBeacon(CCmdUI *pCmdUI);
 	afx_msg void OnUpdateTivoMak(CCmdUI *pCmdUI);

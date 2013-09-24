@@ -36,6 +36,31 @@ BEGIN_MESSAGE_MAP(CWimTiVoClientDoc, CDocument)
 END_MESSAGE_MAP()
 
 // CWimTiVoClientDoc construction/destruction
+static std::string timeToISO8601(const time_t & TheTime)
+{
+	std::ostringstream ISOTime;
+	struct tm UTC;
+	gmtime_s(&UTC, &TheTime);
+	ISOTime.fill('0');
+	ISOTime << UTC.tm_year+1900 << "-";
+	ISOTime.width(2);
+	ISOTime << UTC.tm_mon+1 << "-";
+	ISOTime.width(2);
+	ISOTime << UTC.tm_mday << "T";
+	ISOTime.width(2);
+	ISOTime << UTC.tm_hour << ":";
+	ISOTime.width(2);
+	ISOTime << UTC.tm_min << ":";
+	ISOTime.width(2);
+	ISOTime << UTC.tm_sec;
+	return(ISOTime.str());
+}
+static std::string getTimeISO8601(void)
+{
+	time_t timer;
+	time(&timer);
+	return(timeToISO8601(timer));
+}
 CString FindEXEFromPath(const CString & csEXE)
 {
 	CString csFullPath;
@@ -69,6 +94,18 @@ CString FindEXEFromPath(const CString & csEXE)
 	}
 	return(csFullPath);
 }
+/////////////////////////////////////////////////////////////////////////////
+static const CString QuoteFileName(const CString & Original)
+{
+	CString csQuotedString(Original);
+	if (csQuotedString.Find(_T(" ")) >= 0)
+	{
+		csQuotedString.Insert(0,_T('"'));
+		csQuotedString.AppendChar(_T('"'));
+	}
+	return(csQuotedString);
+}
+/////////////////////////////////////////////////////////////////////////////
 CWimTiVoClientDoc::CWimTiVoClientDoc()
 {
 	TRACE(__FUNCTION__ "\n");
@@ -80,6 +117,7 @@ CWimTiVoClientDoc::CWimTiVoClientDoc()
 	m_TiVoConvertFileThreadRunning = false;
 	m_TiVoConvertFileThreadStopRequested = false;
 	m_CurrentFileProgress = 0;
+	m_TotalFileProgress = 0;
 	m_CurrentFileSize = 0;
 	m_CurrentFileSpeed = 0;
 
@@ -134,7 +172,34 @@ CWimTiVoClientDoc::CWimTiVoClientDoc()
 			m_TiVoServers.push_back(myServer);
 		}
 	}
-	m_csTiVoFileDestination = AfxGetApp()->GetProfileString(_T("TiVo"),_T("TiVoFileDestination"),_T(""));
+
+	//PWSTR pszPath[MAX_PATH];
+	//SHGetKnownFolderPath(FOLDERID_Videos, 0, NULL, pszPath); // This is the new format of this command.
+	TCHAR szPath[MAX_PATH] = _T("");
+	SHGetFolderPath(NULL, CSIDL_MYVIDEO, NULL, 0, szPath);
+	PathAddBackslash(szPath);
+	m_csTiVoFileDestination = AfxGetApp()->GetProfileString(_T("TiVo"), _T("TiVoFileDestination"), szPath);
+	if (m_csTiVoFileDestination.IsEmpty()) //HACK: This is temporary to fix a minor thing that Fred may have run into.
+		m_csTiVoFileDestination = szPath;
+
+	TCHAR szLogFilePath[MAX_PATH] = _T("");
+	SHGetFolderPath(NULL, CSIDL_PERSONAL, NULL, 0, szLogFilePath);
+	CString csLogFileName(AfxGetAppName());
+	PathAppend(szLogFilePath, csLogFileName.GetString());
+	PathAddExtension(szLogFilePath, _T(".txt"));
+	m_LogFile.open(szLogFilePath, std::ios_base::out | std::ios_base::app | std::ios_base::ate);
+	if (m_LogFile.is_open())
+	{
+		std::locale mylocale("");   // get global locale
+		m_LogFile.imbue(mylocale);  // imbue global locale
+		m_LogFile << "[" << getTimeISO8601() << "] LogFile Opened" << std::endl;
+		TCHAR filename[1024];
+		unsigned long buffersize = sizeof(filename) / sizeof(TCHAR);
+		// Get the file name that we are running from.
+		GetModuleFileName(AfxGetResourceHandle(), filename, buffersize );
+		m_LogFile << "[                   ] Program: " << CStringA(filename).GetString() << std::endl;
+		m_LogFile << "[                   ] Version: " << CStringA(GetFileVersion(filename)).GetString() << " Built: " __DATE__ " at " __TIME__ << std::endl;
+	}
 }
 
 CWimTiVoClientDoc::~CWimTiVoClientDoc()
@@ -167,6 +232,11 @@ CWimTiVoClientDoc::~CWimTiVoClientDoc()
 		AfxGetApp()->WriteProfileString(_T("TiVo"), CString(ssKey.str().c_str()), CString(ssValue.str().c_str()));
 	}
 	AfxGetApp()->WriteProfileString(_T("TiVo"),_T("TiVoFileDestination"),m_csTiVoFileDestination);
+	if (m_LogFile.is_open())
+	{
+		m_LogFile << "[" << getTimeISO8601() << "] LogFile Closed" << std::endl;
+		m_LogFile.close();
+	}
 }
 
 #ifdef SHARED_HANDLERS
@@ -242,65 +312,52 @@ void CWimTiVoClientDoc::Dump(CDumpContext& dc) const
 bool CWimTiVoClientDoc::GetNowPlaying(void)
 {
 	TRACE(__FUNCTION__ "\n");
-	//if (SUCCEEDED(CoInitializeEx(0, COINIT_MULTITHREADED))) // COINIT_APARTMENTTHREADED
-	//{
-		//XML_Test_FileReformat(_T("D:\\Videos\\chunk-01-0001.xml"), _T("D:/Videos/Evening Magazine (Recorded Mar 26, 2010, KINGDT).1.xml"));
-		//XML_Test_FileReformat(_T("D:\\Videos\\chunk-02-0002.xml"), _T("D:/Videos/Evening Magazine (Recorded Mar 26, 2010, KINGDT).2.xml"));
-		//XML_Test_Read_ElementsOnly();
-		//XML_Test_Read();
-		//XML_Test_Write();
-		//XML_Test_Write_InMemory();
+	TCHAR szScheme[_MAX_PATH];
+	DWORD dwSchemeLength = sizeof(szScheme) / sizeof(TCHAR);
+	TCHAR szHostName[_MAX_PATH];
+	DWORD dwHostNameLength = sizeof(szHostName) / sizeof(TCHAR);
+	TCHAR szUserName[_MAX_PATH];
+	DWORD dwUserNameLength = sizeof(szUserName) / sizeof(TCHAR);
+	TCHAR szPassword[_MAX_PATH];
+	DWORD dwPasswordLength = sizeof(szPassword) / sizeof(TCHAR);
+	TCHAR szUrlPath[_MAX_PATH];
+	DWORD dwUrlPathLength = sizeof(szUrlPath) / sizeof(TCHAR);
+	TCHAR szExtraInfo[_MAX_PATH];
+	DWORD dwExtraInfoLength = sizeof(szExtraInfo) / sizeof(TCHAR);		
+	URL_COMPONENTS crackedURL;
+	crackedURL.dwStructSize = sizeof(URL_COMPONENTS);
+	crackedURL.lpszScheme = szScheme;					// pointer to scheme name
+	crackedURL.dwSchemeLength = dwSchemeLength;			// length of scheme name
+	crackedURL.nScheme;									// enumerated scheme type (if known)
+	crackedURL.lpszHostName = szHostName;				// pointer to host name
+	crackedURL.dwHostNameLength = dwHostNameLength;		// length of host name
+	crackedURL.nPort;									// converted port number
+	crackedURL.lpszUserName = szUserName;				// pointer to user name
+	crackedURL.dwUserNameLength = dwUserNameLength;		// length of user name
+	crackedURL.lpszPassword = szPassword;				// pointer to password
+	crackedURL.dwPasswordLength = dwPasswordLength;		// length of password
+	crackedURL.lpszUrlPath = szUrlPath;					// pointer to URL-path
+	crackedURL.dwUrlPathLength = dwUrlPathLength;		// length of URL-path
+	crackedURL.lpszExtraInfo = szExtraInfo;				// pointer to extra information (e.g. ?foo or #foo)
+	crackedURL.dwExtraInfoLength = dwExtraInfoLength;	// length of extra information
 	CString csURL(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying&Recurse=Yes&SortOrder=!CaptureDate"));
-		TCHAR szScheme[_MAX_PATH];
-		DWORD dwSchemeLength = sizeof(szScheme) / sizeof(TCHAR);
-		TCHAR szHostName[_MAX_PATH];
-		DWORD dwHostNameLength = sizeof(szHostName) / sizeof(TCHAR);
-		TCHAR szUserName[_MAX_PATH];
-		DWORD dwUserNameLength = sizeof(szUserName) / sizeof(TCHAR);
-		TCHAR szPassword[_MAX_PATH];
-		DWORD dwPasswordLength = sizeof(szPassword) / sizeof(TCHAR);
-		TCHAR szUrlPath[_MAX_PATH];
-		DWORD dwUrlPathLength = sizeof(szUrlPath) / sizeof(TCHAR);
-		TCHAR szExtraInfo[_MAX_PATH];
-		DWORD dwExtraInfoLength = sizeof(szExtraInfo) / sizeof(TCHAR);		
-		URL_COMPONENTS crackedURL;
-		crackedURL.dwStructSize = sizeof(URL_COMPONENTS);
-		crackedURL.lpszScheme = szScheme;					// pointer to scheme name
-		crackedURL.dwSchemeLength = dwSchemeLength;			// length of scheme name
-		crackedURL.nScheme;									// enumerated scheme type (if known)
-		crackedURL.lpszHostName = szHostName;				// pointer to host name
-		crackedURL.dwHostNameLength = dwHostNameLength;		// length of host name
-		crackedURL.nPort;									// converted port number
-		crackedURL.lpszUserName = szUserName;				// pointer to user name
-		crackedURL.dwUserNameLength = dwUserNameLength;		// length of user name
-		crackedURL.lpszPassword = szPassword;				// pointer to password
-		crackedURL.dwPasswordLength = dwPasswordLength;		// length of password
-		crackedURL.lpszUrlPath = szUrlPath;					// pointer to URL-path
-		crackedURL.dwUrlPathLength = dwUrlPathLength;		// length of URL-path
-		crackedURL.lpszExtraInfo = szExtraInfo;				// pointer to extra information (e.g. ?foo or #foo)
-		crackedURL.dwExtraInfoLength = dwExtraInfoLength;	// length of extra information
-		InternetCrackUrl(csURL.GetString(), csURL.GetLength(), ICU_DECODE, &crackedURL);
+	InternetCrackUrl(csURL.GetString(), csURL.GetLength(), ICU_DECODE, &crackedURL);
 
+	cTiVoServer myServer;
+	myServer.m_machine = CStringA(m_TiVoServerName);
+	auto pServer = std::find(m_TiVoServers.begin(), m_TiVoServers.end(), myServer);
+	if (pServer != m_TiVoServers.end())
+	{
+		myServer = *pServer;
 		std::stringstream ss;
-		cTiVoServer myServer;
-		myServer.m_machine = CStringA(m_TiVoServerName);
-		auto pServer = std::find(m_TiVoServers.begin(), m_TiVoServers.end(), myServer);
-		if (pServer != m_TiVoServers.end())
-		{
-			myServer = *pServer;
-			ss << CStringA(crackedURL.lpszScheme).GetString() << "://";
-			ss << "tivo:" << myServer.m_MAK << "@";
-			ss << myServer.m_address << ":" << crackedURL.nPort;
-			ss << CStringA(crackedURL.lpszUrlPath).GetString() << CStringA(crackedURL.lpszExtraInfo).GetString();
-		}
-		else
-		{
-			ss << CStringA(crackedURL.lpszScheme).GetString() << "://";
-			ss << CStringA(crackedURL.lpszUserName).GetString() << ":" << CStringA(crackedURL.lpszPassword).GetString() << "@";
-			ss << CStringA(crackedURL.lpszHostName).GetString() << ":" << crackedURL.nPort;
-			ss << CStringA(crackedURL.lpszUrlPath).GetString() << CStringA(crackedURL.lpszExtraInfo).GetString();
-		}
+		ss << CStringA(crackedURL.lpszScheme).GetString() << "://";
+		ss << "tivo:" << myServer.m_MAK << "@";
+		ss << myServer.m_address << ":" << crackedURL.nPort;
+		ss << CStringA(crackedURL.lpszUrlPath).GetString() << CStringA(crackedURL.lpszExtraInfo).GetString();
 		csURL = CString(ss.str().c_str());
+
+		if (m_LogFile.is_open())
+			m_LogFile << "[" << getTimeISO8601() << "] XML_Parse_TiVoNowPlaying: " << CStringA(csURL).GetString() << std::endl;
 
 		XML_Parse_TiVoNowPlaying(csURL, CString(myServer.m_MAK.c_str()), m_TiVoFiles, m_InternetSession);
 
@@ -311,17 +368,13 @@ bool CWimTiVoClientDoc::GetNowPlaying(void)
 			m_TiVoTotalTime += CTimeSpan(TiVoFile->GetDuration()/1000);
 			m_TiVoTotalSize += TiVoFile->GetSourceSize();
 		}
-		std::stringstream  junk;
-		std::locale mylocale("");   // get global locale
-		junk.imbue(mylocale);  // imbue global locale
-		junk << "TiVo Details: Total Time: " << CStringA(m_TiVoTotalTime.Format(_T("%D Days, %H:%M:%S"))).GetString() << " Total Size: " << m_TiVoTotalSize << std::endl;
-		TRACE(junk.str().c_str());
-	//}
-	//CoUninitialize();
+
+		if (m_LogFile.is_open())
+			m_LogFile << "[" << getTimeISO8601() << "] TiVoNowPlaying Details: Total Time: " << CStringA(m_TiVoTotalTime.Format(_T("%D Days, %H:%M:%S"))).GetString() << " Total Size: " << m_TiVoTotalSize << std::endl;
+	}
 	TRACE(__FUNCTION__ " Exiting\n");
 	return false;
 }
-
 UINT CWimTiVoClientDoc::TiVoBeaconListenThread(LPVOID lvp)
 {
 	TRACE(__FUNCTION__ "\n");
@@ -462,6 +515,8 @@ bool CWimTiVoClientDoc::GetTiVoFile(const cTiVoFile & TiVoFile) //, CInternetSes
 		DWORD dwFlags = INTERNET_FLAG_TRANSFER_BINARY | SECURITY_IGNORE_ERROR_MASK;
 		if (dwServiceType == AFX_INET_SERVICE_HTTPS)
 			dwFlags |= INTERNET_FLAG_SECURE;
+		if (m_LogFile.is_open())
+			m_LogFile << "[" << getTimeISO8601() << "] OpenRequest: " << CStringA(strObject).GetString() << std::endl;
 		std::unique_ptr<CHttpFile> serverFile(serverConnection->OpenRequest(1, strObject, NULL, 1, NULL, NULL, dwFlags));
 		if (serverFile != NULL)
 		{
@@ -479,7 +534,8 @@ bool CWimTiVoClientDoc::GetTiVoFile(const cTiVoFile & TiVoFile) //, CInternetSes
 				serverFile->QueryInfo(HTTP_QUERY_RAW_HEADERS_CRLF,headers);
 				headers.Trim();
 				headers.Replace(_T("\r\n"),_T("\r\n[                   ] HTTP_QUERY_RAW_HEADERS_CRLF: "));
-				std::wcout << L"[                   ] HTTP_QUERY_RAW_HEADERS_CRLF: " << headers.GetString() << std::endl;
+				if (m_LogFile.is_open())
+					m_LogFile << "[                   ] HTTP_QUERY_RAW_HEADERS_CRLF: " << CStringA(headers).GetString() << std::endl;
 				#endif
 				if(dwRet == HTTP_STATUS_OK)
 				{
@@ -487,7 +543,8 @@ bool CWimTiVoClientDoc::GetTiVoFile(const cTiVoFile & TiVoFile) //, CInternetSes
 					serverFile->QueryInfo(HTTP_QUERY_SET_COOKIE, csCookie);
 					if (!csCookie.IsEmpty())
 					{
-						std::wcout << L"[                   ] HTTP_QUERY_SET_COOKIE: " << csCookie.GetString() << std::endl;
+						if (m_LogFile.is_open())
+							m_LogFile  << "[                   ] HTTP_QUERY_SET_COOKIE: " << CStringA(csCookie).GetString() << std::endl;
 						// sid=1BFA53E13BDF178B; path=/; expires="Saturday, 16-Feb-2013 00:00:00 GMT";
 						CString csCookieName(csCookie.Left(csCookie.Find(_T("="))));
 						CString csCookieData(csCookie.Left(csCookie.Find(_T(";"))));;
@@ -503,9 +560,12 @@ bool CWimTiVoClientDoc::GetTiVoFile(const cTiVoFile & TiVoFile) //, CInternetSes
 						csCookieURL.Append(strServer);
 						csCookieURL.AppendFormat(_T(":%d"), nPort);
 						csCookieURL.Append(csCookiePath);
-						std::wcout << L"[                   ] csCookieURL: " << csCookieURL.GetString() << std::endl;
-						std::wcout << L"[                   ] csCookieName: " << csCookieName.GetString() << std::endl;
-						std::wcout << L"[                   ] csCookieData: " << csCookieData.GetString() << std::endl;
+						if (m_LogFile.is_open())
+						{
+							m_LogFile << "[                   ] csCookieURL: " << CStringA(csCookieURL).GetString() << std::endl;
+							m_LogFile << "[                   ] csCookieName: " << CStringA(csCookieName).GetString() << std::endl;
+							m_LogFile << "[                   ] csCookieData: " << CStringA(csCookieData).GetString() << std::endl;
+						}
 						m_InternetSession.SetCookie(csCookieURL,csCookieName,csCookieData);
 					}									
 					CString csContentType;
@@ -515,7 +575,8 @@ bool CWimTiVoClientDoc::GetTiVoFile(const cTiVoFile & TiVoFile) //, CInternetSes
 					if (!csContentType.CompareNoCase(_T("video/x-tivo-mpeg")))
 					{
 						//std::wcout << L"[                   ] Duration: " << TiVoFile
-						std::wcout << L"[                   ] Writing File: " << TiVoFile.GetPathName().GetString() << std::endl;
+						if (m_LogFile.is_open())
+							m_LogFile << "[" << getTimeISO8601() << "] Writing File: " << CStringA(QuoteFileName(TiVoFile.GetPathName())).GetString() << std::endl;
 						m_CurrentFileName = m_csTiVoFileDestination;
 						m_CurrentFileName.Append(TiVoFile.GetPathName());
 						std::ofstream OutputFile(m_CurrentFileName, std::ios_base::binary);
@@ -533,6 +594,7 @@ bool CWimTiVoClientDoc::GetTiVoFile(const cTiVoFile & TiVoFile) //, CInternetSes
 								m_CurrentFileSize += uiRead;
 								ctsTotal = CTime::GetCurrentTime() - ctStart;
 								m_CurrentFileProgress = 100.0 * (double(m_CurrentFileSize) / double(TiVoFile.GetSourceSize()));
+								m_TotalFileProgress = 100.0 * (double(m_CurrentFileSize) / double(m_TiVoFilesToTransferTotalSize));
 								auto TotalSeconds = ctsTotal.GetTotalSeconds();
 								if (TotalSeconds > 0)
 								{
@@ -542,7 +604,9 @@ bool CWimTiVoClientDoc::GetTiVoFile(const cTiVoFile & TiVoFile) //, CInternetSes
 								}
 							}
 							OutputFile.close();
-							m_CurrentFileEstimatedTimeRemaining = ctsTotal;
+							if (m_LogFile.is_open())
+								m_LogFile << "[" << getTimeISO8601() << "] Closing File: " << CStringA(QuoteFileName(TiVoFile.GetPathName())).GetString() << " Total Bytes: " << m_CurrentFileSize << " Transfer Time: " << CStringA(ctsTotal.Format(_T("%H:%M:%S"))).GetString() << " Transfer Speed: " << m_CurrentFileSpeed << " B/s" << std::endl;
+							m_CurrentFileEstimatedTimeRemaining = 0;
 							m_CurrentFileProgress = 100;
 							CFileStatus status;
 							if (TRUE == CFile::GetStatus(m_CurrentFileName, status))
@@ -554,7 +618,8 @@ bool CWimTiVoClientDoc::GetTiVoFile(const cTiVoFile & TiVoFile) //, CInternetSes
 					}
 					else
 					{
-						std::cout << "[                   ] not text/xml or video/x-tivo-mpeg" << std::endl;
+						if (m_LogFile.is_open())
+							m_LogFile << "[                   ] not text/xml or video/x-tivo-mpeg" << std::endl;
 						char ittybittybuffer;
 						while (0 < serverFile->Read(&ittybittybuffer, sizeof(ittybittybuffer)))
 							std::cout << ittybittybuffer;
@@ -567,7 +632,8 @@ bool CWimTiVoClientDoc::GetTiVoFile(const cTiVoFile & TiVoFile) //, CInternetSes
 					if (0 < serverFile->QueryInfo(HTTP_QUERY_RETRY_AFTER, csRetry))
 					{
 						int iRetry = _ttoi(csRetry.GetString());
-						//std::cout << "[" << getTimeISO8601() << "] Sleeping for " << iRetry << " Seconds" << std::endl;
+						if (m_LogFile.is_open())
+							m_LogFile << "[" << getTimeISO8601() << "] Sleeping for " << iRetry << " Seconds" << std::endl;
 						Sleep(iRetry * 1000);
 						rval = false;
 					}
@@ -588,7 +654,8 @@ bool CWimTiVoClientDoc::GetTiVoFile(const cTiVoFile & TiVoFile) //, CInternetSes
 				e->GetErrorMessage(szCause,sizeof(szCause)/sizeof(TCHAR));
 				CStringA csErrorMessage(szCause);
 				csErrorMessage.Trim();
-				std::cout << "[                   ] InternetException: " <<  csErrorMessage.GetString() << " (" << e->m_dwError << ") " << std::endl;
+				if (m_LogFile.is_open())
+					m_LogFile << "[                   ] InternetException: " <<  csErrorMessage.GetString() << " (" << e->m_dwError << ") " << std::endl;
 				if ((e->m_dwError == ERROR_INTERNET_INVALID_CA) || 
 					(e->m_dwError == ERROR_INTERNET_SEC_CERT_CN_INVALID) ||
 					(e->m_dwError == ERROR_INTERNET_SEC_CERT_DATE_INVALID) ||
@@ -604,18 +671,6 @@ bool CWimTiVoClientDoc::GetTiVoFile(const cTiVoFile & TiVoFile) //, CInternetSes
 	}
 	return(rval);
 }
-/////////////////////////////////////////////////////////////////////////////
-static const CString QuoteFileName(const CString & Original)
-{
-	CString csQuotedString(Original);
-	if (csQuotedString.Find(_T(" ")) >= 0)
-	{
-		csQuotedString.Insert(0,_T('"'));
-		csQuotedString.AppendChar(_T('"'));
-	}
-	return(csQuotedString);
-}
-/////////////////////////////////////////////////////////////////////////////
 UINT CWimTiVoClientDoc::TiVoConvertFileThread(LPVOID lvp)
 {
 	TRACE(__FUNCTION__ "\n");
@@ -647,16 +702,24 @@ UINT CWimTiVoClientDoc::TiVoConvertFileThread(LPVOID lvp)
 					if ((pDoc->m_bTiVoDecode) && (TRUE != CFile::GetStatus(csMPEGPathName, status)))
 					{
 						if (!pDoc->m_csTDCatPath.IsEmpty())
-							if (-1 == _tspawnl(_P_WAIT, pDoc->m_csTDCatPath.GetString(), pDoc->m_csTDCatPath.GetString(), _T("--mak"), TiVoFile.GetMAK(), _T("--out"), csXMLPathName.GetString(), _T("--chunk-2"), QuoteFileName(csTiVoFileName).GetString(), NULL))
-								std::cout << "[                   ]  _tspawnlp failed: " /* << strerror(errno) */ << std::endl;
+						{
+							if (pDoc->m_LogFile.is_open())
+								pDoc->m_LogFile << "[" << getTimeISO8601() << "]\tspawn: " << CStringA(pDoc->m_csTDCatPath).GetString() << " " << CStringA(pDoc->m_csTDCatPath).GetString() << "  --mak  " << CStringA(TiVoFile.GetMAK()).GetString() << " --out " << CStringA(QuoteFileName(csXMLPathName)).GetString() << " " << CStringA(csXMLPathName).GetString() << " --chunk-2 " << CStringA(QuoteFileName(csTiVoFileName)).GetString() << std::endl;
+							if (-1 == _tspawnl(_P_WAIT, pDoc->m_csTDCatPath.GetString(), pDoc->m_csTDCatPath.GetString(), _T("--mak"), TiVoFile.GetMAK(), _T("--out"), QuoteFileName(csXMLPathName).GetString(), _T("--chunk-2"), QuoteFileName(csTiVoFileName).GetString(), NULL))
+								if (pDoc->m_LogFile.is_open())
+									pDoc->m_LogFile << "[                   ]  _tspawnlp failed: " /* << strerror(errno) */ << std::endl;
+						}
 						if (TRUE == CFile::GetStatus(csXMLPathName, status))
 						{
 							status.m_ctime = status.m_mtime = TiVoFile.GetCaptureDate();
 							CFile::SetStatus(csXMLPathName, status);
 						}
 
+						if (pDoc->m_LogFile.is_open())
+							pDoc->m_LogFile << "[" << getTimeISO8601() << "]\tspawn: " << CStringA(pDoc->m_csTiVoDecodePath).GetString() << " " << CStringA(pDoc->m_csTiVoDecodePath).GetString() << " --mak " << CStringA(TiVoFile.GetMAK()).GetString() << " --out " << CStringA(QuoteFileName(csMPEGPathName)).GetString() << " " << CStringA(QuoteFileName(csTiVoFileName)).GetString() << std::endl;
 						if (-1 == _tspawnl(_P_WAIT, pDoc->m_csTiVoDecodePath.GetString(), pDoc->m_csTiVoDecodePath.GetString(), _T("--mak"), TiVoFile.GetMAK(), _T("--out"), QuoteFileName(csMPEGPathName).GetString(), QuoteFileName(csTiVoFileName).GetString(), NULL))
-							std::cout << "[                   ]  _tspawnlp failed: " /* << strerror(errno) */ << std::endl;
+							if (pDoc->m_LogFile.is_open())
+								pDoc->m_LogFile << "[                   ]  _tspawnlp failed: " /* << strerror(errno) */ << std::endl;
 						if (TRUE == CFile::GetStatus(csMPEGPathName, status))
 						{
 							status.m_ctime = status.m_mtime = TiVoFile.GetCaptureDate();
@@ -664,10 +727,12 @@ UINT CWimTiVoClientDoc::TiVoConvertFileThread(LPVOID lvp)
 							DeleteFile(csTiVoFileName);
 							if ((pDoc->m_bFFMPEG) && (TRUE != CFile::GetStatus(csMP4PathName, status)))
 							{
-								CString csTitle(TiVoFile.GetTitle()); csTitle.Insert(0,_T("title=\""));csTitle.Append(_T("\""));
-								CString csShow(TiVoFile.GetTitle()); csShow.Insert(0,_T("show=\""));csShow.Append(_T("\""));
-								CString csDescription(TiVoFile.GetDescription()); csDescription.Insert(0,_T("description=\""));csDescription.Append(_T("\""));
-								CString csEpisodeID(TiVoFile.GetEpisodeTitle()); csEpisodeID.Insert(0,_T("episode_id=\""));csEpisodeID.Append(_T("\""));
+								CString csTitle(TiVoFile.GetTitle()); while(0 < csTitle.Replace(_T("\""), _T("'"))); csTitle.Insert(0,_T("title=\""));csTitle.Append(_T("\""));
+								CString csShow(TiVoFile.GetTitle()); while(0 < csShow.Replace(_T("\""), _T("'"))); csShow.Insert(0,_T("show=\""));csShow.Append(_T("\""));
+								CString csDescription(TiVoFile.GetDescription()); while(0 < csDescription.Replace(_T("\""), _T("'"))); csDescription.Insert(0,_T("description=\""));csDescription.Append(_T("\""));
+								CString csEpisodeID(TiVoFile.GetEpisodeTitle()); while(0 < csEpisodeID.Replace(_T("\""), _T("'"))); csEpisodeID.Insert(0,_T("episode_id=\""));csEpisodeID.Append(_T("\""));
+								if (pDoc->m_LogFile.is_open())
+									pDoc->m_LogFile << "[" << getTimeISO8601() << "]\tspawn: " << CStringA(pDoc->m_csFFMPEGPath).GetString() << " " << CStringA(pDoc->m_csFFMPEGPath).GetString() << " -i " << CStringA(QuoteFileName(csMPEGPathName)).GetString() << " -metadata " << CStringA(csTitle).GetString() << " -metadata " << CStringA(csShow).GetString() << " -metadata " << CStringA(csDescription).GetString() << " -metadata " << CStringA(csEpisodeID).GetString() << " -vcodec copy -acodec copy -y " << CStringA(QuoteFileName(csMP4PathName)).GetString() << std::endl;
 								if (-1 == _tspawnlp(_P_WAIT, pDoc->m_csFFMPEGPath.GetString(), pDoc->m_csFFMPEGPath.GetString(), _T("-i"), QuoteFileName(csMPEGPathName).GetString(), 
 									_T("-metadata"), csTitle.GetString(),
 									_T("-metadata"), csShow.GetString(),
@@ -677,7 +742,8 @@ UINT CWimTiVoClientDoc::TiVoConvertFileThread(LPVOID lvp)
 									_T("-acodec"), _T("copy"),
 									_T("-y"), // Cause it to overwrite exiting output files
 									QuoteFileName(csMP4PathName).GetString(), NULL))
-									std::cout << "[                   ]  _tspawnlp failed: " /* << _sys_errlist[errno] */ << std::endl;
+									if (pDoc->m_LogFile.is_open())
+										pDoc->m_LogFile << "[                   ]  _tspawnlp failed: " /* << _sys_errlist[errno] */ << std::endl;
 							}
 							if (TRUE == CFile::GetStatus(csMP4PathName, status))
 							{
@@ -692,7 +758,7 @@ UINT CWimTiVoClientDoc::TiVoConvertFileThread(LPVOID lvp)
 			else
 				Sleep(1000);
 		}
-		pDoc->m_TiVoTransferFileThreadRunning = false;
+		pDoc->m_TiVoConvertFileThreadRunning = false;
 	}
 	TRACE(__FUNCTION__ " Exiting\n");
 	return(0);
