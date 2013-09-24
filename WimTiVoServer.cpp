@@ -49,6 +49,9 @@
 // "c:\\Users\\Wim\\Downloads\\ffmpeg-20130306-git-28adecf-win64-static\\bin\\ffmpeg.exe" -report -i THE_INTOUCHABLES_t08.mkv -vcodec mpeg2video -b 16384k -maxrate 30000k -bufsize 4096k -ab 448k -ar 48000 -filter_complex "[0:0][0:2]overlay" -acodec copy THE_INTOUCHABLES.vob
 // "c:\\Users\\Wim\\Downloads\\ffmpeg-20130306-git-28adecf-win64-static\\bin\\ffmpeg.exe" -report -i THE_INTOUCHABLES_t08.mkv -vcodec mpeg2video -b 16384k -maxrate 30000k -bufsize 4096k -ab 448k -ar 48000 -filter_complex "[0:0][0:2]overlay" -acodec copy -sn THE_INTOUCHABLES.mkv
 
+// Here's an experiment in making a decent quality file for the ipad with subtitles, it seemed to compare favorbly with the original.
+// "c:\\Users\\Wim\\Downloads\\ffmpeg-20130318-git-519ebb5-win64-static\\bin\\ffmpeg.exe" -report -i THE_INTOUCHABLES_t08.mkv -filter_complex "[0:0][0:2]overlay" -ac 2 THE_INTOUCHABLES.mp4
+
 
 #include "stdafx.h"
 #include "WimTiVoServer.h"
