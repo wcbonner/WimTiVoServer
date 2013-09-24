@@ -262,17 +262,18 @@ void cTiVoFile::SetPathName(const CFileFind & csNewPath)
 	if (m_SourceSize == 0)
 		m_SourceSize = csNewPath.GetLength();
 	// Final Output of object values
-	wcout << L"[                   ] " << setw(20) << right << L"m_csPathName" << L" : " << m_csPathName.GetString() << endl;
-	wcout << L"[                   ] " << setw(20) << right << L"m_Title" << L" : " << m_Title.GetString() << endl;
-	wcout << L"[                   ] " << setw(20) << right << L"m_EpisodeTitle" << L" : " << m_EpisodeTitle.GetString() << endl;
-	wcout << L"[                   ] " << setw(20) << right << L"m_Description" << L" : " << m_Description.GetString() << endl;
-	wcout << L"[                   ] " << setw(20) << right << L"m_ContentType" << L" : " << m_ContentType.GetString() << endl;
-	wcout << L"[                   ] " << setw(20) << right << L"m_SourceFormat" << L" : " << m_SourceFormat.GetString() << endl;
-	//wcout << L"[                   ] " << setw(20) << right << L"LastChangeDate" << L" : " << LastChangeDate.GetString() << endl;
-	wcout << L"[                   ] " << setw(20) << right << L"m_SourceSize" << L" : " << m_SourceSize << endl;
-	wcout << L"[                   ] " << setw(20) << right << L"m_Duration" << L" : " << m_Duration << endl;
-	wcout << L"[                   ] " << setw(20) << right << L"m_CaptureDate" << L" : " << m_CaptureDate.Format(_T("%c")).GetString() << endl;
-	wcout << L"[                   ] " << setw(20) << right << L"URL" << L" : " << m_csURL.GetString() << endl;
+	TRACE(__FUNCTION__ " m_csPathName %s %s\n", CStringA(m_csPathName).GetString(), CStringA(m_SourceFormat).GetString());
+	//wcout << L"[                   ] " << setw(20) << right << L"m_csPathName" << L" : " << m_csPathName.GetString() << endl;
+	//wcout << L"[                   ] " << setw(20) << right << L"m_Title" << L" : " << m_Title.GetString() << endl;
+	//wcout << L"[                   ] " << setw(20) << right << L"m_EpisodeTitle" << L" : " << m_EpisodeTitle.GetString() << endl;
+	//wcout << L"[                   ] " << setw(20) << right << L"m_Description" << L" : " << m_Description.GetString() << endl;
+	//wcout << L"[                   ] " << setw(20) << right << L"m_ContentType" << L" : " << m_ContentType.GetString() << endl;
+	//wcout << L"[                   ] " << setw(20) << right << L"m_SourceFormat" << L" : " << m_SourceFormat.GetString() << endl;
+	////wcout << L"[                   ] " << setw(20) << right << L"LastChangeDate" << L" : " << LastChangeDate.GetString() << endl;
+	//wcout << L"[                   ] " << setw(20) << right << L"m_SourceSize" << L" : " << m_SourceSize << endl;
+	//wcout << L"[                   ] " << setw(20) << right << L"m_Duration" << L" : " << m_Duration << endl;
+	//wcout << L"[                   ] " << setw(20) << right << L"m_CaptureDate" << L" : " << m_CaptureDate.Format(_T("%c")).GetString() << endl;
+	//wcout << L"[                   ] " << setw(20) << right << L"URL" << L" : " << m_csURL.GetString() << endl;
 }
 void cTiVoFile::SetFromTiVoItem(const CString &csTitle, const CString &csEpisodeTitle, const CString &csDescription, const CString &csSourceStation, const CString &csContentURL, const CTime &ctCaptureDate, const CTimeSpan &ctsDuration, const CString & csMAK, const unsigned long long llSourceSize)
 {
@@ -317,18 +318,18 @@ void cTiVoFile::PopulateFromFFMPEG(void)
 			if (fmt_ctx->duration != AV_NOPTS_VALUE) 
 			{
 				m_Duration = fmt_ctx->duration + 5000;
-				int secs = m_Duration / AV_TIME_BASE;
-				int us = m_Duration % AV_TIME_BASE;
-				int mins = secs / 60;
-				secs %= 60;
-				int hours = mins / 60;
-				mins %= 60;
-				std::cout << "[                   ] " << setw(20) << right << "m_Duration" << " : ";
-				char oldfill = std::cout.fill('0');
-				streamsize oldwidth = std::cout.width(2);
-				std::cout << hours << ":" << mins << ":" << secs << "." << ((100 * us) / AV_TIME_BASE) << endl;
-				std::cout.width(oldwidth);
-				std::cout.fill(oldfill);
+				//int secs = m_Duration / AV_TIME_BASE;
+				//int us = m_Duration % AV_TIME_BASE;
+				//int mins = secs / 60;
+				//secs %= 60;
+				//int hours = mins / 60;
+				//mins %= 60;
+				//std::cout << "[                   ] " << setw(20) << right << "m_Duration" << " : ";
+				//char oldfill = std::cout.fill('0');
+				//streamsize oldwidth = std::cout.width(2);
+				//std::cout << hours << ":" << mins << ":" << secs << "." << ((100 * us) / AV_TIME_BASE) << endl;
+				//std::cout.width(oldwidth);
+				//std::cout.fill(oldfill);
 				m_Duration /= 1000; // this makes at least my first example match the tivo desktop software
 			}
 			m_SourceFormat.Append(_T("video/"));
