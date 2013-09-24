@@ -1283,7 +1283,7 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 		/* Create HTTP Header */
 		std::stringstream HttpResponse;
 		//HttpResponse << "HTTP/1.1 200 OK\r\n";
-		HttpResponse << "HTTP/1.0 206 Partial Content\r\n";
+		HttpResponse << "HTTP/1.1 206 Partial Content\r\n";
 		HttpResponse << "Server: Wims TiVo Server/1.0.0.1\r\n";
 		HttpResponse << "Date: " << getTimeRFC1123() << "\r\n";
 		HttpResponse << "Transfer-Encoding: chunked\r\n";
@@ -1304,17 +1304,27 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 				bool bSoFarSoGood = true;
 				long long bytessent = 0;
 				char * RAWDataBuff = new char[0x400000];
+				std::stringstream ssChunkHeader;
 				while (!FileToTransfer.eof() && (bSoFarSoGood))
 				{
 					FileToTransfer.read(RAWDataBuff, 0x400000);
 					int BytesToSendInBuffer = FileToTransfer.gcount();
 					int offset = 0;
+					ssChunkHeader.str("");
+					ssChunkHeader << hex << (BytesToSendInBuffer-offset) << "\r\n";
+					send(DataSocket, ssChunkHeader.str().c_str(), ssChunkHeader.str().length(), 0);
 					nRet = send(DataSocket, RAWDataBuff+offset, BytesToSendInBuffer-offset, 0);
 					bytessent += nRet;
 					bSoFarSoGood = nRet == BytesToSendInBuffer;
+					ssChunkHeader.str("");
+					ssChunkHeader << "\r\n";
+					send(DataSocket, ssChunkHeader.str().c_str(), ssChunkHeader.str().length(), 0);
 				}
 				delete[] RAWDataBuff;
 				std::cout << "[                   ] Finished Sending File, bSoFarSoGood=" << boolalpha << bSoFarSoGood << " BytesSent(" << bytessent << ")" << endl;
+				ssChunkHeader.str("");
+				ssChunkHeader << hex << 0 << "\r\n\r\n";	// 0\r\n is last chunk ending, and \r\n is the trailer.
+				send(DataSocket, ssChunkHeader.str().c_str(), ssChunkHeader.str().length(), 0);
 			}
 		}
 		else
@@ -1542,7 +1552,7 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 								bytessent += nRet;
 								if (nRet != dwRead)
 								{
-									std::cout << "[                   ] Not all Read Data was Sent. Read: " << dwRead << " Send: " << nRet << std::endl;
+									std::cout << "\n\r[                   ] Not all Read Data was Sent. Read: " << dwRead << " Send: " << nRet << std::endl;
 									char * ptrData = RAWDataBuff + nRet;
 									int DataToSend = dwRead - nRet;
 									while ((DataSocket != INVALID_SOCKET) && (DataToSend > 0) && (SOCKET_ERROR != nRet))
