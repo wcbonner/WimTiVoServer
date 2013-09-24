@@ -8,6 +8,8 @@
 // TiVoSDKs .Net Libraries http://code.google.com/p/tivo-sdks/source/browse/trunk/Tivo.Hme/Tivo.Hmo/Calypso16.cs?spec=svn112&r=112
 // TiVoServer http://tivoserver.cvs.sourceforge.net/viewvc/tivoserver/tivoserver/BeaconManager.cc?revision=1.16&view=markup
 // TiVo Disk Space Viewer http://peterkellner.net/2008/01/18/tivospaceviewerwithlinq/
+// According to this page, the TiVo times are HEX encoded seconds since January 1, 1970 0:00:00 UTC. http://www.tivocommunity.com/tivo-vb/archive/index.php/t-314742.html
+
 
 // ffmpeg getting started: http://ffmpeg.org/trac/ffmpeg/wiki/Using%20libav*
 // some possible settings info: http://pytivo.sourceforge.net/forum/hd-tivo-ideal-settings-t40.html
@@ -22,6 +24,12 @@
 
 // STL Reference I like to use: http://cplusplus.com/reference/fstream/ofstream/ofstream/
 // I'm going to try to use XMLLite for XML Processing. http://msdn.microsoft.com/en-us/library/windows/desktop/ms752864(v=vs.85).aspx
+// XMLLite processes IStream objects. 
+// SHCreateMemStream function http://msdn.microsoft.com/en-us/library/windows/desktop/bb773831(v=vs.85).aspx
+// SHCreateStreamOnFile function http://msdn.microsoft.com/en-us/library/windows/desktop/bb759864(v=vs.85).aspx
+
+// Smart Pointer Reference: http://msdn.microsoft.com/en-us/library/hh279674.aspx
+// WinINet vs. WinHTTP: http://msdn.microsoft.com/en-us/library/windows/desktop/hh227298(v=vs.85).aspx
 
 #include "stdafx.h"
 #include "WimTiVoServer.h"
@@ -159,6 +167,331 @@ time_t ISO8601totime(const string & ISOTime)
 	timer += _daylight*3600;
 	#endif
 	return(timer);
+}
+/////////////////////////////////////////////////////////////////////////////
+HRESULT WriteAttributes(IXmlReader* pReader) 
+{ 
+    const WCHAR* pwszPrefix; 
+    const WCHAR* pwszLocalName; 
+    const WCHAR* pwszValue; 
+    HRESULT hr = pReader->MoveToFirstAttribute(); 
+ 
+    if (S_FALSE == hr) 
+        return hr; 
+    if (S_OK != hr) 
+    { 
+        wprintf(L"Error moving to first attribute, error is %08.8lx", hr); 
+        return hr; 
+    } 
+    else 
+    { 
+        while (TRUE) 
+        { 
+            if (!pReader->IsDefault()) 
+            { 
+                UINT cwchPrefix; 
+                if (FAILED(hr = pReader->GetPrefix(&pwszPrefix, &cwchPrefix))) 
+                { 
+                    wprintf(L"Error getting prefix, error is %08.8lx", hr); 
+                    return hr; 
+                } 
+                if (FAILED(hr = pReader->GetLocalName(&pwszLocalName, NULL))) 
+                { 
+                    wprintf(L"Error getting local name, error is %08.8lx", hr); 
+                    return hr; 
+                } 
+                if (FAILED(hr = pReader->GetValue(&pwszValue, NULL))) 
+                { 
+                    wprintf(L"Error getting value, error is %08.8lx", hr); 
+                    return hr; 
+                } 
+                if (cwchPrefix > 0) 
+                    wprintf(L"Attr: %s:%s=\"%s\" \n", pwszPrefix, pwszLocalName, pwszValue); 
+                else 
+                    wprintf(L"Attr: %s=\"%s\" \n", pwszLocalName, pwszValue); 
+            } 
+ 
+            if (S_OK != pReader->MoveToNextAttribute()) 
+                break; 
+        } 
+    } 
+    return hr; 
+} 
+void XML_Test_Read(void)
+{
+	HRESULT hr = S_OK;
+	CComPtr<IXmlReader> pReader; 
+	if (FAILED(hr = CreateXmlReader(__uuidof(IXmlReader), (void**) &pReader, NULL))) 
+		std::cout << "[" << getTimeISO8601() << "] Error creating xml reader, error is: " << hex << hr << endl;
+	else
+	{
+		if (FAILED(hr = pReader->SetProperty(XmlReaderProperty_DtdProcessing, DtdProcessing_Prohibit))) 
+			std::cout << "[" << getTimeISO8601() << "] Error setting XmlReaderProperty_DtdProcessing, error is: " << hex << hr << endl;
+		else
+		{
+			//Open read-only input stream 
+			CComPtr<IStream> pFileStream;
+			if (FAILED(hr = SHCreateStreamOnFile(_T("WimTivoServer.0.xml"), STGM_READ, &pFileStream))) 
+				std::cout << "[" << getTimeISO8601() << "] Error creating file reader, error is: " << hex << hr << endl;
+			else
+			{
+				if (FAILED(hr = pReader->SetInput(pFileStream))) 
+					std::cout << "[" << getTimeISO8601() << "] Error setting input for reader, error is: " << hex << hr << endl;
+				else
+				{
+				 	XmlNodeType nodeType; 
+					const WCHAR* pwszPrefix; 
+					const WCHAR* pwszLocalName; 
+					const WCHAR* pwszValue; 
+					UINT cwchPrefix; 
+					//read until there are no more nodes 
+					while (S_OK == (hr = pReader->Read(&nodeType))) 
+					{ 
+						switch (nodeType) 
+						{ 
+						case XmlNodeType_XmlDeclaration: 
+							wprintf(L"XmlDeclaration\n"); 
+							if (FAILED(hr = WriteAttributes(pReader))) 
+								wprintf(L"Error writing attributes, error is %08.8lx", hr); 
+							break; 
+						case XmlNodeType_Element: 
+							if (FAILED(hr = pReader->GetPrefix(&pwszPrefix, &cwchPrefix))) 
+								wprintf(L"Error getting prefix, error is %08.8lx", hr); 
+							if (FAILED(hr = pReader->GetLocalName(&pwszLocalName, NULL))) 
+								wprintf(L"Error getting local name, error is %08.8lx", hr); 
+							if (cwchPrefix > 0) 
+								wprintf(L"Element: %s:%s\n", pwszPrefix, pwszLocalName); 
+							else 
+								wprintf(L"Element: %s\n", pwszLocalName);  
+							if (FAILED(hr = WriteAttributes(pReader))) 
+								wprintf(L"Error writing attributes, error is %08.8lx", hr); 
+							if (pReader->IsEmptyElement() ) 
+								wprintf(L" (empty)"); 
+							break; 
+						case XmlNodeType_EndElement: 
+							if (FAILED(hr = pReader->GetPrefix(&pwszPrefix, &cwchPrefix))) 
+								wprintf(L"Error getting prefix, error is %08.8lx", hr); 
+							if (FAILED(hr = pReader->GetLocalName(&pwszLocalName, NULL))) 
+								wprintf(L"Error getting local name, error is %08.8lx", hr); 
+							if (cwchPrefix > 0) 
+								wprintf(L"End Element: %s:%s\n", pwszPrefix, pwszLocalName); 
+							else 
+								wprintf(L"End Element: %s\n", pwszLocalName); 
+							break; 
+						case XmlNodeType_Text: 
+						case XmlNodeType_Whitespace: 
+							if (FAILED(hr = pReader->GetValue(&pwszValue, NULL))) 
+								wprintf(L"Error getting value, error is %08.8lx", hr); 
+							wprintf(L"Text: >%s<\n", pwszValue); 
+							break; 
+						case XmlNodeType_CDATA: 
+							if (FAILED(hr = pReader->GetValue(&pwszValue, NULL))) 
+								wprintf(L"Error getting value, error is %08.8lx", hr); 
+							wprintf(L"CDATA: %s\n", pwszValue); 
+							break; 
+						case XmlNodeType_ProcessingInstruction: 
+							if (FAILED(hr = pReader->GetLocalName(&pwszLocalName, NULL))) 
+								wprintf(L"Error getting name, error is %08.8lx", hr); 
+							if (FAILED(hr = pReader->GetValue(&pwszValue, NULL))) 
+								wprintf(L"Error getting value, error is %08.8lx", hr); 
+							wprintf(L"Processing Instruction name:%s value:%s\n", pwszLocalName, pwszValue); 
+							break; 
+						case XmlNodeType_Comment: 
+							if (FAILED(hr = pReader->GetValue(&pwszValue, NULL))) 
+								wprintf(L"Error getting value, error is %08.8lx", hr); 
+							wprintf(L"Comment: %s\n", pwszValue); 
+							break; 
+						case XmlNodeType_DocumentType: 
+							wprintf(L"DOCTYPE is not printed\n"); 
+							break; 
+						} 
+					} 
+				}
+			}
+		}
+	}
+}
+void XML_Test_Write_InMemory(void)
+{
+	HRESULT hr = S_OK;
+	CComPtr<IXmlWriter> pWriter;
+	if (FAILED(hr = CreateXmlWriter(__uuidof(IXmlWriter), (void**) &pWriter, NULL))) 
+		std::cout << "[" << getTimeISO8601() << "] Error creating xml writer, error is: " << hex << hr << endl;
+	else
+	{
+		// from: http://stackoverflow.com/questions/3037946/how-can-i-store-xml-in-buffer-using-xmlite
+		CComPtr<IStream> spMemoryStream(::SHCreateMemStream(NULL, 0));
+		//// Opens writeable output stream.
+		//spMemoryStream.Attach(::SHCreateMemStream(NULL, 0));
+		//std::unique_ptr<IStream> spMemoryStream(::SHCreateMemStream(NULL, 0));
+		if (spMemoryStream != NULL)
+		{
+			CComPtr<IXmlWriterOutput> pWriterOutput;
+			CreateXmlWriterOutputWithEncodingName(spMemoryStream, NULL, L"utf-16", &pWriterOutput);
+			pWriter->SetOutput(pWriterOutput);
+			//pWriter->SetOutput(spMemoryStream);
+			pWriter->SetProperty(XmlWriterProperty_Indent, TRUE);
+			pWriter->WriteStartDocument(XmlStandalone_Omit);
+				pWriter->WriteStartElement(NULL,_T("TiVoContainer"),_T("http://www.tivo.com/developer/calypso-protocol-1.6/"));
+					pWriter->WriteStartElement(NULL,_T("Details"),NULL);
+						pWriter->WriteStartElement(NULL,_T("ContentType"),NULL);
+							pWriter->WriteString(_T("x-tivo-container/tivo-server"));
+						pWriter->WriteFullEndElement();
+						pWriter->WriteStartElement(NULL,_T("SourceFormat"),NULL);
+							pWriter->WriteString(_T("x-tivo-container/tivo-dvr"));
+						pWriter->WriteFullEndElement();
+						pWriter->WriteStartElement(NULL,_T("Title"),NULL);
+							pWriter->WriteString(_T("TivoHD"));
+						pWriter->WriteFullEndElement();
+						pWriter->WriteStartElement(NULL,_T("TotalItems"),NULL);
+							pWriter->WriteString(_T("1"));
+						pWriter->WriteFullEndElement();
+					pWriter->WriteFullEndElement();	// Details
+
+					pWriter->WriteStartElement(NULL,_T("ItemStart"),NULL);
+						pWriter->WriteString(_T("0"));
+					pWriter->WriteFullEndElement();
+					pWriter->WriteStartElement(NULL,_T("ItemCount"),NULL);
+						pWriter->WriteString(_T("1"));
+					pWriter->WriteFullEndElement();
+
+					pWriter->WriteStartElement(NULL,_T("Item"),NULL);
+						pWriter->WriteStartElement(NULL,_T("Details"),NULL);
+							pWriter->WriteStartElement(NULL,_T("ContentType"),NULL);
+								pWriter->WriteString(_T("x-tivo-container/tivo-videos"));
+							pWriter->WriteFullEndElement();
+							pWriter->WriteStartElement(NULL,_T("SourceFormat"),NULL);
+								pWriter->WriteString(_T("x-tivo-container/tivo-dvr"));
+							pWriter->WriteFullEndElement();
+							pWriter->WriteStartElement(NULL,_T("Title"),NULL);
+								pWriter->WriteString(_T("TivoHD"));
+							pWriter->WriteFullEndElement();
+							pWriter->WriteStartElement(NULL,_T("UniqueId"),NULL);
+								pWriter->WriteString(_T("TivoHD"));
+							pWriter->WriteFullEndElement();
+						pWriter->WriteFullEndElement();	// Details
+						pWriter->WriteStartElement(NULL,_T("Links"),NULL);
+							pWriter->WriteStartElement(NULL,_T("Content"),NULL);
+								pWriter->WriteStartElement(NULL,_T("Url"),NULL);
+									pWriter->WriteString(_T("https://192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=%2FNowPlaying"));
+								pWriter->WriteFullEndElement();
+								pWriter->WriteStartElement(NULL,_T("ContentType"),NULL);
+									pWriter->WriteString(_T("x-tivo-container/tivo-videos"));
+								pWriter->WriteFullEndElement();
+							pWriter->WriteFullEndElement();	// Content
+						pWriter->WriteFullEndElement();	// Links
+					pWriter->WriteFullEndElement();	// Item
+				pWriter->WriteFullEndElement();	// TiVoContainer
+			pWriter->WriteEndDocument();
+			pWriter->Flush();
+
+			// Allocates enough memeory for the xml content.
+			STATSTG ssStreamData = {0};
+			spMemoryStream->Stat(&ssStreamData, STATFLAG_NONAME);
+			SIZE_T cbSize = ssStreamData.cbSize.LowPart;
+			LPWSTR pwszContent = (WCHAR*) new BYTE[cbSize + sizeof(WCHAR)];
+			if (pwszContent != NULL)
+			{
+				// Copies the content from the stream to the buffer.
+				LARGE_INTEGER position;
+				position.QuadPart = 0;
+				spMemoryStream->Seek(position, STREAM_SEEK_SET, NULL);
+				ULONG cbRead;
+				spMemoryStream->Read(pwszContent, cbSize, &cbRead);
+				pwszContent[cbSize / sizeof(WCHAR)] = L'\0';
+
+				wprintf(L"%s", pwszContent);
+				delete[] pwszContent;
+			}
+			// Next I'm going to follow http://stackoverflow.com/questions/8804687/unable-to-read-xml-string-with-xmllite-using-memory-buffer
+			// and figure out how to read the XML out of an internal memory buffer.
+		}
+	}
+}
+void XML_Test_Write(void)
+{
+	HRESULT hr = S_OK;
+	CComPtr<IXmlWriter> pWriter;
+	if (FAILED(hr = CreateXmlWriter(__uuidof(IXmlWriter), (void**) &pWriter, NULL))) 
+		std::cout << "[" << getTimeISO8601() << "] Error creating xml writer, error is: " << hex << hr << endl;
+	else
+	{
+		//Open writeable output stream 
+		CComPtr<IStream> pOutFileStream;
+		if (FAILED(hr = SHCreateStreamOnFile(_T("WimTivoServer.8.xml"), STGM_CREATE | STGM_WRITE, &pOutFileStream))) 
+			cout << "[" << getTimeISO8601() << "] Error creating file writer, error is: " << hex << hr << endl;
+		else
+		{ 
+			if (FAILED(hr = pWriter->SetOutput(pOutFileStream))) 
+				wprintf(L"Error, Method: SetOutput, error is %08.8lx", hr); 
+			else
+			{
+				if (FAILED(hr = pWriter->SetProperty(XmlWriterProperty_Indent, TRUE))) 
+					wprintf(L"Error, Method: SetProperty XmlWriterProperty_Indent, error is %08.8lx", hr); 
+				else
+				{
+					if (FAILED(hr = pWriter->WriteStartDocument(XmlStandalone_Omit))) 
+						wprintf(L"Error, Method: WriteStartDocument, error is %08.8lx", hr); 
+					else
+					{
+						pWriter->WriteStartElement(NULL,_T("TiVoContainer"),_T("http://www.tivo.com/developer/calypso-protocol-1.6/"));
+							pWriter->WriteStartElement(NULL,_T("Details"),NULL);
+								pWriter->WriteStartElement(NULL,_T("ContentType"),NULL);
+									pWriter->WriteString(_T("x-tivo-container/tivo-server"));
+								pWriter->WriteFullEndElement();
+								pWriter->WriteStartElement(NULL,_T("SourceFormat"),NULL);
+									pWriter->WriteString(_T("x-tivo-container/tivo-dvr"));
+								pWriter->WriteFullEndElement();
+								pWriter->WriteStartElement(NULL,_T("Title"),NULL);
+									pWriter->WriteString(_T("TivoHD"));
+								pWriter->WriteFullEndElement();
+								pWriter->WriteStartElement(NULL,_T("TotalItems"),NULL);
+									pWriter->WriteString(_T("1"));
+								pWriter->WriteFullEndElement();
+							pWriter->WriteFullEndElement();	// Details
+							pWriter->WriteStartElement(NULL,_T("ItemStart"),NULL);
+								pWriter->WriteString(_T("0"));
+							pWriter->WriteFullEndElement();
+							pWriter->WriteStartElement(NULL,_T("ItemCount"),NULL);
+								pWriter->WriteString(_T("1"));
+							pWriter->WriteFullEndElement();
+							pWriter->WriteStartElement(NULL,_T("Item"),NULL);
+								pWriter->WriteStartElement(NULL,_T("Details"),NULL);
+									pWriter->WriteStartElement(NULL,_T("ContentType"),NULL);
+										pWriter->WriteString(_T("x-tivo-container/tivo-videos"));
+									pWriter->WriteFullEndElement();
+									pWriter->WriteStartElement(NULL,_T("SourceFormat"),NULL);
+										pWriter->WriteString(_T("x-tivo-container/tivo-dvr"));
+									pWriter->WriteFullEndElement();
+									pWriter->WriteStartElement(NULL,_T("Title"),NULL);
+										pWriter->WriteString(_T("TivoHD"));
+									pWriter->WriteFullEndElement();
+									pWriter->WriteStartElement(NULL,_T("UniqueId"),NULL);
+										pWriter->WriteString(_T("TivoHD"));
+									pWriter->WriteFullEndElement();
+								pWriter->WriteFullEndElement();	// Details
+								pWriter->WriteStartElement(NULL,_T("Links"),NULL);
+									pWriter->WriteStartElement(NULL,_T("Content"),NULL);
+										pWriter->WriteStartElement(NULL,_T("Url"),NULL);
+											pWriter->WriteString(_T("https://192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=%2FNowPlaying"));
+										pWriter->WriteFullEndElement();
+										pWriter->WriteStartElement(NULL,_T("ContentType"),NULL);
+											pWriter->WriteString(_T("x-tivo-container/tivo-videos"));
+										pWriter->WriteFullEndElement();
+									pWriter->WriteFullEndElement();	// Content
+								pWriter->WriteFullEndElement();	// Links
+							pWriter->WriteFullEndElement();	// Item
+						pWriter->WriteFullEndElement();	// TiVoContainer
+						// WriteEndDocument closes any open elements or attributes 
+						if (FAILED(hr = pWriter->WriteEndDocument())) 
+							wprintf(L"Error, Method: WriteEndDocument, error is %08.8lx", hr); 
+						if (FAILED(hr = pWriter->Flush())) 
+							wprintf(L"Error, Method: Flush, error is %08.8lx", hr); 
+					}
+				}
+			}
+		} 
+	} 
 }
 /////////////////////////////////////////////////////////////////////////////
 void printerr(TCHAR * errormsg)
@@ -1326,54 +1659,6 @@ VOID ServiceMain(DWORD argc, LPTSTR * argv)
 	}
 }
 /////////////////////////////////////////////////////////////////////////////
-HRESULT WriteAttributes(IXmlReader* pReader) 
-{ 
-    const WCHAR* pwszPrefix; 
-    const WCHAR* pwszLocalName; 
-    const WCHAR* pwszValue; 
-    HRESULT hr = pReader->MoveToFirstAttribute(); 
- 
-    if (S_FALSE == hr) 
-        return hr; 
-    if (S_OK != hr) 
-    { 
-        wprintf(L"Error moving to first attribute, error is %08.8lx", hr); 
-        return hr; 
-    } 
-    else 
-    { 
-        while (TRUE) 
-        { 
-            if (!pReader->IsDefault()) 
-            { 
-                UINT cwchPrefix; 
-                if (FAILED(hr = pReader->GetPrefix(&pwszPrefix, &cwchPrefix))) 
-                { 
-                    wprintf(L"Error getting prefix, error is %08.8lx", hr); 
-                    return hr; 
-                } 
-                if (FAILED(hr = pReader->GetLocalName(&pwszLocalName, NULL))) 
-                { 
-                    wprintf(L"Error getting local name, error is %08.8lx", hr); 
-                    return hr; 
-                } 
-                if (FAILED(hr = pReader->GetValue(&pwszValue, NULL))) 
-                { 
-                    wprintf(L"Error getting value, error is %08.8lx", hr); 
-                    return hr; 
-                } 
-                if (cwchPrefix > 0) 
-                    wprintf(L"Attr: %s:%s=\"%s\" \n", pwszPrefix, pwszLocalName, pwszValue); 
-                else 
-                    wprintf(L"Attr: %s=\"%s\" \n", pwszLocalName, pwszValue); 
-            } 
- 
-            if (S_OK != pReader->MoveToNextAttribute()) 
-                break; 
-        } 
-    } 
-    return hr; 
-} 
 /////////////////////////////////////////////////////////////////////////////
 volatile bool bRun = true;
 void SignalHandler(int signal)
@@ -1646,404 +1931,9 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 
 			if (S_OK == CoInitializeEx(0, COINIT_MULTITHREADED)) // COINIT_APARTMENTTHREADED
 			{
-				HRESULT hr = S_OK;
-				//CComPtr<IXmlReader> pReader; 
-				//if (FAILED(hr = CreateXmlReader(__uuidof(IXmlReader), (void**) &pReader, NULL))) 
-				//	std::cout << "[" << getTimeISO8601() << "] Error creating xml reader, error is: " << hex << hr << endl;
-				//else
-				//{
-				//	if (FAILED(hr = pReader->SetProperty(XmlReaderProperty_DtdProcessing, DtdProcessing_Prohibit))) 
-				//		std::cout << "[" << getTimeISO8601() << "] Error setting XmlReaderProperty_DtdProcessing, error is: " << hex << hr << endl;
-				//	else
-				//	{
-				//		//Open read-only input stream 
-				//		CComPtr<IStream> pFileStream;
-				//		if (FAILED(hr = SHCreateStreamOnFile(_T("WimTivoServer.0.xml"), STGM_READ, &pFileStream))) 
-				//			std::cout << "[" << getTimeISO8601() << "] Error creating file reader, error is: " << hex << hr << endl;
-				//		else
-				//		{
-				//			if (FAILED(hr = pReader->SetInput(pFileStream))) 
-				//				std::cout << "[" << getTimeISO8601() << "] Error setting input for reader, error is: " << hex << hr << endl;
-				//			else
-				//			{
-				// 				XmlNodeType nodeType; 
-				//				const WCHAR* pwszPrefix; 
-				//				const WCHAR* pwszLocalName; 
-				//				const WCHAR* pwszValue; 
-				//				UINT cwchPrefix; 
-				//				//read until there are no more nodes 
-				//				while (S_OK == (hr = pReader->Read(&nodeType))) 
-				//				{ 
-				//					switch (nodeType) 
-				//					{ 
-				//					case XmlNodeType_XmlDeclaration: 
-				//						wprintf(L"XmlDeclaration\n"); 
-				//						if (FAILED(hr = WriteAttributes(pReader))) 
-				//							wprintf(L"Error writing attributes, error is %08.8lx", hr); 
-				//						break; 
-				//					case XmlNodeType_Element: 
-				//						if (FAILED(hr = pReader->GetPrefix(&pwszPrefix, &cwchPrefix))) 
-				//							wprintf(L"Error getting prefix, error is %08.8lx", hr); 
-				//						if (FAILED(hr = pReader->GetLocalName(&pwszLocalName, NULL))) 
-				//							wprintf(L"Error getting local name, error is %08.8lx", hr); 
-				//						if (cwchPrefix > 0) 
-				//							wprintf(L"Element: %s:%s\n", pwszPrefix, pwszLocalName); 
-				//						else 
-				//							wprintf(L"Element: %s\n", pwszLocalName);  
-				//						if (FAILED(hr = WriteAttributes(pReader))) 
-				//							wprintf(L"Error writing attributes, error is %08.8lx", hr); 
-				//						if (pReader->IsEmptyElement() ) 
-				//							wprintf(L" (empty)"); 
-				//						break; 
-				//					case XmlNodeType_EndElement: 
-				//						if (FAILED(hr = pReader->GetPrefix(&pwszPrefix, &cwchPrefix))) 
-				//							wprintf(L"Error getting prefix, error is %08.8lx", hr); 
-				//						if (FAILED(hr = pReader->GetLocalName(&pwszLocalName, NULL))) 
-				//							wprintf(L"Error getting local name, error is %08.8lx", hr); 
-				//						if (cwchPrefix > 0) 
-				//							wprintf(L"End Element: %s:%s\n", pwszPrefix, pwszLocalName); 
-				//						else 
-				//							wprintf(L"End Element: %s\n", pwszLocalName); 
-				//						break; 
-				//					case XmlNodeType_Text: 
-				//					case XmlNodeType_Whitespace: 
-				//						if (FAILED(hr = pReader->GetValue(&pwszValue, NULL))) 
-				//							wprintf(L"Error getting value, error is %08.8lx", hr); 
-				//						wprintf(L"Text: >%s<\n", pwszValue); 
-				//						break; 
-				//					case XmlNodeType_CDATA: 
-				//						if (FAILED(hr = pReader->GetValue(&pwszValue, NULL))) 
-				//							wprintf(L"Error getting value, error is %08.8lx", hr); 
-				//						wprintf(L"CDATA: %s\n", pwszValue); 
-				//						break; 
-				//					case XmlNodeType_ProcessingInstruction: 
-				//						if (FAILED(hr = pReader->GetLocalName(&pwszLocalName, NULL))) 
-				//							wprintf(L"Error getting name, error is %08.8lx", hr); 
-				//						if (FAILED(hr = pReader->GetValue(&pwszValue, NULL))) 
-				//							wprintf(L"Error getting value, error is %08.8lx", hr); 
-				//						wprintf(L"Processing Instruction name:%s value:%s\n", pwszLocalName, pwszValue); 
-				//						break; 
-				//					case XmlNodeType_Comment: 
-				//						if (FAILED(hr = pReader->GetValue(&pwszValue, NULL))) 
-				//							wprintf(L"Error getting value, error is %08.8lx", hr); 
-				//						wprintf(L"Comment: %s\n", pwszValue); 
-				//						break; 
-				//					case XmlNodeType_DocumentType: 
-				//						wprintf(L"DOCTYPE is not printed\n"); 
-				//						break; 
-				//					} 
-				//				} 
-				//			}
-				//		}
-				//	}
-				//}
-
-				CComPtr<IXmlWriter> pWriter;
-				if (FAILED(hr = CreateXmlWriter(__uuidof(IXmlWriter), (void**) &pWriter, NULL))) 
-					std::cout << "[" << getTimeISO8601() << "] Error creating xml writer, error is: " << hex << hr << endl;
-				else
-				{
-					// from: http://stackoverflow.com/questions/3037946/how-can-i-store-xml-in-buffer-using-xmlite
-					CComPtr<IStream> spMemoryStream;
-					// Opens writeable output stream.
-					spMemoryStream.Attach(::SHCreateMemStream(NULL, 0));
-					if (spMemoryStream != NULL)
-					{
-						CComPtr<IXmlWriterOutput> pWriterOutput;
-						CreateXmlWriterOutputWithEncodingName(spMemoryStream, NULL, L"utf-16", &pWriterOutput);
-						pWriter->SetOutput(pWriterOutput);
-						//pWriter->SetOutput(spMemoryStream);
-						pWriter->SetProperty(XmlWriterProperty_Indent, TRUE);
-						pWriter->WriteStartDocument(XmlStandalone_Omit);
-							pWriter->WriteStartElement(NULL,_T("TiVoContainer"),_T("http://www.tivo.com/developer/calypso-protocol-1.6/"));
-								pWriter->WriteStartElement(NULL,_T("Details"),NULL);
-									pWriter->WriteStartElement(NULL,_T("ContentType"),NULL);
-										pWriter->WriteString(_T("x-tivo-container/tivo-server"));
-									pWriter->WriteFullEndElement();
-									pWriter->WriteStartElement(NULL,_T("SourceFormat"),NULL);
-										pWriter->WriteString(_T("x-tivo-container/tivo-dvr"));
-									pWriter->WriteFullEndElement();
-									pWriter->WriteStartElement(NULL,_T("Title"),NULL);
-										pWriter->WriteString(_T("TivoHD"));
-									pWriter->WriteFullEndElement();
-									pWriter->WriteStartElement(NULL,_T("TotalItems"),NULL);
-										pWriter->WriteString(_T("1"));
-									pWriter->WriteFullEndElement();
-								pWriter->WriteFullEndElement();	// Details
-
-								pWriter->WriteStartElement(NULL,_T("ItemStart"),NULL);
-									pWriter->WriteString(_T("0"));
-								pWriter->WriteFullEndElement();
-								pWriter->WriteStartElement(NULL,_T("ItemCount"),NULL);
-									pWriter->WriteString(_T("1"));
-								pWriter->WriteFullEndElement();
-
-								pWriter->WriteStartElement(NULL,_T("Item"),NULL);
-									pWriter->WriteStartElement(NULL,_T("Details"),NULL);
-										pWriter->WriteStartElement(NULL,_T("ContentType"),NULL);
-											pWriter->WriteString(_T("x-tivo-container/tivo-videos"));
-										pWriter->WriteFullEndElement();
-										pWriter->WriteStartElement(NULL,_T("SourceFormat"),NULL);
-											pWriter->WriteString(_T("x-tivo-container/tivo-dvr"));
-										pWriter->WriteFullEndElement();
-										pWriter->WriteStartElement(NULL,_T("Title"),NULL);
-											pWriter->WriteString(_T("TivoHD"));
-										pWriter->WriteFullEndElement();
-										pWriter->WriteStartElement(NULL,_T("UniqueId"),NULL);
-											pWriter->WriteString(_T("TivoHD"));
-										pWriter->WriteFullEndElement();
-									pWriter->WriteFullEndElement();	// Details
-									pWriter->WriteStartElement(NULL,_T("Links"),NULL);
-										pWriter->WriteStartElement(NULL,_T("Content"),NULL);
-											pWriter->WriteStartElement(NULL,_T("Url"),NULL);
-												pWriter->WriteString(_T("https://192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=%2FNowPlaying"));
-											pWriter->WriteFullEndElement();
-											pWriter->WriteStartElement(NULL,_T("ContentType"),NULL);
-												pWriter->WriteString(_T("x-tivo-container/tivo-videos"));
-											pWriter->WriteFullEndElement();
-										pWriter->WriteFullEndElement();	// Content
-									pWriter->WriteFullEndElement();	// Links
-								pWriter->WriteFullEndElement();	// Item
-							pWriter->WriteFullEndElement();	// TiVoContainer
-						pWriter->WriteEndDocument();
-						pWriter->Flush();
-
-						// Allocates enough memeory for the xml content.
-						STATSTG ssStreamData = {0};
-						spMemoryStream->Stat(&ssStreamData, STATFLAG_NONAME);
-						SIZE_T cbSize = ssStreamData.cbSize.LowPart;
-						LPWSTR pwszContent = (WCHAR*) new BYTE[cbSize + sizeof(WCHAR)];
-						if (pwszContent == NULL)
-							return E_OUTOFMEMORY;
-
-						// Copies the content from the stream to the buffer.
-						LARGE_INTEGER position;
-						position.QuadPart = 0;
-						spMemoryStream->Seek(position, STREAM_SEEK_SET, NULL);
-						ULONG cbRead;
-						spMemoryStream->Read(pwszContent, cbSize, &cbRead);
-						pwszContent[cbSize / sizeof(WCHAR)] = L'\0';
-
-						wprintf(L"%s", pwszContent);
-						delete[] pwszContent;
-						// Next I'm going to follow http://stackoverflow.com/questions/8804687/unable-to-read-xml-string-with-xmllite-using-memory-buffer
-						// and figure out how to read the XML out of an internal memory buffer.
-					}
-
-					//Open writeable output stream 
-					CComPtr<IStream> pOutFileStream;
-					if (FAILED(hr = SHCreateStreamOnFile(_T("WimTivoServer.8.xml"), STGM_CREATE | STGM_WRITE, &pOutFileStream))) 
-						cout << "[" << getTimeISO8601() << "] Error creating file writer, error is: " << hex << hr << endl;
-					else
-					{ 
-						if (FAILED(hr = pWriter->SetOutput(pOutFileStream))) 
-							wprintf(L"Error, Method: SetOutput, error is %08.8lx", hr); 
-						else
-						{
-							if (FAILED(hr = pWriter->SetProperty(XmlWriterProperty_Indent, TRUE))) 
-								wprintf(L"Error, Method: SetProperty XmlWriterProperty_Indent, error is %08.8lx", hr); 
-							else
-							{
-								if (FAILED(hr = pWriter->WriteStartDocument(XmlStandalone_Omit))) 
-									wprintf(L"Error, Method: WriteStartDocument, error is %08.8lx", hr); 
-								else
-								{
-									pWriter->WriteStartElement(NULL,_T("TiVoContainer"),_T("http://www.tivo.com/developer/calypso-protocol-1.6/"));
-										pWriter->WriteStartElement(NULL,_T("Details"),NULL);
-											pWriter->WriteStartElement(NULL,_T("ContentType"),NULL);
-												pWriter->WriteString(_T("x-tivo-container/tivo-server"));
-											pWriter->WriteFullEndElement();
-											pWriter->WriteStartElement(NULL,_T("SourceFormat"),NULL);
-												pWriter->WriteString(_T("x-tivo-container/tivo-dvr"));
-											pWriter->WriteFullEndElement();
-											pWriter->WriteStartElement(NULL,_T("Title"),NULL);
-												pWriter->WriteString(_T("TivoHD"));
-											pWriter->WriteFullEndElement();
-											pWriter->WriteStartElement(NULL,_T("TotalItems"),NULL);
-												pWriter->WriteString(_T("1"));
-											pWriter->WriteFullEndElement();
-										pWriter->WriteFullEndElement();	// Details
-										pWriter->WriteStartElement(NULL,_T("ItemStart"),NULL);
-											pWriter->WriteString(_T("0"));
-										pWriter->WriteFullEndElement();
-										pWriter->WriteStartElement(NULL,_T("ItemCount"),NULL);
-											pWriter->WriteString(_T("1"));
-										pWriter->WriteFullEndElement();
-										pWriter->WriteStartElement(NULL,_T("Item"),NULL);
-											pWriter->WriteStartElement(NULL,_T("Details"),NULL);
-												pWriter->WriteStartElement(NULL,_T("ContentType"),NULL);
-													pWriter->WriteString(_T("x-tivo-container/tivo-videos"));
-												pWriter->WriteFullEndElement();
-												pWriter->WriteStartElement(NULL,_T("SourceFormat"),NULL);
-													pWriter->WriteString(_T("x-tivo-container/tivo-dvr"));
-												pWriter->WriteFullEndElement();
-												pWriter->WriteStartElement(NULL,_T("Title"),NULL);
-													pWriter->WriteString(_T("TivoHD"));
-												pWriter->WriteFullEndElement();
-												pWriter->WriteStartElement(NULL,_T("UniqueId"),NULL);
-													pWriter->WriteString(_T("TivoHD"));
-												pWriter->WriteFullEndElement();
-											pWriter->WriteFullEndElement();	// Details
-											pWriter->WriteStartElement(NULL,_T("Links"),NULL);
-												pWriter->WriteStartElement(NULL,_T("Content"),NULL);
-													pWriter->WriteStartElement(NULL,_T("Url"),NULL);
-														pWriter->WriteString(_T("https://192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=%2FNowPlaying"));
-													pWriter->WriteFullEndElement();
-													pWriter->WriteStartElement(NULL,_T("ContentType"),NULL);
-														pWriter->WriteString(_T("x-tivo-container/tivo-videos"));
-													pWriter->WriteFullEndElement();
-												pWriter->WriteFullEndElement();	// Content
-											pWriter->WriteFullEndElement();	// Links
-										pWriter->WriteFullEndElement();	// Item
-									pWriter->WriteFullEndElement();	// TiVoContainer
-									// WriteEndDocument closes any open elements or attributes 
-									if (FAILED(hr = pWriter->WriteEndDocument())) 
-										wprintf(L"Error, Method: WriteEndDocument, error is %08.8lx", hr); 
-									if (FAILED(hr = pWriter->Flush())) 
-										wprintf(L"Error, Method: Flush, error is %08.8lx", hr); 
-									// if you want to use a DTD using either the SYSTEM or PUBLIC identifiers, 
-									// or if you want to use an internal DTD subset, you can modify the following 
-									// call to WriteDocType. 
-									//if (FAILED(hr = pWriter->WriteDocType(L"root", NULL, NULL, NULL))) 
-									//	wprintf(L"Error, Method: WriteDocType, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteProcessingInstruction(L"xml-stylesheet", 
-									//	L"href=\"mystyle.css\" title=\"Compact\" type=\"text/css\""))) 
-									//	wprintf(L"Error, Method: WriteProcessingInstruction, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteStartElement(NULL, L"root", NULL))) 
-									//	wprintf(L"Error, Method: WriteStartElement, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteStartElement(NULL, L"sub", NULL))) 
-									//	wprintf(L"Error, Method: WriteStartElement, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteAttributeString(NULL, L"myAttr", NULL, 
-									//												L"1234"))) 
-									//	wprintf(L"Error, Method: WriteAttributeString, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteString( 
-									//			L"Markup is <escaped> for this string"))) 
-									//	wprintf(L"Error, Method: WriteString, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteFullEndElement())) 
-									//	wprintf(L"Error, Method: WriteFullEndElement, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteStartElement(NULL, L"anotherChild", NULL))) 
-									//	wprintf(L"Error, Method: WriteStartElement, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteString(L"some text"))) 
-									//	wprintf(L"Error, Method: WriteString, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteFullEndElement())) 
-									//	wprintf(L"Error, Method: WriteFullEndElement, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
-									//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteCData(L"This is CDATA text."))) 
-									//	wprintf(L"Error, Method: WriteCData, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
-									//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteStartElement(NULL, L"containsCharacterEntity", NULL))) 
-									//	wprintf(L"Error, Method: WriteStartElement, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteCharEntity(L'a'))) 
-									//	wprintf(L"Error, Method: WriteCharEntity, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteFullEndElement())) 
-									//	wprintf(L"Error, Method: WriteFullEndElement, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
-									//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteStartElement(NULL, L"containsChars", NULL))) 
-									//	wprintf(L"Error, Method: WriteStartElement, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteChars(L"abcdefghijklm", 5))) 
-									//	wprintf(L"Error, Method: WriteChars, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteFullEndElement())) 
-									//	wprintf(L"Error, Method: WriteFullEndElement, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
-									//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteStartElement(NULL, L"containsEntity", NULL))) 
-									//	wprintf(L"Error, Method: WriteStartElement, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteEntityRef(L"myEntity"))) 
-									//	wprintf(L"Error, Method: WriteEntityRef, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteEndElement())) 
-									//	wprintf(L"Error, Method: WriteEndElement, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
-									//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteStartElement(NULL, L"containsName", NULL))) 
-									//	wprintf(L"Error, Method: WriteStartElement, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteName(L"myName"))) 
-									//	wprintf(L"Error, Method: WriteName, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteEndElement())) 
-									//	wprintf(L"Error, Method: WriteEndElement, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
-									//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteStartElement(NULL, L"containsNmToken", NULL))) 
-									//	wprintf(L"Error, Method: WriteStartElement, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteNmToken(L"myNmToken"))) 
-									//	wprintf(L"Error, Method: WriteNmToken, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteEndElement())) 
-									//	wprintf(L"Error, Method: WriteEndElement, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
-									//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteComment(L"This is a comment"))) 
-									//	wprintf(L"Error, Method: WriteComment, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
-									//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteRaw(L"<elementWrittenRaw/>"))) 
-									//	wprintf(L"Error, Method: WriteRaw, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
-									//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteRawChars(L"<rawCharacters/>", 16))) 
-									//	wprintf(L"Error, Method: WriteRawChars, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
-									//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteElementString(NULL, L"myElement", NULL, L"myValue"))) 
-									//	wprintf(L"Error, Method: WriteElementString, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteFullEndElement())) 
-									//	wprintf(L"Error, Method: WriteFullEndElement, error is %08.8lx", hr); 
-									//else 
-									//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
-									//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
-
-									//// WriteEndDocument closes any open elements or attributes 
-									//if (FAILED(hr = pWriter->WriteEndDocument())) 
-									//	wprintf(L"Error, Method: WriteEndDocument, error is %08.8lx", hr); 
-
-									//if (FAILED(hr = pWriter->Flush())) 
-									//	wprintf(L"Error, Method: Flush, error is %08.8lx", hr); 
-								}
-							}
-						}
-					} 
-				} 
+				XML_Test_Read();
+				XML_Test_Write();
+				XML_Test_Write_InMemory();
 
 				std::vector<CString> myURLS;
 				myURLS.push_back(CString(_T("http://192.168.0.108/TiVoConnect?Command=QueryContainer&Container=/")));
