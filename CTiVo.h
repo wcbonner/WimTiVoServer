@@ -21,6 +21,7 @@ class CTiVoContainer
 public:
 	std::string m_title;
 	std::string m_url;
+	std::string m_MAK;
 	std::string m_ContentType;
 	std::string m_SourceFormat;
 };
