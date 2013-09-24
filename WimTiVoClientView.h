@@ -56,6 +56,7 @@ public:
 	afx_msg void OnUpdateTivoBeacon(CCmdUI *pCmdUI);
 	afx_msg void OnUpdateTivoMak(CCmdUI *pCmdUI);
 	afx_msg void OnTivoList();
+	afx_msg void OnLvnColumnclick(NMHDR *pNMHDR, LRESULT *pResult);
 };
 
 #ifndef _DEBUG  // debug version in WimTiVoClientView.cpp

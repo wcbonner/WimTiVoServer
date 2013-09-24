@@ -22,6 +22,7 @@ private:
 	CString m_Description;
 	CString m_ContentType;
 	CString m_SourceFormat;
+	CString m_SourceStation;
 	unsigned long long m_SourceSize;
     unsigned long long m_Duration;
 	CTime m_CaptureDate;
@@ -31,12 +32,18 @@ public:
     m_Duration(0)
 	{
 	}
+	// Simple Sorting Routines
 	friend bool cTiVoFileCompareDate(const cTiVoFile & a, const cTiVoFile & b);
 	friend bool cTiVoFileCompareDateReverse(const cTiVoFile & a, const cTiVoFile & b);
+	friend bool cTiVoFileComparePath(const cTiVoFile & a, const cTiVoFile & b);
+	friend bool cTiVoFileComparePathReverse(const cTiVoFile & a, const cTiVoFile & b);
+	friend bool cTiVoFileCompareSize(const cTiVoFile & a, const cTiVoFile & b);
+	friend bool cTiVoFileCompareSizeReverse(const cTiVoFile & a, const cTiVoFile & b);
+	// Access Routines
 	void SetPathName(const CString csNewPath);
 	void SetPathName(const CFileFind & csNewPath);
 	const CString & GetPathName(void) const { return(m_csPathName); }
-	void SetFromTiVoItem(const CString &csTitle, const CString &csEpisodeTitle, const CString &csDescription, const CString &csSourceStation, const CString &csContentURL, const CTime &ctCaptureDate, const CTimeSpan &ctsDuration);
+	void SetFromTiVoItem(const CString &csTitle, const CString &csEpisodeTitle, const CString &csDescription, const CString &csSourceStation, const CString &csContentURL, const CTime &ctCaptureDate, const CTimeSpan &ctsDuration, const unsigned long long llSourceSize = 0);
 	#ifdef AVCODEC_AVCODEC_H
 	void PopulateFromFFMPEG(void);
 	#endif
@@ -46,6 +53,7 @@ public:
 	const CString & GetDescription(void) const { return(m_Description); }
 	const CTime & GetCaptureDate(void) const { return(m_CaptureDate); }
 	const unsigned long long & GetDuration(void) const { return(m_Duration); }
+	const unsigned long long & GetSourceSize(void) const { return(m_SourceSize); }
 	void GetXML(CComPtr<IXmlWriter> & pWriter) const;
 	void GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const;
 };

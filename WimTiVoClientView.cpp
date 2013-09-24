@@ -38,6 +38,7 @@ BEGIN_MESSAGE_MAP(CWimTiVoClientView, CListView)
 	ON_UPDATE_COMMAND_UI(ID_TIVO_BEACON, &CWimTiVoClientView::OnUpdateTivoBeacon)
 	ON_UPDATE_COMMAND_UI(ID_TIVO_MAK, &CWimTiVoClientView::OnUpdateTivoMak)
 	ON_COMMAND(ID_TIVO_LIST, &CWimTiVoClientView::OnTivoList)
+	ON_NOTIFY_REFLECT(LVN_COLUMNCLICK, &CWimTiVoClientView::OnLvnColumnclick)
 END_MESSAGE_MAP()
 
 // CWimTiVoClientView construction/destruction
@@ -106,6 +107,7 @@ void CWimTiVoClientView::OnInitialUpdate()
 	ListCtrl.InsertColumn(3, _T("Description"), LVCFMT_LEFT, 100, 3);
 	ListCtrl.InsertColumn(4, _T("CaptureDate"), LVCFMT_LEFT, 105, 4);
 	ListCtrl.InsertColumn(5, _T("Duration"), LVCFMT_LEFT, 55, 5);
+	ListCtrl.InsertColumn(6, _T("Estimated Size"), LVCFMT_RIGHT, 90, 6);
 
 	CListView::OnInitialUpdate(); // This needed to be moved to the end because it call's Update, and that manipulated the ListCtrl.
 	TRACE(__FUNCTION__ " Exiting\n");
@@ -170,6 +172,11 @@ void CWimTiVoClientView::OnUpdate(CView* pSender, LPARAM lHint, CObject* pHint)
 			ListCtrl.SetItemText(nItem, 3, TiVoFile->GetDescription());
 			ListCtrl.SetItemText(nItem, 4, TiVoFile->GetCaptureDate().Format(_T("%c")));
 			ListCtrl.SetItemText(nItem, 5, CTimeSpan(TiVoFile->GetDuration()/1000).Format(_T("%H:%M:%S")));
+			std::stringstream ss;
+			std::locale mylocale("");   // get global locale
+			ss.imbue(mylocale);  // imbue global locale
+			ss << TiVoFile->GetSourceSize();
+			ListCtrl.SetItemText(nItem, 6, CString(ss.str().c_str()));
 		}
 	}
 	CListView::OnUpdate(pSender, lHint, pHint);
@@ -257,4 +264,47 @@ void CWimTiVoClientView::OnTivoList()
 			}
 		}
 	}
+}
+
+
+void CWimTiVoClientView::OnLvnColumnclick(NMHDR *pNMHDR, LRESULT *pResult)
+{
+	TRACE(__FUNCTION__ "\n");
+	LPNMLISTVIEW pNMLV = reinterpret_cast<LPNMLISTVIEW>(pNMHDR);
+	CWimTiVoClientDoc * pDoc = GetDocument();
+	if (pDoc)
+	{
+		if (pNMLV->iSubItem == 0)
+		{
+			static bool forward = true;
+			if (forward)
+				std::sort(pDoc->m_FilesToGetFromTiVo.begin(),pDoc->m_FilesToGetFromTiVo.end(),cTiVoFileComparePath);
+			else
+				std::sort(pDoc->m_FilesToGetFromTiVo.begin(),pDoc->m_FilesToGetFromTiVo.end(),cTiVoFileComparePathReverse);
+			forward = !forward;
+			pDoc->UpdateAllViews(NULL);
+		}
+		else if (pNMLV->iSubItem == 4)
+		{
+			static bool forward = true;
+			if (forward)
+				std::sort(pDoc->m_FilesToGetFromTiVo.begin(),pDoc->m_FilesToGetFromTiVo.end(),cTiVoFileCompareDate);
+			else
+				std::sort(pDoc->m_FilesToGetFromTiVo.begin(),pDoc->m_FilesToGetFromTiVo.end(),cTiVoFileCompareDateReverse);
+			forward = !forward;
+			pDoc->UpdateAllViews(NULL);
+		}
+		else if (pNMLV->iSubItem == 6)
+		{
+			static bool forward = true;
+			if (forward)
+				std::sort(pDoc->m_FilesToGetFromTiVo.begin(),pDoc->m_FilesToGetFromTiVo.end(),cTiVoFileCompareSize);
+			else
+				std::sort(pDoc->m_FilesToGetFromTiVo.begin(),pDoc->m_FilesToGetFromTiVo.end(),cTiVoFileCompareSizeReverse);
+			forward = !forward;
+			pDoc->UpdateAllViews(NULL);
+		}
+	}
+	*pResult = 0;
+	TRACE(__FUNCTION__ " Exiting\n");
 }

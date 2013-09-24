@@ -133,9 +133,46 @@ bool CWimTiVoClientDoc::GetNowPlaying(void)
 		//XML_Test_Read();
 		//XML_Test_Write();
 		//XML_Test_Write_InMemory();
+	CString csURL(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying&Recurse=Yes&SortOrder=!CaptureDate"));
+		TCHAR szScheme[_MAX_PATH];
+		DWORD dwSchemeLength = sizeof(szScheme) / sizeof(TCHAR);
+		TCHAR szHostName[_MAX_PATH];
+		DWORD dwHostNameLength = sizeof(szHostName) / sizeof(TCHAR);
+		TCHAR szUserName[_MAX_PATH];
+		DWORD dwUserNameLength = sizeof(szUserName) / sizeof(TCHAR);
+		TCHAR szPassword[_MAX_PATH];
+		DWORD dwPasswordLength = sizeof(szPassword) / sizeof(TCHAR);
+		TCHAR szUrlPath[_MAX_PATH];
+		DWORD dwUrlPathLength = sizeof(szUrlPath) / sizeof(TCHAR);
+		TCHAR szExtraInfo[_MAX_PATH];
+		DWORD dwExtraInfoLength = sizeof(szExtraInfo) / sizeof(TCHAR);		
+		URL_COMPONENTS crackedURL;
+		crackedURL.dwStructSize = sizeof(URL_COMPONENTS);
+		crackedURL.lpszScheme = szScheme;					// pointer to scheme name
+		crackedURL.dwSchemeLength = dwSchemeLength;			// length of scheme name
+		crackedURL.nScheme;									// enumerated scheme type (if known)
+		crackedURL.lpszHostName = szHostName;				// pointer to host name
+		crackedURL.dwHostNameLength = dwHostNameLength;		// length of host name
+		crackedURL.nPort;									// converted port number
+		crackedURL.lpszUserName = szUserName;				// pointer to user name
+		crackedURL.dwUserNameLength = dwUserNameLength;		// length of user name
+		crackedURL.lpszPassword = szPassword;				// pointer to password
+		crackedURL.dwPasswordLength = dwPasswordLength;		// length of password
+		crackedURL.lpszUrlPath = szUrlPath;					// pointer to URL-path
+		crackedURL.dwUrlPathLength = dwUrlPathLength;		// length of URL-path
+		crackedURL.lpszExtraInfo = szExtraInfo;				// pointer to extra information (e.g. ?foo or #foo)
+		crackedURL.dwExtraInfoLength = dwExtraInfoLength;	// length of extra information
+		InternetCrackUrl(csURL.GetString(), csURL.GetLength(), ICU_DECODE, &crackedURL);
+
+		std::stringstream ss;
+		ss << CStringA(crackedURL.lpszScheme).GetString() << "://";
+		ss << CStringA(crackedURL.lpszUserName).GetString() << ":" << CStringA(crackedURL.lpszPassword).GetString() << "@";
+		ss << CStringA(crackedURL.lpszHostName).GetString() << ":" << crackedURL.nPort;
+		ss << CStringA(crackedURL.lpszUrlPath).GetString() << CStringA(crackedURL.lpszExtraInfo).GetString();
+		csURL = CString(ss.str().c_str());
+
 		CInternetSession serverSession0;
-		XML_Parse_TiVoNowPlaying(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying&Recurse=Yes&SortOrder=!CaptureDate")), m_FilesToGetFromTiVo, serverSession0);
-		std::sort(m_FilesToGetFromTiVo.begin(),m_FilesToGetFromTiVo.end(),cTiVoFileCompareDateReverse);
+		XML_Parse_TiVoNowPlaying(csURL, m_FilesToGetFromTiVo, serverSession0);
 	//}
 	//CoUninitialize();
 	return false;
@@ -151,12 +188,11 @@ UINT CWimTiVoClientDoc::TiVoBeaconListenThread(LPVOID lvp)
 	if (pDoc != 0)
 	{
 		pDoc->m_TiVoBeaconListenThreadRunning = true;
-		//while ((pDoc->TiVoBeaconListenThreadStopRequested == false) && (TiVoBeaconListen(saServer) == true))
-		//	std::cout << "[" << getTimeISO8601() << "] \r";
-
 		do {
 			SOCKET theSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-			if (theSocket != INVALID_SOCKET)
+			if (theSocket == INVALID_SOCKET)
+				pDoc->m_TiVoBeaconListenThreadStopRequested = true;
+			else
 			{
 				SOCKADDR_IN saClient;
 				saClient.sin_family = AF_INET;
