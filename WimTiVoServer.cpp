@@ -557,7 +557,7 @@ void XML_Test_Write(const CString csFileName = CString(_T("WimTivoServer.8.xml")
 		//Open writeable output stream 
 		CComPtr<IStream> pOutFileStream;
 		if (FAILED(hr = SHCreateStreamOnFile(csFileName.GetString(), STGM_CREATE | STGM_WRITE, &pOutFileStream))) 
-			cout << "[" << getTimeISO8601() << "] Error creating file writer, error is: " << hex << hr << endl;
+			std::cout << "[" << getTimeISO8601() << "] Error creating file writer, error is: " << hex << hr << endl;
 		else
 		{ 
 			if (FAILED(hr = pWriter->SetOutput(pOutFileStream))) 
@@ -802,12 +802,12 @@ public:
 					secs %= 60;
 					int hours = mins / 60;
 					mins %= 60;
-					cout << "[                   ] " << setw(20) << right << "Duration" << " : ";
-					char oldfill = cout.fill('0');
-					streamsize oldwidth = cout.width(2);
-					cout << hours << ":" << mins << ":" << secs << "." << ((100 * us) / AV_TIME_BASE) << endl;
-					cout.width(oldwidth);
-					cout.fill(oldfill);
+					std::cout << "[                   ] " << setw(20) << right << "Duration" << " : ";
+					char oldfill = std::cout.fill('0');
+					streamsize oldwidth = std::cout.width(2);
+					std::cout << hours << ":" << mins << ":" << secs << "." << ((100 * us) / AV_TIME_BASE) << endl;
+					std::cout.width(oldwidth);
+					std::cout.fill(oldfill);
 					Duration /= 1000; // this makes at least my first example match the tivo desktop software
 				}
 				SourceFormat.Append(_T("video/"));
@@ -1519,8 +1519,8 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 	FileToTransfer.open(CStringA(csFileName).GetString(), ios_base::in | ios_base::binary);
 	if (FileToTransfer.good())
 	{
-		cout << "[                   ] Sending File: " << CStringA(csFileName).GetString() << endl;
-		cout << HttpResponse.str() << endl;
+		std::cout << "[                   ] Sending File: " << CStringA(csFileName).GetString() << endl;
+		std::cout << HttpResponse.str() << endl;
 		bool bSoFarSoGood = true;
 		long long bytessent = 0;
 		char * RAWDataBuff = new char[0x400000];
@@ -1540,7 +1540,7 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 			bSoFarSoGood = nRet == BytesToSendInBuffer;
 		}
 		delete[] RAWDataBuff;
-		cout << "[                   ] Finished Sending File, bSoFarSoGood=" << boolalpha << bSoFarSoGood << " BytesSent(" << bytessent << ")" << endl;
+		std::cout << "[                   ] Finished Sending File, bSoFarSoGood=" << boolalpha << bSoFarSoGood << " BytesSent(" << bytessent << ")" << endl;
 	}
 	return(0);
 }
@@ -1606,7 +1606,7 @@ UINT HTTPMain(LPVOID lvp)
 							else
 							{
 								#ifdef _DEBUG
-								cout << "[" << getTimeISO8601() << "] "  << __FUNCTION__ << "HTTP/1.1 404 Not Found\t" << InBuff;
+								std::cout << "[" << getTimeISO8601() << "] "  << __FUNCTION__ << "HTTP/1.1 404 Not Found\t" << InBuff;
 								#endif
 								int nRet = send(remoteSocket,"HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n",41,0);
 							}
@@ -1784,7 +1784,7 @@ bool TiVoBeaconListen(SOCKADDR_IN &saServer)
 				CStringA csServerBroadcast(szBuf, nRet);
 				csServerBroadcast.Replace("\n", " ");
 				csServerBroadcast.Trim();
-				cout << "[" << getTimeISO8601() << "] " << inet_ntoa(saServer.sin_addr) << " " << csServerBroadcast.GetString() << endl;
+				std::cout << "[" << getTimeISO8601() << "] " << inet_ntoa(saServer.sin_addr) << " " << csServerBroadcast.GetString() << endl;
 //				printf("%s\t%s\n", inet_ntoa(saServer.sin_addr), csServerBroadcast.GetString());
 				rval = true;
 
@@ -2394,9 +2394,11 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 				std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate);
 
 				std::vector<CString> myURLS;
+				myURLS.push_back(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=ResetServer")));
 				myURLS.push_back(CString(_T("http://192.168.0.108/TiVoConnect?Command=QueryContainer&Container=/")));
 				myURLS.push_back(CString(_T("http://192.168.0.108/TiVoConnect?Command=QueryFormats&SourceFormat=video%2Fx-tivo-mpeg")));
 				myURLS.push_back(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying")));
+				myURLS.push_back(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying?Recurse=Yes")));
 				myURLS.push_back(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying/9948")));
 				myURLS.push_back(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoVideoDetails?id=984268")));
 				//myURLS.push_back(CString(_T("http://192.168.1.11/TiVoConnect?Command=QueryContainer&Container=/")));
@@ -2404,150 +2406,11 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 				//myURLS.push_back(CString(_T("http://192.168.0.5:8080/TiVoConnect?Command=QueryContainer&Container=/")));
 				//myURLS.push_back(CString(_T("http://192.168.0.5:8080/TiVoConnect?Command=QueryFormats&SourceFormat=video%2Fx-tivo-mpeg")));
 				//myURLS.push_back(CString(_T("https://tivo:1760168186@192.168.0.5:4430/TiVoConnect?Command=QueryContainer&Container=/TivoNowPlaying")));
-				int FileIndex = 0;
-				CInternetSession serverSession;
-				for (auto csURL = myURLS.begin(); csURL != myURLS.end(); csURL++)
-				{
-					std::cout << "[" << getTimeISO8601() << "] Attempting: " << CStringA(*csURL).GetString() << endl;
-					DWORD dwServiceType;
-					CString strServer;
-					CString strObject; 
-					INTERNET_PORT nPort; 
-					CString strUsername; 
-					CString strPassword; 
-					AfxParseURLEx(csURL->GetString(), dwServiceType, strServer, strObject, nPort, strUsername, strPassword);
-					std::unique_ptr<CHttpConnection> serverConnection(serverSession.GetHttpConnection(strServer,nPort,strUsername,strPassword));
-					if (NULL != serverConnection)
-					{
-						DWORD dwFlags = INTERNET_FLAG_TRANSFER_BINARY | SECURITY_IGNORE_ERROR_MASK;
-						if (dwServiceType == AFX_INET_SERVICE_HTTPS)
-							dwFlags |= INTERNET_FLAG_SECURE;
-						std::unique_ptr<CHttpFile> serverFile(serverConnection->OpenRequest(1, strObject, NULL, 1, NULL, NULL, dwFlags));
-						if (serverFile != NULL)
-						{
-							int BadCertErrorCount = 0;
-							AGAIN:
-							try 
-							{
-								//std::unique_ptr<CHttpFile> serverFile((CHttpFile*) serverSession.OpenURL(*csURL, 1, INTERNET_FLAG_TRANSFER_BINARY));
-								serverFile->SendRequest();
-								DWORD dwRet;
-								serverFile->QueryInfoStatusCode(dwRet);
-								if(dwRet == HTTP_STATUS_OK)
-								{
-									CString csCookie;
-									serverFile->QueryInfo(HTTP_QUERY_SET_COOKIE,csCookie);
-									if (!csCookie.IsEmpty())
-									{
-										std::wcout << L"[                   ] HTTP_QUERY_SET_COOKIE: " << csCookie.GetString() << endl;
-										// sid=1BFA53E13BDF178B; path=/; expires="Saturday, 16-Feb-2013 00:00:00 GMT";
-										CString csCookieName(csCookie.Left(csCookie.Find(_T("="))));
-										CString csCookieData(csCookie.Left(csCookie.Find(_T(";"))));;
-										csCookieData.Delete(0,csCookieData.Find(_T("="))+1);
-										CString csCookiePath(csCookie);
-										csCookiePath.Delete(0,csCookiePath.Find(_T("path="))+5);
-										csCookiePath.Delete(csCookiePath.Find(_T(";")),csCookiePath.GetLength());
-										CString csCookieURL;
-										if (dwServiceType == AFX_INET_SERVICE_HTTPS)
-											csCookieURL = _T("https://");
-										else
-											csCookieURL = _T("https://");
-										csCookieURL.Append(strServer);
-										csCookieURL.AppendFormat(_T(":%d"), nPort);
-										csCookieURL.Append(csCookiePath);
-										std::wcout << L"[                   ] csCookieURL: " << csCookieURL.GetString() << endl;
-										std::wcout << L"[                   ] csCookieName: " << csCookieName.GetString() << endl;
-										std::wcout << L"[                   ] csCookieData: " << csCookieData.GetString() << endl;
-										serverSession.SetCookie(csCookieURL,csCookieName,csCookieData);
-									}
-
-									CComPtr<IStream> spMemoryStreamOne(::SHCreateMemStream(NULL, 0));
-									CComPtr<IStream> spMemoryStreamTwo(::SHCreateMemStream(NULL, 0));
-									if ((spMemoryStreamOne != NULL) && (spMemoryStreamTwo != NULL))
-									{
-										char ittybittybuffer;
-										ULONG cbWritten;
-										while (0 < serverFile->Read(&ittybittybuffer, sizeof(ittybittybuffer)))
-											spMemoryStreamOne->Write(&ittybittybuffer, 1, &cbWritten);
-
-										// reposition back to beginning of stream
-										LARGE_INTEGER position;
-										position.QuadPart = 0;
-										spMemoryStreamOne->Seek(position, STREAM_SEEK_SET, NULL);
-
-										HRESULT hr = S_OK;
-										CComPtr<IXmlReader> pReader; 
-										if (SUCCEEDED(hr = CreateXmlReader(__uuidof(IXmlReader), (void**) &pReader, NULL))) 
-										{
-											if (SUCCEEDED(hr = pReader->SetProperty(XmlReaderProperty_DtdProcessing, DtdProcessing_Prohibit))) 
-											{
-												if (SUCCEEDED(hr = pReader->SetInput(spMemoryStreamOne))) 
-												{
-													CComPtr<IXmlWriter> pWriter;
-													if (SUCCEEDED(hr = CreateXmlWriter(__uuidof(IXmlWriter), (void**) &pWriter, NULL))) 
-													{
-														pWriter->SetOutput(spMemoryStreamTwo);
-														pWriter->SetProperty(XmlWriterProperty_Indent, TRUE);
-														while (S_OK == (hr = pWriter->WriteNode(pReader, TRUE)));	// loops over entire xml file, writing it out with indenting
-														//pWriter->WriteEndDocument();
-														pWriter->Flush();
-
-														// Allocates enough memeory for the xml content.
-														STATSTG ssStreamData = {0};
-														spMemoryStreamTwo->Stat(&ssStreamData, STATFLAG_NONAME);
-														SIZE_T cbSize = ssStreamData.cbSize.LowPart;
-														char *XMLDataBuff = new char[cbSize+1];
-
-														// Copies the content from the stream to the buffer.
-														LARGE_INTEGER position;
-														position.QuadPart = 0;
-														spMemoryStreamTwo->Seek(position, STREAM_SEEK_SET, NULL);
-
-														ULONG cbRead;
-														spMemoryStreamTwo->Read(XMLDataBuff, cbSize, &cbRead);
-														XMLDataBuff[cbSize] = '\0';
-														std::stringstream OutPutFileName;
-														//std::stringstream ReturnedData;
-														OutPutFileName << "WimTivoServer." << FileIndex++ << ".xml";
-														std::ofstream OutputFile(OutPutFileName.str(), ios_base::binary);
-														if (OutputFile.is_open())
-															OutputFile.write(XMLDataBuff,cbSize);
-														OutputFile.close();
-														delete[] XMLDataBuff;
-													}
-												}
-											}
-										}
-									}
-								}
-								serverFile->Close();
-							}
-							catch(CInternetException *e)
-							{
-								TCHAR   szCause[255];
-								e->GetErrorMessage(szCause,sizeof(szCause)/sizeof(TCHAR));
-								CStringA csErrorMessage(szCause);
-								csErrorMessage.Trim();
-								std::cout << "[" << getTimeISO8601() << "] InternetException: " <<  csErrorMessage.GetString() << " (" << e->m_dwError << ") " << endl;
-								if ((e->m_dwError == ERROR_INTERNET_INVALID_CA) || 
-									(e->m_dwError == ERROR_INTERNET_SEC_CERT_CN_INVALID) ||
-									(e->m_dwError == ERROR_INTERNET_SEC_CERT_DATE_INVALID) ||
-									(e->m_dwError == ERROR_INTERNET_SEC_INVALID_CERT) )
-								{
-									serverFile->SetOption(INTERNET_OPTION_SECURITY_FLAGS, SECURITY_SET_MASK);
-									if (BadCertErrorCount++ < 2)
-										goto AGAIN;
-								}
-							}
-						}
-					}
-				}
-				// Here I'm going to transfer a raw file and see what I get.
-				// 
-				myURLS.clear();
 				myURLS.push_back(CString(_T("http://tivo:1760168186@192.168.0.108:80/download/Evening Magazine.TiVo?Container=/NowPlaying&id=984268")));
 				myURLS.push_back(CString(_T("http://tivo:1760168186@192.168.0.108:80/download/Evening Magazine.TiVo?Container=/NowPlaying&id=879493")));
 				myURLS.push_back(CString(_T("http://tivo:1760168186@192.168.0.108:80/download/Community.TiVo?Container=/NowPlaying&id=3002485")));
+				int FileIndex = 0;
+				CInternetSession serverSession;
 				for (auto csURL = myURLS.begin(); csURL != myURLS.end(); csURL++)
 				{
 					std::cout << "[" << getTimeISO8601() << "] Attempting: " << CStringA(*csURL).GetString() << endl;
@@ -2573,7 +2436,7 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 						if (serverFile != NULL)
 						{
 							int BadCertErrorCount = 0;
-							AGAIN2:
+							AGAIN:
 							try 
 							{
 								//std::unique_ptr<CHttpFile> serverFile((CHttpFile*) serverSession.OpenURL(*csURL, 1, INTERNET_FLAG_TRANSFER_BINARY));
@@ -2590,47 +2453,153 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 								#endif
 								if(dwRet == HTTP_STATUS_OK)
 								{
-									std::stringstream OutPutFileName;
-									OutPutFileName << "WimTivoServer." << FileIndex++ << ".TiVo";
-									std::ofstream OutputFile(OutPutFileName.str(), ios_base::binary);
-									if (OutputFile.is_open())
+									CString csCookie;
+									serverFile->QueryInfo(HTTP_QUERY_SET_COOKIE, csCookie);
+									if (!csCookie.IsEmpty())
 									{
-										static size_t ReadWriteBufferSize = 1024;
-										char* ReadWriteBuffer = new char[ReadWriteBufferSize];
-										long long TotalRead = 0;
-										UINT uiRead;
-										CTime ctCurrent(CTime::GetCurrentTime());
-										CTime ctStart(ctCurrent);
-										CTime ctLastOutput(ctStart);
-										CTimeSpan ctsTotal = ctCurrent - ctStart;
-										std::locale mylocale("");   // get global locale
-										std::locale OriginalLocale(std::cout.imbue(mylocale));  // imbue global locale
-										std::cout << "[" << getTimeISO8601() << "] ReadWriteBufferSize: " << ReadWriteBufferSize << endl;
-										while (0 < (uiRead = serverFile->Read(ReadWriteBuffer, ReadWriteBufferSize)))
+										std::wcout << L"[                   ] HTTP_QUERY_SET_COOKIE: " << csCookie.GetString() << endl;
+										// sid=1BFA53E13BDF178B; path=/; expires="Saturday, 16-Feb-2013 00:00:00 GMT";
+										CString csCookieName(csCookie.Left(csCookie.Find(_T("="))));
+										CString csCookieData(csCookie.Left(csCookie.Find(_T(";"))));;
+										csCookieData.Delete(0,csCookieData.Find(_T("="))+1);
+										CString csCookiePath(csCookie);
+										csCookiePath.Delete(0,csCookiePath.Find(_T("path="))+5);
+										csCookiePath.Delete(csCookiePath.Find(_T(";")),csCookiePath.GetLength());
+										CString csCookieURL;
+										if (dwServiceType == AFX_INET_SERVICE_HTTPS)
+											csCookieURL = _T("https://");
+										else
+											csCookieURL = _T("https://");
+										csCookieURL.Append(strServer);
+										csCookieURL.AppendFormat(_T(":%d"), nPort);
+										csCookieURL.Append(csCookiePath);
+										std::wcout << L"[                   ] csCookieURL: " << csCookieURL.GetString() << endl;
+										std::wcout << L"[                   ] csCookieName: " << csCookieName.GetString() << endl;
+										std::wcout << L"[                   ] csCookieData: " << csCookieData.GetString() << endl;
+										serverSession.SetCookie(csCookieURL,csCookieName,csCookieData);
+									}									
+									CString csContentType;
+									serverFile->QueryInfo(HTTP_QUERY_CONTENT_TYPE, csContentType);
+									if (!csContentType.CompareNoCase(_T("text/xml")))
+									{								
+										CComPtr<IStream> spMemoryStreamOne(::SHCreateMemStream(NULL, 0));
+										CComPtr<IStream> spMemoryStreamTwo(::SHCreateMemStream(NULL, 0));
+										if ((spMemoryStreamOne != NULL) && (spMemoryStreamTwo != NULL))
 										{
-											OutputFile.write(ReadWriteBuffer,uiRead);
-											TotalRead += uiRead;
-											ctCurrent = CTime::GetCurrentTime();
-											ctsTotal = ctCurrent - ctStart;
-											if ((ctCurrent - ctLastOutput) > CTimeSpan(0,0,0,10))
+											char ittybittybuffer;
+											ULONG cbWritten;
+											while (0 < serverFile->Read(&ittybittybuffer, sizeof(ittybittybuffer)))
+												spMemoryStreamOne->Write(&ittybittybuffer, 1, &cbWritten);
+
+											// reposition back to beginning of stream
+											LARGE_INTEGER position;
+											position.QuadPart = 0;
+											spMemoryStreamOne->Seek(position, STREAM_SEEK_SET, NULL);
+
+											HRESULT hr = S_OK;
+											CComPtr<IXmlReader> pReader; 
+											if (SUCCEEDED(hr = CreateXmlReader(__uuidof(IXmlReader), (void**) &pReader, NULL))) 
 											{
-												std::cout << "[" << getTimeISO8601() << "] Elapsed: " << CStringA(ctsTotal.Format(_T("%H:%M:%S"))).GetString() << " Bytes: " << TotalRead << " bytes/second: " <<  (TotalRead / ctsTotal.GetTotalSeconds()) << "\r";
-												ctLastOutput = ctCurrent;
+												if (SUCCEEDED(hr = pReader->SetProperty(XmlReaderProperty_DtdProcessing, DtdProcessing_Prohibit))) 
+												{
+													if (SUCCEEDED(hr = pReader->SetInput(spMemoryStreamOne))) 
+													{
+														CComPtr<IXmlWriter> pWriter;
+														if (SUCCEEDED(hr = CreateXmlWriter(__uuidof(IXmlWriter), (void**) &pWriter, NULL))) 
+														{
+															pWriter->SetOutput(spMemoryStreamTwo);
+															pWriter->SetProperty(XmlWriterProperty_Indent, TRUE);
+															while (S_OK == (hr = pWriter->WriteNode(pReader, TRUE)));	// loops over entire xml file, writing it out with indenting
+															//pWriter->WriteEndDocument();
+															pWriter->Flush();
+
+															// Allocates enough memeory for the xml content.
+															STATSTG ssStreamData = {0};
+															spMemoryStreamTwo->Stat(&ssStreamData, STATFLAG_NONAME);
+															SIZE_T cbSize = ssStreamData.cbSize.LowPart;
+															char *XMLDataBuff = new char[cbSize+1];
+
+															// Copies the content from the stream to the buffer.
+															LARGE_INTEGER position;
+															position.QuadPart = 0;
+															spMemoryStreamTwo->Seek(position, STREAM_SEEK_SET, NULL);
+
+															ULONG cbRead;
+															spMemoryStreamTwo->Read(XMLDataBuff, cbSize, &cbRead);
+															XMLDataBuff[cbSize] = '\0';
+															std::stringstream OutPutFileName;
+															//std::stringstream ReturnedData;
+															OutPutFileName << "WimTivoServer." << FileIndex++ << ".xml";
+															std::ofstream OutputFile(OutPutFileName.str(), ios_base::binary);
+															if (OutputFile.is_open())
+																OutputFile.write(XMLDataBuff,cbSize);
+															OutputFile.close();
+															delete[] XMLDataBuff;
+														}
+													}
+												}
 											}
 										}
-										std::wcout << endl;
-										OutputFile.close();
-										delete[] ReadWriteBuffer;
-										std::cout << "[" << getTimeISO8601() << "] Elapsed: " << CStringA(ctsTotal.Format(_T("%H:%M:%S"))).GetString() << " Bytes: " << TotalRead << endl;
-										std::cout << "[" << getTimeISO8601() << "] ReadWriteBufferSize: " << ReadWriteBufferSize << " Total Bytes: " << TotalRead << " Total Seconds: " << ctsTotal.GetTotalSeconds() << " bytes/second: " <<  (TotalRead / ctsTotal.GetTotalSeconds()) << endl;
-										std::cout.imbue(OriginalLocale);
-										ReadWriteBufferSize *= 10;
+									}
+									else if (!csContentType.CompareNoCase(_T("video/x-tivo-mpeg")))
+									{
+										std::stringstream OutPutFileName;
+										OutPutFileName << "WimTivoServer." << FileIndex++ << ".TiVo";
+										std::ofstream OutputFile(OutPutFileName.str(), ios_base::binary);
+										if (OutputFile.is_open())
+										{
+											static size_t ReadWriteBufferSize = 1024;
+											char* ReadWriteBuffer = new char[ReadWriteBufferSize];
+											long long TotalRead = 0;
+											UINT uiRead;
+											CTime ctCurrent(CTime::GetCurrentTime());
+											CTime ctStart(ctCurrent);
+											CTime ctLastOutput(ctStart);
+											CTimeSpan ctsTotal = ctCurrent - ctStart;
+											std::locale mylocale("");   // get global locale
+											std::locale OriginalLocale(std::cout.imbue(mylocale));  // imbue global locale
+											std::cout << "[                   ] ReadWriteBufferSize: " << ReadWriteBufferSize << endl;
+											while (0 < (uiRead = serverFile->Read(ReadWriteBuffer, ReadWriteBufferSize)))
+											{
+												OutputFile.write(ReadWriteBuffer,uiRead);
+												TotalRead += uiRead;
+												ctCurrent = CTime::GetCurrentTime();
+												ctsTotal = ctCurrent - ctStart;
+												if ((ctCurrent - ctLastOutput) > CTimeSpan(0,0,0,10))
+												{
+													std::cout << "[" << getTimeISO8601() << "] Elapsed: " << CStringA(ctsTotal.Format(_T("%H:%M:%S"))).GetString() << " Bytes: " << TotalRead << " bytes/second: " <<  (TotalRead / ctsTotal.GetTotalSeconds()) << "\r";
+													ctLastOutput = ctCurrent;
+												}
+											}
+											OutputFile.close();
+											delete[] ReadWriteBuffer;
+											std::cout << "[" << getTimeISO8601() << "] Elapsed: " << CStringA(ctsTotal.Format(_T("%H:%M:%S"))).GetString() << " Bytes: " << TotalRead << " bytes/second: " <<  (TotalRead / ctsTotal.GetTotalSeconds()) << " ReadWriteBufferSize: " << ReadWriteBufferSize << endl;
+											std::cout.imbue(OriginalLocale);
+											ReadWriteBufferSize *= 10;
+										}
+									}
+									else
+									{
+										std::cout << "[                   ] not text/xml or video/x-tivo-mpeg" << endl;
+										char ittybittybuffer;
+										while (0 < serverFile->Read(&ittybittybuffer, sizeof(ittybittybuffer)))
+											std::cout << ittybittybuffer;
+										std::cout << endl;
+									}
+								}
+								else if (dwRet == HTTP_STATUS_SERVICE_UNAVAIL)
+								{
+									CString csRetry;
+									if (0 < serverFile->QueryInfo(HTTP_QUERY_RETRY_AFTER, csRetry))
+									{
+										int iRetry = _ttoi(csRetry.GetString());
+										std::cout << "[" << getTimeISO8601() << "] Sleeping for " << iRetry << " Seconds" << endl;
+										Sleep(iRetry * 1000);
 									}
 								}
 								else if (serverFile->GetLength() > 0)
 								{
 									char ittybittybuffer;
-									ULONG cbWritten;
 									std::string ss;
 									while (0 < serverFile->Read(&ittybittybuffer, sizeof(ittybittybuffer)))
 										ss += ittybittybuffer;
@@ -2652,7 +2621,7 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 								{
 									serverFile->SetOption(INTERNET_OPTION_SECURITY_FLAGS, SECURITY_SET_MASK);
 									if (BadCertErrorCount++ < 2)
-										goto AGAIN2;
+										goto AGAIN;
 								}
 							}
 						}
@@ -2663,7 +2632,7 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 
 			if (csMyHostName.CompareNoCase(_T("INSPIRON")))
 			{
-				cout << "[" << getTimeISO8601() << "] Listening for TiVo Broadcast packets on UDP port 2190" << endl;
+				std::cout << "[" << getTimeISO8601() << "] Listening for TiVo Broadcast packets on UDP port 2190" << endl;
 				// Set up CTR-C signal handler
 				typedef void (*SignalHandlerPointer)(int);
 				SignalHandlerPointer previousHandler = signal(SIGINT, SignalHandler);
@@ -2671,10 +2640,10 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 				bRun = true;
 				SOCKADDR_IN saServer;
 				while (bRun && (TiVoBeaconListen(saServer) == true))
-					cout << "[" << getTimeISO8601() << "] \r";
+					std::cout << "[" << getTimeISO8601() << "] \r";
 				// remove our special Ctrl-C signal handler and restore previous one
 				signal(SIGINT, previousHandler);
-				cout << "\n[" << getTimeISO8601() << "] No longer listening for TiVo Broadcast packets on UDP port 2190" << endl;
+				std::cout << "\n[" << getTimeISO8601() << "] No longer listening for TiVo Broadcast packets on UDP port 2190" << endl;
 			}
 			terminateEvent = CreateEvent(0,TRUE,FALSE,0);
 			if (terminateEvent != NULL) 
@@ -2704,7 +2673,7 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 					}
 					//csTiVoPacket.AppendFormat(_T("services=<name>[:<port>][/<protocol>], ...\r\n"));
 					csTiVoPacket.Append("swversion=");csTiVoPacket.Append(CStringA(csBuildDateTime));csTiVoPacket.Append("\n");
-					cout << csTiVoPacket.GetString();
+					std::cout << csTiVoPacket.GetString();
 					for (auto index = 300; index > 0; --index)
 					{
 						CStringA csTiVoPacket("tivoconnect=1\n");
@@ -2727,7 +2696,7 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 						TiVoBeaconSend(csTiVoPacket);
 						//csTiVoPacket.Replace("\n", " ");
 						//csTiVoPacket.Trim();
-						//cout << "[" << getTimeISO8601() << "] (" << index << ") " << csTiVoPacket.GetString() << "\r";
+						//std::cout << "[" << getTimeISO8601() << "] (" << index << ") " << csTiVoPacket.GetString() << "\r";
 						Sleep(1000);
 					}
 					closesocket(ControlSocket);
