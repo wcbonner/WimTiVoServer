@@ -1318,9 +1318,6 @@ UINT HTTPMain(LPVOID lvp)
 			SOCKADDR_IN saServer;
 			saServer.sin_family = AF_INET;
 			saServer.sin_addr.s_addr = INADDR_ANY;	/* Let WinSock supply address */
-			#ifdef _DEBUG
-			saServer.sin_port = htons(64321);
-			#endif
 			CString csRegKey(_T("Software\\WimsWorld\\"));
 			csRegKey.Append(theApp.m_pszAppName);
 			DWORD vData = 0;
@@ -1328,7 +1325,11 @@ UINT HTTPMain(LPVOID lvp)
 			if (ERROR_SUCCESS == RegGetValue(HKEY_LOCAL_MACHINE, csRegKey, _T("TCPPort"), RRF_RT_REG_DWORD, NULL, &vData, &cbData))
 				saServer.sin_port = htons(vData);
 			else
+				#ifdef _DEBUG
+				saServer.sin_port = htons(64321);
+				#else
 				saServer.sin_port = htons(0);			/* Use unique port */
+				#endif
 			int nRet = bind(ControlSocket,			/* Socket */
 						(LPSOCKADDR)&saServer,		/* Our address */
 						sizeof(struct sockaddr));	/* Size of address structure */

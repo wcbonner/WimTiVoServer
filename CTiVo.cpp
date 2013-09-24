@@ -83,9 +83,9 @@ static time_t ISO8601totime(const std::string & ISOTime)
 	int hours = 0;
 	if (0 != _get_daylight(&hours))
 		hours = 0;
-	long seconds = 0;
-	if (0 != _get_timezone(&seconds))
-		seconds = 0;
+	long SecondsFromUTC = 0;
+	if (0 != _get_timezone(&SecondsFromUTC))
+		SecondsFromUTC = 0;
 	long dstbias = 0;
 	if (0 != _get_dstbias(&dstbias))
 		dstbias = 0;
@@ -93,8 +93,8 @@ static time_t ISO8601totime(const std::string & ISOTime)
 	#endif
 	time_t timer = mktime(&UTC);
 	#ifdef _MSC_VER
-	timer -= seconds;
-	timer += hours * dstbias;
+	timer -= SecondsFromUTC;
+	timer -= hours * dstbias;
 	#endif
 	return(timer);
 }
@@ -464,6 +464,12 @@ void cTiVoFile::PopulateFromFFMPEG(void)
 					while (0 < Value.Replace(_T(";;"),_T(";")));
 					while (0 < Value.Replace(_T("//"),_T("/")));
 					m_vActor = Value;
+				}
+				if (_stricmp("WM/WMRVEncodeTime", tag->key) == 0)
+				{
+					CTime OriginalBroadcastDate = ISO8601totime(std::string(tag->value));
+					if (OriginalBroadcastDate > 0)
+						m_CaptureDate = OriginalBroadcastDate;
 				}
 				if (_stricmp("WM/MediaOriginalBroadcastDateTime", tag->key) == 0)
 				{
