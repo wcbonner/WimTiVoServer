@@ -1,49 +1,44 @@
 #include "stdafx.h"
 #include "CTiVo.h"
+#pragma comment(lib, "wininet") // For some reason InternetCanonicalizeUrl() wasn't linking without this.
 using namespace std;
 
 static std::string timeToISO8601(const time_t & TheTime)
 {
 	std::ostringstream ISOTime;
-	time_t timer = TheTime;
-	struct tm * UTC = gmtime(&timer);
-	if (UTC != NULL)
-	{
-		ISOTime.fill('0');
-		ISOTime << UTC->tm_year+1900 << "-";
-		ISOTime.width(2);
-		ISOTime << UTC->tm_mon+1 << "-";
-		ISOTime.width(2);
-		ISOTime << UTC->tm_mday << "T";
-		ISOTime.width(2);
-		ISOTime << UTC->tm_hour << ":";
-		ISOTime.width(2);
-		ISOTime << UTC->tm_min << ":";
-		ISOTime.width(2);
-		ISOTime << UTC->tm_sec;
-	}
+	struct tm UTC;
+	gmtime_s(&UTC, &TheTime);
+	ISOTime.fill('0');
+	ISOTime << UTC.tm_year+1900 << "-";
+	ISOTime.width(2);
+	ISOTime << UTC.tm_mon+1 << "-";
+	ISOTime.width(2);
+	ISOTime << UTC.tm_mday << "T";
+	ISOTime.width(2);
+	ISOTime << UTC.tm_hour << ":";
+	ISOTime.width(2);
+	ISOTime << UTC.tm_min << ":";
+	ISOTime.width(2);
+	ISOTime << UTC.tm_sec;
 	return(ISOTime.str());
 }
 static std::string timeToExcelDate(const time_t & TheTime)
 {
 	std::ostringstream ISOTime;
-	time_t timer = TheTime;
-	struct tm * UTC = gmtime(&timer);
-	if (UTC != NULL)
-	{
-		ISOTime.fill('0');
-		ISOTime << UTC->tm_year+1900 << "-";
-		ISOTime.width(2);
-		ISOTime << UTC->tm_mon+1 << "-";
-		ISOTime.width(2);
-		ISOTime << UTC->tm_mday << " ";
-		ISOTime.width(2);
-		ISOTime << UTC->tm_hour << ":";
-		ISOTime.width(2);
-		ISOTime << UTC->tm_min << ":";
-		ISOTime.width(2);
-		ISOTime << UTC->tm_sec;
-	}
+	struct tm UTC;
+	gmtime_s(&UTC, &TheTime);
+	ISOTime.fill('0');
+	ISOTime << UTC.tm_year+1900 << "-";
+	ISOTime.width(2);
+	ISOTime << UTC.tm_mon+1 << "-";
+	ISOTime.width(2);
+	ISOTime << UTC.tm_mday << " ";
+	ISOTime.width(2);
+	ISOTime << UTC.tm_hour << ":";
+	ISOTime.width(2);
+	ISOTime << UTC.tm_min << ":";
+	ISOTime.width(2);
+	ISOTime << UTC.tm_sec;
 	return(ISOTime.str());
 }
 static std::string getTimeISO8601(void)
@@ -71,7 +66,9 @@ void cTiVoFile::SetPathName(const CString csNewPath)
 		//cout << "[                   ] " << setw(20) << right << "Time modified" << " : " << timebuf << endl;
 
 		m_CaptureDate = CTime(buf.st_mtime);
+		#ifdef AVCODEC_AVCODEC_H
 		PopulateFromFFMPEG();
+		#endif
 		TCHAR path_buffer[_MAX_PATH];
 		TCHAR drive[_MAX_DRIVE];
 		TCHAR dir[_MAX_DIR];
@@ -123,7 +120,9 @@ void cTiVoFile::SetPathName(const CFileFind & csNewPath)
 	DWORD dwBufferLength = sizeof(lpszBuffer) / sizeof(TCHAR);
 	InternetCanonicalizeUrl(m_csURL.GetString(), lpszBuffer, &dwBufferLength, 0);
 	m_csURL = CString(lpszBuffer, dwBufferLength);
+	#ifdef AVCODEC_AVCODEC_H
 	PopulateFromFFMPEG();
+	#endif
 	// Final Output of object values
 	wcout << L"[                   ] " << setw(20) << right << L"m_csPathName" << L" : " << m_csPathName.GetString() << endl;
 	wcout << L"[                   ] " << setw(20) << right << L"m_Title" << L" : " << m_Title.GetString() << endl;
@@ -153,6 +152,7 @@ void cTiVoFile::SetFromTiVoItem(const CString &csTitle, const CString &csEpisode
 	ssFileName << L" (Recorded " << ctCaptureDate.Format(_T("%b %d, %Y, ")).GetString() << csSourceStation.GetString() << L").TiVo";
 	m_csPathName = ssFileName.str().c_str();
 }
+#ifdef AVCODEC_AVCODEC_H
 void cTiVoFile::PopulateFromFFMPEG(void)
 {
 	// Change so that I only get the details from inside the file if details are requested
@@ -254,6 +254,7 @@ void cTiVoFile::PopulateFromFFMPEG(void)
 	}
 	av_log_set_level(Oldavlog);
 }
+#endif
 void cTiVoFile::GetXML(CComPtr<IXmlWriter> & pWriter) const
 {
 	pWriter->WriteStartElement(NULL, L"Item", NULL);
@@ -274,7 +275,9 @@ void cTiVoFile::GetXML(CComPtr<IXmlWriter> & pWriter) const
 				CTime tempTime(m_CaptureDate);
 				const CTime UnixEpochTime(1970,1,1,0,0,0);
 				_tzset();
-				tempTime += CTimeSpan(_timezone);	// the time difference was ~8 hours, which makes sense as the diff between UTC and local time.
+				long SecondsFromUTC;
+				_get_timezone(&SecondsFromUTC);
+				tempTime += CTimeSpan(SecondsFromUTC);	// the time difference was ~8 hours, which makes sense as the diff between UTC and local time.
 				CTimeSpan TimeDiff = tempTime - UnixEpochTime;
 				std::wstringstream ss(std::stringstream::in | std::stringstream::out);
 				ss << showbase << hex << TimeDiff.GetTotalSeconds();

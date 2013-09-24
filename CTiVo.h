@@ -36,7 +36,9 @@ public:
 	void SetPathName(const CFileFind & csNewPath);
 	const CString GetPathName(void) const { return(m_csPathName); }
 	void SetFromTiVoItem(const CString &csTitle, const CString &csEpisodeTitle, const CString &csDescription, const CString &csSourceStation, const CString &csContentURL, const CTime &ctCaptureDate, const CTimeSpan &ctsDuration);
+	#ifdef AVCODEC_AVCODEC_H
 	void PopulateFromFFMPEG(void);
+	#endif
 	const CString GetURL(void) const { return(m_csURL); }
 	void GetXML(CComPtr<IXmlWriter> & pWriter) const;
 	void GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const;

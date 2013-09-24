@@ -20,6 +20,7 @@
 #endif
 
 #include "WimTiVoClientDoc.h"
+#include "CTiVo.h"
 
 #include <propkey.h>
 
