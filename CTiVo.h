@@ -45,9 +45,11 @@ private:
 	unsigned long long m_SourceSize;
     unsigned long long m_Duration;
 	CTime m_CaptureDate;
+	CTime m_LastWriteTime;
 	CString m_csMAK;
 	bool m_AudioCompatible;
 	bool m_VideoCompatible;
+	CString m_TvBusEnvelope;
 public:
 	cTiVoFile() : 
 	m_AudioCompatible(false),
@@ -78,12 +80,13 @@ public:
 	const CString & GetEpisodeTitle(void) const { return(m_EpisodeTitle); }
 	const CString & GetDescription(void) const { return(m_Description); }
 	const CTime & GetCaptureDate(void) const { return(m_CaptureDate); }
+	const CTime & GetLastWriteTime(void) const { return(m_LastWriteTime); }
 	const CString & SetMAK(const CString & csMAK);
 	const CString & GetMAK(void) const { return(m_csMAK); }
 	const CString & GetSourceFormat(void) const { return(m_SourceFormat); }
 	const unsigned long long & GetDuration(void) const { return(m_Duration); }
 	const unsigned long long & GetSourceSize(void) const { return(m_SourceSize); }
-	void GetXML(CComPtr<IXmlWriter> & pWriter) const;
+	void GetTiVoItem(CComPtr<IXmlWriter> & pWriter) const;
 	void GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const;
 	const CString GetFFMPEGCommandLine(const CString & csFFMPEGPath = _T("ffmpeg.exe")) const;
 };
