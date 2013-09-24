@@ -247,6 +247,7 @@ void CWimTiVoClientView::OnTiviNowplaying()
 				if (IDOK == myDlg.DoModal())
 					pServer->m_MAK = CStringA(myDlg.m_csMediaAccessKey).GetString();
 			}
+			CWaitCursor wait;
 			pDoc->GetNowPlaying();
 		}
 		pDoc->UpdateAllViews(NULL);
