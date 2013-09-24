@@ -22,6 +22,28 @@ static std::string timeToISO8601(const time_t & TheTime)
 	ISOTime << UTC.tm_sec;
 	return(ISOTime.str());
 }
+//static std::string timeToISO8601(const CTime & TheTime)
+//{
+//	time_t TheOtherTime;
+//	//mktime(
+//	//TheTime.
+//	return(timeToISO8601(TheOtherTime));
+//}
+static std::string timeToISO8601(const CTimeSpan & TheTimeSpan)
+{
+	std::ostringstream ISOTime;
+	ISOTime << "P";
+	if (TheTimeSpan.GetDays() > 0)
+		ISOTime << TheTimeSpan.GetDays() << "D";
+	ISOTime << "T";
+	if (TheTimeSpan.GetHours() > 0)
+		ISOTime << TheTimeSpan.GetHours() << "H";
+	if (TheTimeSpan.GetMinutes() > 0)
+		ISOTime << TheTimeSpan.GetMinutes() << "M";
+	if (TheTimeSpan.GetSeconds() > 0)
+		ISOTime << TheTimeSpan.GetSeconds() << "S";
+	return(ISOTime.str());
+}
 static std::string timeToExcelDate(const time_t & TheTime)
 {
 	std::ostringstream ISOTime;
@@ -277,6 +299,7 @@ void cTiVoFile::GetXML(CComPtr<IXmlWriter> & pWriter) const
 			if (!m_EpisodeTitle.IsEmpty()) pWriter->WriteElementString(NULL, L"EpisodeTitle", NULL, m_EpisodeTitle.GetString());
 			if (!m_Description.IsEmpty()) pWriter->WriteElementString(NULL, L"Description", NULL, m_Description.GetString());
 			if (!m_ContentType.IsEmpty()) pWriter->WriteElementString(NULL, L"ContentType", NULL, m_ContentType.GetString());
+			//if (!m_ContentType.IsEmpty()) pWriter->WriteElementString(NULL, L"SourceFormat", NULL, m_ContentType.GetString());
 			if (!m_SourceFormat.IsEmpty()) pWriter->WriteElementString(NULL, L"SourceFormat", NULL, m_SourceFormat.GetString());
 			if (m_Duration > 0)
 			{
@@ -323,14 +346,15 @@ void cTiVoFile::GetXML(CComPtr<IXmlWriter> & pWriter) const
 }
 void cTiVoFile::GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const
 {
-	pWriter->WriteElementString(NULL, L"recordedDuration", NULL, CTimeSpan(m_Duration/1000).Format(_T("PT%HH%MM%SS")));
+	pWriter->WriteRaw(L"<TvBusMarshalledStruct:TvBusEnvelope xmlns:xs=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:TvBusMarshalledStruct=\"http://tivo.com/developer/xml/idl/TvBusMarshalledStruct\" xmlns:TvPgdRecording=\"http://tivo.com/developer/xml/idl/TvPgdRecording\" xmlns:TvBusDuration=\"http://tivo.com/developer/xml/idl/TvBusDuration\" xmlns:TvPgdShowing=\"http://tivo.com/developer/xml/idl/TvPgdShowing\" xmlns:TvDbShowingBit=\"http://tivo.com/developer/xml/idl/TvDbShowingBit\" xmlns:TvBusDateTime=\"http://tivo.com/developer/xml/idl/TvBusDateTime\" xmlns:TvPgdProgram=\"http://tivo.com/developer/xml/idl/TvPgdProgram\" xmlns:TvDbColorCode=\"http://tivo.com/developer/xml/idl/TvDbColorCode\" xmlns:TvPgdSeries=\"http://tivo.com/developer/xml/idl/TvPgdSeries\" xmlns:TvDbShowType=\"http://tivo.com/developer/xml/idl/TvDbShowType\" xmlns:TvPgdBookmark=\"http://tivo.com/developer/xml/idl/TvPgdBookmark\" xmlns:TvPgdChannel=\"http://tivo.com/developer/xml/idl/TvPgdChannel\" xmlns:TvDbBitstreamFormat=\"http://tivo.com/developer/xml/idl/TvDbBitstreamFormat\" xs:schemaLocation=\"http://tivo.com/developer/xml/idl/TvBusMarshalledStruct TvBusMarshalledStruct.xsd http://tivo.com/developer/xml/idl/TvPgdRecording TvPgdRecording.xsd http://tivo.com/developer/xml/idl/TvBusDuration TvBusDuration.xsd http://tivo.com/developer/xml/idl/TvPgdShowing TvPgdShowing.xsd http://tivo.com/developer/xml/idl/TvDbShowingBit TvDbShowingBit.xsd http://tivo.com/developer/xml/idl/TvBusDateTime TvBusDateTime.xsd http://tivo.com/developer/xml/idl/TvPgdProgram TvPgdProgram.xsd http://tivo.com/developer/xml/idl/TvDbColorCode TvDbColorCode.xsd http://tivo.com/developer/xml/idl/TvPgdSeries TvPgdSeries.xsd http://tivo.com/developer/xml/idl/TvDbShowType TvDbShowType.xsd http://tivo.com/developer/xml/idl/TvPgdBookmark TvPgdBookmark.xsd http://tivo.com/developer/xml/idl/TvPgdChannel TvPgdChannel.xsd http://tivo.com/developer/xml/idl/TvDbBitstreamFormat TvDbBitstreamFormat.xsd\" xs:type=\"TvPgdRecording:TvPgdRecording\">");
+	pWriter->WriteElementString(NULL, L"recordedDuration", NULL, CString(timeToISO8601(CTimeSpan(m_Duration/1000)).c_str()).GetString()); // This is ISO8601 Format for Duration
 	pWriter->WriteStartElement(NULL, L"vActualShowing", NULL);pWriter->WriteEndElement();
 	pWriter->WriteStartElement(NULL, L"vBookmark", NULL);pWriter->WriteEndElement();
 	pWriter->WriteStartElement(NULL, L"recordingQuality", NULL);pWriter->WriteAttributeString(NULL,L"value",NULL,L"75");pWriter->WriteString(L"HIGH");pWriter->WriteEndElement();
 	pWriter->WriteStartElement(NULL, L"showing", NULL);
 		pWriter->WriteStartElement(NULL, L"showingBits", NULL);pWriter->WriteAttributeString(NULL,L"value",NULL,L"4609");pWriter->WriteEndElement();
 		pWriter->WriteElementString(NULL, L"time", NULL, m_CaptureDate.FormatGmt(_T("%Y-%m-%d:%H:%M:%SZ")));
-		pWriter->WriteElementString(NULL, L"duration", NULL, CTimeSpan(m_Duration/1000).Format(_T("PT%HH%MM%SS")));
+		pWriter->WriteElementString(NULL, L"duration", NULL, CString(timeToISO8601(CTimeSpan(m_Duration/1000)).c_str()).GetString());
 		pWriter->WriteStartElement(NULL, L"program", NULL);
 			pWriter->WriteStartElement(NULL, L"vActor", NULL);
 			pWriter->WriteEndElement();				
@@ -342,7 +366,7 @@ void cTiVoFile::GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const
 			pWriter->WriteElementString(NULL, L"description", NULL, m_Description.GetString());
 			pWriter->WriteStartElement(NULL, L"vDirector", NULL);
 			pWriter->WriteEndElement();
-			if (!m_EpisodeTitle.IsEmpty()) pWriter->WriteElementString(NULL, L"episodeTitle", NULL, m_EpisodeTitle.GetString());
+			pWriter->WriteElementString(NULL, L"episodeTitle", NULL, m_EpisodeTitle.GetString());
 			pWriter->WriteStartElement(NULL, L"vExecProducer", NULL);
 			pWriter->WriteEndElement();
 			pWriter->WriteStartElement(NULL, L"vProgramGenre", NULL);
@@ -351,12 +375,12 @@ void cTiVoFile::GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const
 			pWriter->WriteEndElement();
 			pWriter->WriteStartElement(NULL, L"vHost", NULL);
 			pWriter->WriteEndElement();
-			pWriter->WriteElementString(NULL, L"isEpisode", NULL, L"true");
+			pWriter->WriteElementString(NULL, L"isEpisode", NULL, L"false");
 			pWriter->WriteElementString(NULL, L"originalAirDate", NULL, m_CaptureDate.FormatGmt(_T("%Y-%m-%d:%H:%M:%SZ")));
 			pWriter->WriteStartElement(NULL, L"vProducer", NULL);
 			pWriter->WriteEndElement();
 			pWriter->WriteStartElement(NULL, L"series", NULL);
-				pWriter->WriteElementString(NULL, L"isEpisodic", NULL, L"true");
+				pWriter->WriteElementString(NULL, L"isEpisodic", NULL, L"false");
 				pWriter->WriteStartElement(NULL, L"vSeriesGenre", NULL);
 					//pWriter->WriteElementString(NULL, L"element", NULL, L"Talk Show");
 					//pWriter->WriteElementString(NULL, L"element", NULL, L"News Magazine");
@@ -371,13 +395,14 @@ void cTiVoFile::GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const
 			pWriter->WriteEndElement();
 		pWriter->WriteEndElement();
 		pWriter->WriteStartElement(NULL, L"channel", NULL);
-			pWriter->WriteElementString(NULL, L"displayMajorNumber", NULL, L"0");
-			pWriter->WriteElementString(NULL, L"displayMinorNumber", NULL, L"0");
+			pWriter->WriteElementString(NULL, L"displayMajorNumber", NULL, NULL);
+			pWriter->WriteElementString(NULL, L"displayMinorNumber", NULL, NULL);
 			pWriter->WriteElementString(NULL, L"callsign", NULL, NULL);
 		pWriter->WriteEndElement();
 	pWriter->WriteEndElement();
 	pWriter->WriteElementString(NULL, L"startTime", NULL, m_CaptureDate.FormatGmt(_T("%Y-%m-%d:%H:%M:%SZ")));
 	pWriter->WriteElementString(NULL, L"stopTime", NULL, CTime(m_CaptureDate + CTimeSpan(m_Duration/1000)).FormatGmt(_T("%Y-%m-%d:%H:%M:%SZ")));
+	pWriter->WriteRaw(L"</TvBusMarshalledStruct:TvBusEnvelope>");
 }
 /////////////////////////////////////////////////////////////////////////////
 // Simple Sorting Routines

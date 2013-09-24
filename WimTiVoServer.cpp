@@ -666,6 +666,17 @@ void XML_Test_FileReformat(const CString & Source = _T("D:\\Videos\\chunk-01-000
 	}
 }
 /////////////////////////////////////////////////////////////////////////////
+const CString QuoteFileName(const CString & Original)
+{
+	CString csQuotedString(Original);
+	if (csQuotedString.Find(_T(" ")) >= 0)
+	{
+		csQuotedString.Insert(0,_T('"'));
+		csQuotedString.AppendChar(_T('"'));
+	}
+	return(csQuotedString);
+}
+/////////////////////////////////////////////////////////////////////////////
 void PopulateTiVoFileList(std::vector<cTiVoFile> & TiVoFileList, std::string FileSpec)
 {
 	TRACE(__FUNCTION__ "\n");
@@ -1053,12 +1064,11 @@ int GetTiVoTVBusQuery(SOCKET DataSocket, const char * InBuffer)
 			HRESULT hr = S_OK;
 			pWriter->SetProperty(XmlWriterProperty_ConformanceLevel, XmlConformanceLevel_Fragment);
 			pWriter->SetOutput(spMemoryStream);
-			pWriter->SetProperty(XmlWriterProperty_Indent, TRUE);
+			pWriter->SetProperty(XmlWriterProperty_Indent, FALSE);
 			pWriter->WriteStartDocument(XmlStandalone_Omit);
-			//pWriter->WriteRaw(L"<TvBusMarshalledStruct:TvBusEnvelope xmlns:xs=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:TvBusMarshalledStruct=\"http://tivo.com/developer/xml/idl/TvBusMarshalledStruct\" xmlns:TvPgdRecording=\"http://tivo.com/developer/xml/idl/TvPgdRecording\" xmlns:TvBusDuration=\"http://tivo.com/developer/xml/idl/TvBusDuration\" xmlns:TvPgdShowing=\"http://tivo.com/developer/xml/idl/TvPgdShowing\" xmlns:TvDbShowingBit=\"http://tivo.com/developer/xml/idl/TvDbShowingBit\" xmlns:TvBusDateTime=\"http://tivo.com/developer/xml/idl/TvBusDateTime\" xmlns:TvPgdProgram=\"http://tivo.com/developer/xml/idl/TvPgdProgram\" xmlns:TvDbColorCode=\"http://tivo.com/developer/xml/idl/TvDbColorCode\" xmlns:TvPgdSeries=\"http://tivo.com/developer/xml/idl/TvPgdSeries\" xmlns:TvDbShowType=\"http://tivo.com/developer/xml/idl/TvDbShowType\" xmlns:TvPgdChannel=\"http://tivo.com/developer/xml/idl/TvPgdChannel\" xmlns:TvDbTvRating=\"http://tivo.com/developer/xml/idl/TvDbTvRating\" xmlns:TvDbRecordQuality=\"http://tivo.com/developer/xml/idl/TvDbRecordQuality\" xmlns:TvDbBitstreamFormat=\"http://tivo.com/developer/xml/idl/TvDbBitstreamFormat\" xs:schemaLocation=\"http://tivo.com/developer/xml/idl/TvBusMarshalledStruct TvBusMarshalledStruct.xsd http://tivo.com/developer/xml/idl/TvPgdRecording TvPgdRecording.xsd http://tivo.com/developer/xml/idl/TvBusDuration TvBusDuration.xsd http://tivo.com/developer/xml/idl/TvPgdShowing TvPgdShowing.xsd http://tivo.com/developer/xml/idl/TvDbShowingBit TvDbShowingBit.xsd http://tivo.com/developer/xml/idl/TvBusDateTime TvBusDateTime.xsd http://tivo.com/developer/xml/idl/TvPgdProgram TvPgdProgram.xsd http://tivo.com/developer/xml/idl/TvDbColorCode TvDbColorCode.xsd http://tivo.com/developer/xml/idl/TvPgdSeries TvPgdSeries.xsd http://tivo.com/developer/xml/idl/TvDbShowType TvDbShowType.xsd http://tivo.com/developer/xml/idl/TvPgdChannel TvPgdChannel.xsd http://tivo.com/developer/xml/idl/TvDbTvRating TvDbTvRating.xsd http://tivo.com/developer/xml/idl/TvDbRecordQuality TvDbRecordQuality.xsd http://tivo.com/developer/xml/idl/TvDbBitstreamFormat TvDbBitstreamFormat.xsd\" xs:type=\"TvPgdRecording:TvPgdRecording\">");
 				//pWriter->WriteStartElement(NULL, L"TvBusEnvelope", L"http://tivo.com/developer/xml/idl/TvBusMarshalledStruct");
-				if (FAILED(hr = pWriter->WriteStartElement(L"TvBusMarshalledStruct", L"TvBusEnvelope", L"http://tivo.com/developer/xml/idl/TvBusMarshalledStruct TvBusMarshalledStruct.xsd")))
-					std::cout << "Error, Method: WriteStartElement, error is " << hex << hr << dec <<std::endl;
+				//if (FAILED(hr = pWriter->WriteStartElement(L"TvBusMarshalledStruct", L"TvBusEnvelope", L"http://tivo.com/developer/xml/idl/TvBusMarshalledStruct TvBusMarshalledStruct.xsd")))
+				//	std::cout << "Error, Method: WriteStartElement, error is " << hex << hr << dec <<std::endl;
 				//pWriter->WriteAttributeString(L"xmlns", L"xs", NULL, L"http://www.w3.org/2001/XMLSchema-instance");
 				//pWriter->WriteAttributeString(L"xmlns", L"TvBusMarshalledStruct", NULL, L"http://tivo.com/developer/xml/idl/TvBusMarshalledStruct");
 				//pWriter->WriteAttributeString(L"xmlns", L"TvPgdRecording", NULL, L"http://tivo.com/developer/xml/idl/TvPgdRecording");
@@ -1082,10 +1092,9 @@ int GetTiVoTVBusQuery(SOCKET DataSocket, const char * InBuffer)
 						MyFile->GetTvBusEnvelope(pWriter);
 						break;
 					}
-				pWriter->WriteFullEndElement();
-			//pWriter->WriteRaw(L"</TvBusMarshalledStruct:TvBusEnvelope>");
-			pWriter->WriteComment(L" Copyright © 2013 William C Bonner ");
-			pWriter->WriteEndDocument();
+				//pWriter->WriteFullEndElement();
+			//pWriter->WriteComment(L" Copyright © 2013 William C Bonner ");
+			//pWriter->WriteEndDocument();
 			pWriter->Flush();
 
 			// Allocates enough memeory for the xml content.
@@ -1116,7 +1125,7 @@ int GetTiVoTVBusQuery(SOCKET DataSocket, const char * InBuffer)
 	#ifdef _DEBUG
 	std::cout << HttpResponse.str() << endl;
 	auto trunclen = strlen(XMLDataBuff);
-	trunclen = min(trunclen,4000);
+	trunclen = min(trunclen,8000);
 	XMLDataBuff[trunclen] = 0;
 	std::cout << XMLDataBuff << endl;
 	#endif
@@ -1175,40 +1184,168 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 	HttpResponse << "Date: " << getTimeRFC1123() << "\r\n";
 	HttpResponse << "Content-Range: bytes 0-" << buf.st_size-1 << "/" << buf.st_size << "\r\n";
 	HttpResponse << "Content-Length: " << buf.st_size << "\r\n";
-	HttpResponse << "Server: Wims TiVo Server/2.8.412.370\r\n";
+	HttpResponse << "Server: Wims TiVo Server/1.0.0.1\r\n";
 	HttpResponse << "\r\n";
 	send(DataSocket, HttpResponse.str().c_str(), HttpResponse.str().length(),0);
 	#ifdef _DEBUG
 	std::cout << HttpResponse.str() << endl;
 	#endif
 
-	int nRet;
-	std::ifstream FileToTransfer;
-	FileToTransfer.open(CStringA(csFileName).GetString(), ios_base::in | ios_base::binary);
-	if (FileToTransfer.good())
+	if (!csFileName.Right(5).CompareNoCase(_T(".tivo")))
 	{
-		std::cout << "[                   ] Sending File: " << CStringA(csFileName).GetString() << endl;
-		std::cout << HttpResponse.str() << endl;
-		bool bSoFarSoGood = true;
-		long long bytessent = 0;
-		char * RAWDataBuff = new char[0x400000];
-		while (!FileToTransfer.eof() && (bSoFarSoGood))
+		int nRet;
+		std::ifstream FileToTransfer;
+		FileToTransfer.open(CStringA(csFileName).GetString(), ios_base::in | ios_base::binary);
+		if (FileToTransfer.good())
 		{
-			FileToTransfer.read(RAWDataBuff, 0x400000);
-			int BytesToSendInBuffer = FileToTransfer.gcount();
-			int offset = 0;
-			nRet = send(DataSocket, RAWDataBuff+offset, BytesToSendInBuffer-offset, 0);
-			bytessent += nRet;
-			//while ((nRet > 0) && (nRet < BytesToSendInBuffer))
-			//{
-			//	offset += nRet;
-			//	nRet = send(DataSocket, RAWDataBuff+offset, BytesToSendInBuffer-offset, 0);
-			//	bytessent += nRet;
-			//}
-			bSoFarSoGood = nRet == BytesToSendInBuffer;
+			std::cout << "[                   ] Sending File: " << CStringA(csFileName).GetString() << endl;
+			std::cout << HttpResponse.str() << endl;
+			bool bSoFarSoGood = true;
+			long long bytessent = 0;
+			char * RAWDataBuff = new char[0x400000];
+			while (!FileToTransfer.eof() && (bSoFarSoGood))
+			{
+				FileToTransfer.read(RAWDataBuff, 0x400000);
+				int BytesToSendInBuffer = FileToTransfer.gcount();
+				int offset = 0;
+				nRet = send(DataSocket, RAWDataBuff+offset, BytesToSendInBuffer-offset, 0);
+				bytessent += nRet;
+				//while ((nRet > 0) && (nRet < BytesToSendInBuffer))
+				//{
+				//	offset += nRet;
+				//	nRet = send(DataSocket, RAWDataBuff+offset, BytesToSendInBuffer-offset, 0);
+				//	bytessent += nRet;
+				//}
+				bSoFarSoGood = nRet == BytesToSendInBuffer;
+			}
+			delete[] RAWDataBuff;
+			std::cout << "[                   ] Finished Sending File, bSoFarSoGood=" << boolalpha << bSoFarSoGood << " BytesSent(" << bytessent << ")" << endl;
 		}
-		delete[] RAWDataBuff;
-		std::cout << "[                   ] Finished Sending File, bSoFarSoGood=" << boolalpha << bSoFarSoGood << " BytesSent(" << bytessent << ")" << endl;
+	}
+	else
+	{
+		// Set the bInheritHandle flag so pipe handles are inherited. 
+		SECURITY_ATTRIBUTES saAttr;  
+		saAttr.nLength = sizeof(SECURITY_ATTRIBUTES); 
+		saAttr.bInheritHandle = TRUE; 
+		saAttr.lpSecurityDescriptor = NULL; 
+
+		// Create a pipe for the child process's STDOUT. 
+		HANDLE g_hChildStd_OUT_Rd = NULL;
+		HANDLE g_hChildStd_OUT_Wr = NULL;
+		if ( ! CreatePipe(&g_hChildStd_OUT_Rd, &g_hChildStd_OUT_Wr, &saAttr, 0) ) 
+			std::cout << "[" << getTimeISO8601() << "] "  << __FUNCTION__ << "\t ERROR: StdoutRd CreatePipe" << endl;
+		else
+		{
+			// Ensure the read handle to the pipe for STDOUT is not inherited.
+			if ( ! SetHandleInformation(g_hChildStd_OUT_Rd, HANDLE_FLAG_INHERIT, 0) )
+				std::cout << "[" << getTimeISO8601() << "] "  << __FUNCTION__ << "\t ERROR: Stdout SetHandleInformation" << endl;
+			else
+			{
+				//// Create a pipe for the child process's STDIN. 
+				//HANDLE g_hChildStd_IN_Rd = NULL;
+				//HANDLE g_hChildStd_IN_Wr = NULL;
+				//if (! CreatePipe(&g_hChildStd_IN_Rd, &g_hChildStd_IN_Wr, &saAttr, 0)) 
+				//	std::cout << "[" << getTimeISO8601() << "] "  << __FUNCTION__ << "\t ERROR: Stdin CreatePipe" << endl;
+				//else
+				//{
+				//	// Ensure the write handle to the pipe for STDIN is not inherited. 
+				//	if ( ! SetHandleInformation(g_hChildStd_IN_Wr, HANDLE_FLAG_INHERIT, 0) )
+				//		std::cout << "[" << getTimeISO8601() << "] "  << __FUNCTION__ << "\t ERROR: Stdin SetHandleInformation" << endl;
+				//	else
+				//	{
+						// http://msdn.microsoft.com/en-us/library/windows/desktop/ms682512(v=vs.85).aspx is the simple version of CreateProcess
+						// http://msdn.microsoft.com/en-us/library/windows/desktop/ms682499(v=vs.85).aspx is the CreateProcess example with redirection of stdout and stdin.
+						// Create a child process that uses the previously created pipes for STDIN and STDOUT.
+						// Set up members of the PROCESS_INFORMATION structure.  
+						PROCESS_INFORMATION piProcInfo; 
+						ZeroMemory( &piProcInfo, sizeof(PROCESS_INFORMATION) );
+ 
+						// Set up members of the STARTUPINFO structure. 
+						// This structure specifies the STDIN and STDOUT handles for redirection.
+ 
+						STARTUPINFO siStartInfo;
+						ZeroMemory( &siStartInfo, sizeof(STARTUPINFO) );
+						siStartInfo.cb = sizeof(STARTUPINFO); 
+						//siStartInfo.hStdError = g_hChildStd_OUT_Wr;
+						//siStartInfo.hStdInput = g_hChildStd_IN_Rd;
+						siStartInfo.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+						siStartInfo.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+						siStartInfo.hStdOutput = g_hChildStd_OUT_Wr;
+						siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
+ 
+						// "D:\\pytivo\\bin\\ffmpeg.exe" -i "D:\\Videos\\archer\\Archer.2009.S03E12.HDTV.x264.mp4" -vcodec mpeg2video -b 16384k -maxrate 30000k -bufsize 4096k -ab 448k -ar 48000 -acodec ac3 -copyts -map 0:0 -map 0:1 -report -f vob -
+						std::wstringstream ss;
+						ss << L"ffmpeg.exe -i " << QuoteFileName(csFileName).GetString() << L" -vcodec mpeg2video -b 16384k -maxrate 30000k -bufsize 4096k -ab 448k -ar 48000 -acodec ac3 -copyts -map 0:0 -map 0:1 -report -f vob -";
+						//CString csCommandLine(ss.str().c_str());
+						TCHAR szCmdline[1024];
+						ss >> szCmdline;
+
+						// Create the child process.     
+						//TCHAR szCmdline[]=TEXT("child");
+						BOOL bSuccess = CreateProcess(NULL, 
+							szCmdline,     // command line 
+							NULL,          // process security attributes 
+							NULL,          // primary thread security attributes 
+							TRUE,          // handles are inherited 
+							0,             // creation flags 
+							NULL,          // use parent's environment 
+							NULL,          // use parent's current directory 
+							&siStartInfo,  // STARTUPINFO pointer 
+							&piProcInfo);  // receives PROCESS_INFORMATION 
+   
+						// If an error occurs, exit the application. 
+						if ( bSuccess ) 
+						{
+							long long bytessent = 0;
+							char * RAWDataBuff = new char[0x100000];
+							DWORD dwRead, dwWritten; 
+							//CHAR chBuf[BUFSIZE]; 
+							BOOL bSuccess = FALSE;
+							//HANDLE hParentStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
+
+							for (;;) 
+							{ 
+								bSuccess = ReadFile(g_hChildStd_OUT_Rd, RAWDataBuff, 0x100000, &dwRead, NULL);
+								if( ! bSuccess || dwRead == 0 ) break; 
+
+								int nRet = send(DataSocket, RAWDataBuff, dwRead, 0);
+								bytessent += nRet;
+
+								//bSuccess = WriteFile(hParentStdOut, chBuf, dwRead, &dwWritten, NULL);
+								//if (! bSuccess ) break; 
+							} 
+
+							//while (!FileToTransfer.eof() && (bSoFarSoGood))
+							//{
+							//	FileToTransfer.read(RAWDataBuff, 0x400000);
+							//	int BytesToSendInBuffer = FileToTransfer.gcount();
+							//	int offset = 0;
+							//	nRet = send(DataSocket, RAWDataBuff+offset, BytesToSendInBuffer-offset, 0);
+							//	bytessent += nRet;
+							//	//while ((nRet > 0) && (nRet < BytesToSendInBuffer))
+							//	//{
+							//	//	offset += nRet;
+							//	//	nRet = send(DataSocket, RAWDataBuff+offset, BytesToSendInBuffer-offset, 0);
+							//	//	bytessent += nRet;
+							//	//}
+							//	bSoFarSoGood = nRet == BytesToSendInBuffer;
+							//}
+							delete[] RAWDataBuff;
+							std::cout << "[                   ] Finished Sending File, BytesSent(" << bytessent << ")" << endl;
+
+							// Close handles to the child process and its primary thread.
+							// Some applications might keep these handles to monitor the status
+							// of the child process, for example. 
+							CloseHandle(piProcInfo.hProcess);
+							CloseHandle(piProcInfo.hThread);
+						}
+				//	}
+				//	CloseHandle(g_hChildStd_IN_Wr);
+				//}
+			}
+			CloseHandle(g_hChildStd_OUT_Rd);
+		}
 	}
 	return(0);
 }
@@ -2051,18 +2188,87 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 				//std::sort(FilesToGetFromTiVo.begin(),FilesToGetFromTiVo.end(),cTiVoFileCompareDateReverse);
 				FilesToGetFromTiVo.clear();
 				CInternetSession serverSession0;
-				//XML_Parse_TiVoNowPlaying(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying&Recurse=Yes&SortOrder=!CaptureDate")), FilesToGetFromTiVo, serverSession0);
-				//std::sort(FilesToGetFromTiVo.begin(),FilesToGetFromTiVo.end(),cTiVoFileCompareDateReverse);
-				//for (auto TiVoFileToGet = FilesToGetFromTiVo.begin(); TiVoFileToGet != FilesToGetFromTiVo.end(); TiVoFileToGet++)
-				//	while (false == GetTiVoFile(*TiVoFileToGet, serverSession0, _T("1760168186")));
+				XML_Parse_TiVoNowPlaying(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying&Recurse=Yes&SortOrder=!CaptureDate")), FilesToGetFromTiVo, serverSession0);
+				std::sort(FilesToGetFromTiVo.begin(),FilesToGetFromTiVo.end(),cTiVoFileCompareDateReverse);				
+				//FilesToGetFromTiVo.clear();	// This line is temporary just to make sure that no files are downloaded or converted
+				for (auto TiVoFileToGet = FilesToGetFromTiVo.begin(); TiVoFileToGet != FilesToGetFromTiVo.end(); TiVoFileToGet++)
+				{
+					CString csPathName(_T("//Acid/TiVo/"));
+					csPathName.Append(TiVoFileToGet->GetPathName());
+					CFileStatus status;
+					if (TRUE != CFile::GetStatus(csPathName, status))
+						while (false == GetTiVoFile(*TiVoFileToGet, serverSession0, _T("1760168186"), _T("//Acid/TiVo/")));
+					if (TRUE == CFile::GetStatus(csPathName, status))
+					{
+						status.m_ctime = status.m_mtime = TiVoFileToGet->GetCaptureDate();
+						CFile::SetStatus(csPathName, status);
+						CString csMPEGPathName(csPathName);
+						csMPEGPathName.Replace(_T(".TiVo"), _T(".mpeg"));
+						CString csMP4PathName(csPathName);
+						csMP4PathName.Replace(_T(".TiVo"), _T(".mp4"));
+						if (TRUE != CFile::GetStatus(csMP4PathName, status)) // Only do a bunch of this stuff if the mp4 file doesn't already exist
+						{
+							// This is just demo code making sure I can create a temporary file properly for future use with tdcat or tivodecode
+							TCHAR lpTempPathBuffer[MAX_PATH];
+							DWORD dwRetVal = GetTempPath(MAX_PATH, lpTempPathBuffer);
+							if ((dwRetVal > MAX_PATH) || (dwRetVal == 0))
+							{
+								std::cout << "[" << getTimeISO8601() << "] GetTempPath failed" << endl;
+								_tcscpy(lpTempPathBuffer,_T("."));
+							}
+							//  Generates a temporary file name. 
+							TCHAR szTempFileName[MAX_PATH];  
+							if (0 != GetTempFileName(lpTempPathBuffer, AfxGetAppName(), 0, szTempFileName))
+							{
+								wcout << L"[                   ]  GetTempFileName: " << szTempFileName << endl;
+								if (-1 == _tspawnlp(_P_WAIT, _T("tdcat.exe"), _T("tdcat.exe"), _T("--mak"), _T("1760168186"), _T("--out"), szTempFileName, _T("--chunk-2"), QuoteFileName(csPathName).GetString(), NULL))
+									std::cout << "[" << getTimeISO8601() << "] _tspawnlp failed: " << _sys_errlist[errno] << endl;
+
+								if (TRUE != CFile::GetStatus(csMPEGPathName, status))
+									if (-1 == _tspawnlp(_P_WAIT, _T("tivodecode.exe"), _T("tivodecode.exe"), _T("--mak"), _T("1760168186"), _T("--out"), QuoteFileName(csMPEGPathName).GetString(), QuoteFileName(csPathName).GetString(), NULL))
+										std::cout << "[" << getTimeISO8601() << "] _tspawnlp failed: " << _sys_errlist[errno] << endl;
+								if (TRUE == CFile::GetStatus(csMPEGPathName, status))
+								{
+									status.m_ctime = status.m_mtime = TiVoFileToGet->GetCaptureDate();
+									CFile::SetStatus(csMPEGPathName, status);
+									if (TRUE != CFile::GetStatus(csMP4PathName, status))
+									{
+										CString csTitle(TiVoFileToGet->GetTitle()); csTitle.Insert(0,_T("title=\""));csTitle.Append(_T("\""));
+										CString csShow(TiVoFileToGet->GetTitle()); csShow.Insert(0,_T("show=\""));csShow.Append(_T("\""));
+										CString csDescription(TiVoFileToGet->GetDescription()); csDescription.Insert(0,_T("description=\""));csDescription.Append(_T("\""));
+										CString csEpisodeID(TiVoFileToGet->GetEpisodeTitle()); csEpisodeID.Insert(0,_T("episode_id=\""));csEpisodeID.Append(_T("\""));
+										if (-1 == _tspawnlp(_P_WAIT, _T("ffmpeg.exe"), _T("ffmpeg.exe"), _T("-i"), QuoteFileName(csMPEGPathName).GetString(), 
+											_T("-metadata"), csTitle.GetString(),
+											_T("-metadata"), csShow.GetString(),
+											_T("-metadata"), csDescription.GetString(),
+											_T("-metadata"), csEpisodeID.GetString(),
+											_T("-vcodec"), _T("copy"),
+											_T("-acodec"), _T("copy"),
+											_T("-y"), // Cause it to overwrite exiting output files
+											QuoteFileName(csMP4PathName).GetString(), NULL))
+											std::cout << "[" << getTimeISO8601() << "] _tspawnlp failed: " << _sys_errlist[errno] << endl;
+									}
+									if (TRUE == CFile::GetStatus(csMP4PathName, status))
+									{
+										status.m_ctime = status.m_mtime = TiVoFileToGet->GetCaptureDate();
+										CFile::SetStatus(csMP4PathName, status);
+										DeleteFile(csMPEGPathName);
+									}
+								}
+								DeleteFile(szTempFileName);	// I must delete this file because the zero in the unique field up above causes a file to be created.
+							}
+						}
+					}
+				}
 
 				if (!csMyHostName.CompareNoCase(_T("INSPIRON")))
 				{
 					//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/*.TiVo");
-					PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/Evening*.TiVo");
+					//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/Evening*.TiVo");
 					//PopulateTiVoFileList(TiVoFileList, "D:/Videos/Evening Magazine (Recorded Mar 26, 2010, KINGDT).TiVo");
-					PopulateTiVoFileList(TiVoFileList, "D:/Recorded TV/Bob*");
-					PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/Archer.2009.S02E14*");
+					PopulateTiVoFileList(TiVoFileList, "D:/Recorded TV/Gold*");
+					PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/Evening*.TiVo");
+					PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/Archer.2009.S02E1*");
 					//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/Archer.*");
 				}
 				else
@@ -2073,10 +2279,10 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 				std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate);
 
 				std::vector<CString> myURLS;
-				myURLS.push_back(CString(_T("http://192.168.0.108/TiVoConnect?Command=ResetServer")));
-				myURLS.push_back(CString(_T("http://192.168.0.108/TiVoConnect?Command=QueryContainer&Container=/")));
+				//myURLS.push_back(CString(_T("http://192.168.0.108/TiVoConnect?Command=ResetServer")));
+				//myURLS.push_back(CString(_T("http://192.168.0.108/TiVoConnect?Command=QueryContainer&Container=/")));
 				myURLS.push_back(CString(_T("http://192.168.0.108/TiVoConnect?Command=QueryFormats&SourceFormat=video%2Fx-tivo-mpeg")));
-				myURLS.push_back(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying")));
+				//myURLS.push_back(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying")));
 				myURLS.push_back(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying&Recurse=Yes&SortOrder=!CaptureDate")));
 				myURLS.push_back(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying/9948")));
 				myURLS.push_back(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoVideoDetails?id=984268")));	// It appears that after a "Details" call it uses a "Connection: keep-alive" call, so I should probably make another call to the now playing list to see if that makes the tivo more stable.
@@ -2090,7 +2296,7 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 				//myURLS.push_back(CString(_T("http://tivo:1760168186@192.168.0.108/download/Evening Magazine.TiVo?Container=/NowPlaying&id=984268")));
 				//myURLS.push_back(CString(_T("http://tivo:1760168186@192.168.0.108/download/Evening Magazine.TiVo?Container=/NowPlaying&id=879493")));
 				//myURLS.push_back(CString(_T("http://tivo:1760168186@192.168.0.108/download/Community.TiVo?Container=/NowPlaying&id=3002485")));
-				myURLS.push_back(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=ResetServer")));
+				//myURLS.push_back(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=ResetServer")));
 				myURLS.push_back(CString(_T("http://tivo:1760168186@192.168.0.108/TiVoConnect?Command=ResetServer")));
 				int FileIndex = 0;
 				CInternetSession serverSession;
