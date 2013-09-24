@@ -54,6 +54,8 @@ public:
 	afx_msg void OnTiviNowplaying();
 	afx_msg void OnTivoBeacon();
 	afx_msg void OnUpdateTivoBeacon(CCmdUI *pCmdUI);
+	afx_msg void OnUpdateTivoMak(CCmdUI *pCmdUI);
+	afx_msg void OnTivoList();
 };
 
 #ifndef _DEBUG  // debug version in WimTiVoClientView.cpp
