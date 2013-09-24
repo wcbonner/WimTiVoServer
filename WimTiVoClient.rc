@@ -242,8 +242,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,0,0,1
- PRODUCTVERSION 1,0,0,1
+ FILEVERSION 1,0,0,412
+ PRODUCTVERSION 1,0,0,412
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -260,12 +260,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "WimsWorld"
             VALUE "FileDescription", "WimTiVoClient"
-            VALUE "FileVersion", "1.0.0.1"
+            VALUE "FileVersion", "1.0.0.412"
             VALUE "InternalName", "WimTiVoClient.exe"
             VALUE "LegalCopyright", "Copyright © 2013 William C Bonner.  All rights reserved."
             VALUE "OriginalFilename", "WimTiVoClient.exe"
             VALUE "ProductName", "WimTiVoClient"
-            VALUE "ProductVersion", "1.0.0.1"
+            VALUE "ProductVersion", "1.0.0.412"
         END
     END
     BLOCK "VarFileInfo"
@@ -476,6 +476,12 @@ END
 STRINGTABLE
 BEGIN
     IDS_EDIT_MENU           "Edit"
+END
+
+STRINGTABLE
+BEGIN
+    ID_TRANSFER_SPEED       "Current File Transfer Speed"
+    ID_TRANSFER_ETR         "Estimated Time Remaining"
 END
 
 #endif    // English (United States) resources

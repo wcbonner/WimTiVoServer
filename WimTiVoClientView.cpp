@@ -43,6 +43,9 @@ BEGIN_MESSAGE_MAP(CWimTiVoClientView, CListView)
 	ON_COMMAND(ID_TIVODECODE, &CWimTiVoClientView::OnTiVoDecode)
 	ON_COMMAND(ID_FFMPEG, &CWimTiVoClientView::OnFFMPEG)
 	ON_UPDATE_COMMAND_UI(ID_FFMPEG, &CWimTiVoClientView::OnUpdateFFMPEG)
+	ON_COMMAND(ID_TIVO_GET_FILES, &CWimTiVoClientView::OnTivoGetFiles)
+	ON_UPDATE_COMMAND_UI(ID_TIVO_GET_FILES, &CWimTiVoClientView::OnUpdateTivoGetFiles)
+	ON_WM_TIMER()
 END_MESSAGE_MAP()
 
 // CWimTiVoClientView construction/destruction
@@ -51,6 +54,7 @@ CWimTiVoClientView::CWimTiVoClientView()
 {
 	TRACE(__FUNCTION__ "\n");
 	// TODO: add construction code here
+	m_nWindowTimer = 666;
 }
 
 CWimTiVoClientView::~CWimTiVoClientView()
@@ -155,11 +159,11 @@ void CWimTiVoClientView::OnUpdate(CView* pSender, LPARAM lHint, CObject* pHint)
 		if (0 != ListCtrl.DeleteAllItems())
 		{
 			ASSERT(ListCtrl.GetItemCount() == 0);
-			for(auto TiVoFile = pDoc->m_FilesToGetFromTiVo.begin(); TiVoFile != pDoc->m_FilesToGetFromTiVo.end(); TiVoFile++)
+			for(auto TiVoFile = pDoc->m_TiVoFiles.begin(); TiVoFile != pDoc->m_TiVoFiles.end(); TiVoFile++)
 			{
 				int nItem = ListCtrl.InsertItem(
 					LVIF_TEXT | LVIF_STATE,
-					TiVoFile-pDoc->m_FilesToGetFromTiVo.begin(), 
+					TiVoFile-pDoc->m_TiVoFiles.begin(), 
 					TiVoFile->GetPathName(), 
 					INDEXTOSTATEIMAGEMASK(1), 
 					LVIS_STATEIMAGEMASK, 
@@ -206,6 +210,9 @@ void CWimTiVoClientView::OnUpdate(CView* pSender, LPARAM lHint, CObject* pHint)
 				//pEditTotalSize->SetTextAlign(ES_RIGHT);
 				//pEditTotalSize->SetTextAlwaysOnRight();
 			}
+			CMFCRibbonEdit* pEditTiVoFileDestination = DYNAMIC_DOWNCAST(CMFCRibbonEdit, pRibbon->FindByID(ID_TIVO_FILE_LOCATION));
+			if (pEditTiVoFileDestination)
+				pEditTiVoFileDestination->SetEditText(pDoc->m_csTiVoFileDestination);
 		}
 	}
 	CListView::OnUpdate(pSender, lHint, pHint);
@@ -301,9 +308,9 @@ void CWimTiVoClientView::OnLvnColumnclick(NMHDR *pNMHDR, LRESULT *pResult)
 		{
 			static bool forward = true;
 			if (forward)
-				std::sort(pDoc->m_FilesToGetFromTiVo.begin(),pDoc->m_FilesToGetFromTiVo.end(),cTiVoFileComparePath);
+				std::sort(pDoc->m_TiVoFiles.begin(),pDoc->m_TiVoFiles.end(),cTiVoFileComparePath);
 			else
-				std::sort(pDoc->m_FilesToGetFromTiVo.begin(),pDoc->m_FilesToGetFromTiVo.end(),cTiVoFileComparePathReverse);
+				std::sort(pDoc->m_TiVoFiles.begin(),pDoc->m_TiVoFiles.end(),cTiVoFileComparePathReverse);
 			forward = !forward;
 			pDoc->UpdateAllViews(NULL);
 		}
@@ -311,9 +318,9 @@ void CWimTiVoClientView::OnLvnColumnclick(NMHDR *pNMHDR, LRESULT *pResult)
 		{
 			static bool forward = true;
 			if (forward)
-				std::sort(pDoc->m_FilesToGetFromTiVo.begin(),pDoc->m_FilesToGetFromTiVo.end(),cTiVoFileCompareDate);
+				std::sort(pDoc->m_TiVoFiles.begin(),pDoc->m_TiVoFiles.end(),cTiVoFileCompareDate);
 			else
-				std::sort(pDoc->m_FilesToGetFromTiVo.begin(),pDoc->m_FilesToGetFromTiVo.end(),cTiVoFileCompareDateReverse);
+				std::sort(pDoc->m_TiVoFiles.begin(),pDoc->m_TiVoFiles.end(),cTiVoFileCompareDateReverse);
 			forward = !forward;
 			pDoc->UpdateAllViews(NULL);
 		}
@@ -321,9 +328,9 @@ void CWimTiVoClientView::OnLvnColumnclick(NMHDR *pNMHDR, LRESULT *pResult)
 		{
 			static bool forward = true;
 			if (forward)
-				std::sort(pDoc->m_FilesToGetFromTiVo.begin(),pDoc->m_FilesToGetFromTiVo.end(),cTiVoFileCompareSize);
+				std::sort(pDoc->m_TiVoFiles.begin(),pDoc->m_TiVoFiles.end(),cTiVoFileCompareSize);
 			else
-				std::sort(pDoc->m_FilesToGetFromTiVo.begin(),pDoc->m_FilesToGetFromTiVo.end(),cTiVoFileCompareSizeReverse);
+				std::sort(pDoc->m_TiVoFiles.begin(),pDoc->m_TiVoFiles.end(),cTiVoFileCompareSizeReverse);
 			forward = !forward;
 			pDoc->UpdateAllViews(NULL);
 		}
@@ -360,4 +367,176 @@ void CWimTiVoClientView::OnUpdateFFMPEG(CCmdUI *pCmdUI)
 		pCmdUI->Enable(!pDoc->m_csFFMPEGPath.IsEmpty());
 		pCmdUI->SetCheck(pDoc->m_bFFMPEG);
 	}
+}
+void CWimTiVoClientView::OnTivoGetFiles()
+{
+	TRACE(__FUNCTION__ "\n");
+	CWimTiVoClientDoc * pDoc = GetDocument();
+	if (pDoc)
+	{
+		while (!pDoc->m_TiVoFilesToTransfer.empty())
+			pDoc->m_TiVoFilesToTransfer.pop();
+		pDoc->m_TiVoFilesToTransferTotalSize = 0;
+		CListCtrl& ListCtrl = GetListCtrl();
+		int nItem = -1;
+		while (-1 < (nItem = ListCtrl.GetNextItem(nItem, LVNI_ALL)))
+		{
+			if (ListCtrl.GetCheck(nItem))
+			{
+				CString csItem(ListCtrl.GetItemText(nItem,0));
+				TRACE(_T("Item %d was Checked: %s\n"), nItem, csItem.GetString());
+				CString csPathToCheckExistence(csItem);
+				csPathToCheckExistence.Insert(0,pDoc->m_csTiVoFileDestination);
+				CFileStatus status;
+				if (TRUE != CFile::GetStatus(csPathToCheckExistence, status)) // Only do a bunch of this stuff if the TiVo file doesn't already exist
+				{
+					csPathToCheckExistence.Replace(_T(".TiVo"), _T(".mpeg"));
+					if (TRUE != CFile::GetStatus(csPathToCheckExistence, status)) // Only do a bunch of this stuff if the mpeg file doesn't already exist
+					{
+						csPathToCheckExistence.Replace(_T(".mpeg"), _T(".mp4"));
+						if (TRUE != CFile::GetStatus(csPathToCheckExistence, status)) // Only do a bunch of this stuff if the mpeg file doesn't already exist
+						{
+							cTiVoFile CrapFile;
+							CrapFile.SetPathName(csItem);
+							auto TiVoFile = std::find(pDoc->m_TiVoFiles.begin(), pDoc->m_TiVoFiles.end(), CrapFile);
+							if (pDoc->m_TiVoFiles.end() != TiVoFile)
+							{
+								pDoc->m_TiVoFilesToTransferTotalSize += TiVoFile->GetSourceSize();
+								pDoc->m_TiVoFilesToTransfer.push(*TiVoFile);
+							}
+						}
+						#ifdef _DEBUG
+						else TRACE(_T("File Exists: %s\n"), status.m_szFullName);
+						#endif
+					}
+					#ifdef _DEBUG
+					else TRACE(_T("File Exists: %s\n"), status.m_szFullName);
+					#endif
+				}
+				#ifdef _DEBUG
+				else TRACE(_T("File Exists: %s\n"), status.m_szFullName);
+				#endif
+			}
+		}
+		CMFCRibbonBar* pRibbon = ((CFrameWndEx*) GetTopLevelFrame())->GetRibbonBar();
+		if (pRibbon)
+		{
+			CMFCRibbonEdit* pEditTransferCount = DYNAMIC_DOWNCAST(CMFCRibbonEdit, pRibbon->FindByID(ID_TRANSFER_COUNT));
+			if (pEditTransferCount)
+			{
+				std::stringstream  junk;
+				std::locale mylocale("");   // get global locale
+				junk.imbue(mylocale);  // imbue global locale
+				junk << pDoc->m_TiVoFilesToTransfer.size();
+				pEditTransferCount->SetEditText(CString(junk.str().c_str()));
+			}
+			CMFCRibbonEdit* pEditTransferSize = DYNAMIC_DOWNCAST(CMFCRibbonEdit, pRibbon->FindByID(ID_TRANSFER_SIZE));
+			if (pEditTransferSize)
+			{
+				std::stringstream  junk;
+				std::locale mylocale("");   // get global locale
+				junk.imbue(mylocale);  // imbue global locale
+				junk << pDoc->m_TiVoFilesToTransferTotalSize;
+				pEditTransferSize->SetEditText(CString(junk.str().c_str()));
+			}
+		}
+		//CFrameWndEx* mainFrm = dynamic_cast<CFrameWndEx*>(GetTopLevelFrame());
+		//if (mainFrm)
+		//{
+		//	mainFrm->SetProgressBarState(TBPF_NORMAL);
+		//	mainFrm->SetProgressBarRange(0, 100);
+		//	mainFrm->SetProgressBarPosition(pDoc->m_CurrentFileProgress);
+		//}
+		pDoc->m_TiVoTransferFileThreadStopRequested = false;
+		AfxBeginThread(pDoc->TiVoTransferFileThread, (LPVOID) GetSafeHwnd());
+		AfxBeginThread(pDoc->TiVoConvertFileThread, (LPVOID) GetSafeHwnd());
+		m_nWindowTimer = SetTimer(m_nWindowTimer, 1000, NULL);
+	}
+	TRACE(__FUNCTION__ " Exiting\n");
+}
+void CWimTiVoClientView::OnUpdateTivoGetFiles(CCmdUI *pCmdUI)
+{
+	CWimTiVoClientDoc * pDoc = GetDocument();
+	if (pDoc)
+		pCmdUI->Enable(!pDoc->m_TiVoTransferFileThreadRunning);
+}
+void CWimTiVoClientView::OnTimer(UINT_PTR nIDEvent)
+{
+	// TODO: Add your message handler code here and/or call default
+	if (m_nWindowTimer == nIDEvent)
+	{
+		CWimTiVoClientDoc * pDoc = GetDocument();
+		if (pDoc)
+		{
+			if (!pDoc->m_TiVoTransferFileThreadRunning)
+			{
+				KillTimer(m_nWindowTimer);
+				//CFrameWndEx* mainFrm = dynamic_cast<CFrameWndEx*>(GetTopLevelFrame());
+				////CFrameWndEx* mainFrm = dynamic_cast<CFrameWndEx*>(AfxGetApp()->GetMainWnd());
+				//if (mainFrm)
+				//	mainFrm->SetProgressBarState(TBPF_NOPROGRESS);
+			}
+			//else
+			//{
+			//	//CFrameWndEx* mainFrm = dynamic_cast<CFrameWndEx*>(AfxGetApp()->GetMainWnd());
+			//	CFrameWndEx* mainFrm = dynamic_cast<CFrameWndEx*>(GetTopLevelFrame());
+			//	if (mainFrm)
+			//		mainFrm->SetProgressBarPosition(pDoc->m_CurrentFileProgress);
+			//}
+			CMFCRibbonBar* pRibbon = ((CFrameWndEx*) GetTopLevelFrame())->GetRibbonBar();
+			if (pRibbon)
+			{
+				CMFCRibbonEdit* pEditCurrentFileName = DYNAMIC_DOWNCAST(CMFCRibbonEdit, pRibbon->FindByID(ID_TRANSFER_CURRENT_FILE_NAME));
+				if (pEditCurrentFileName)
+					pEditCurrentFileName->SetEditText(pDoc->m_CurrentFileName);
+				CMFCRibbonEdit* pEditCurrentFileSize = DYNAMIC_DOWNCAST(CMFCRibbonEdit, pRibbon->FindByID(ID_TRANSFER_CURRENT_FILE_SIZE));
+				if (pEditCurrentFileSize)
+				{
+					std::stringstream  junk;
+					std::locale mylocale("");   // get global locale
+					junk.imbue(mylocale);  // imbue global locale
+					junk << pDoc->m_CurrentFileSize;
+					pEditCurrentFileSize->SetEditText(CString(junk.str().c_str()));
+				}
+				CMFCRibbonEdit* pEditCurrentSpeed = DYNAMIC_DOWNCAST(CMFCRibbonEdit, pRibbon->FindByID(ID_TRANSFER_SPEED));
+				if (pEditCurrentSpeed)
+				{
+					std::stringstream  junk;
+					std::locale mylocale("");   // get global locale
+					junk.imbue(mylocale);  // imbue global locale
+					junk << pDoc->m_CurrentFileSpeed << " B/s";
+					pEditCurrentSpeed->SetEditText(CString(junk.str().c_str()));
+				}
+				CMFCRibbonEdit* pEditCurrentETR = DYNAMIC_DOWNCAST(CMFCRibbonEdit, pRibbon->FindByID(ID_TRANSFER_ETR));
+				if (pEditCurrentETR)
+					pEditCurrentETR->SetEditText(pDoc->m_CurrentFileEstimatedTimeRemaining.Format(_T("%H:%M:%S")));
+				CMFCRibbonProgressBar* pEditCurrentFileProgress = DYNAMIC_DOWNCAST(CMFCRibbonProgressBar, pRibbon->FindByID(ID_TRANSFER_CURRENT_FILE_PROGRESS));
+				if (pEditCurrentFileProgress)
+					pEditCurrentFileProgress->SetPos(pDoc->m_CurrentFileProgress);
+				CMFCRibbonEdit* pEditTransferCount = DYNAMIC_DOWNCAST(CMFCRibbonEdit, pRibbon->FindByID(ID_TRANSFER_COUNT));
+				if (pEditTransferCount)
+				{
+					std::stringstream  junk;
+					std::locale mylocale("");   // get global locale
+					junk.imbue(mylocale);  // imbue global locale
+					junk << pDoc->m_TiVoFilesToTransfer.size();
+					pEditTransferCount->SetEditText(CString(junk.str().c_str()));
+				}
+				CMFCRibbonEdit* pEditTransferSize = DYNAMIC_DOWNCAST(CMFCRibbonEdit, pRibbon->FindByID(ID_TRANSFER_SIZE));
+				if (pEditTransferSize)
+				{
+					std::stringstream  junk;
+					std::locale mylocale("");   // get global locale
+					junk.imbue(mylocale);  // imbue global locale
+					junk << pDoc->m_TiVoFilesToTransferTotalSize;
+					pEditTransferSize->SetEditText(CString(junk.str().c_str()));
+				}
+				CMFCRibbonEdit* pEditCurrentTTR = DYNAMIC_DOWNCAST(CMFCRibbonEdit, pRibbon->FindByID(ID_TRANSFER_TTR));
+				if (pEditCurrentTTR)
+					pEditCurrentTTR->SetEditText(pDoc->m_TotalFileEstimatedTimeRemaining.Format(_T("%H:%M:%S")));
+			}
+		}
+	}
+	else
+		CListView::OnTimer(nIDEvent);
 }

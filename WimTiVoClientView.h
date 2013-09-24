@@ -24,6 +24,8 @@ protected: // create from serialization only
 public:
 	CWimTiVoClientDoc* GetDocument() const;
 
+protected:
+	UINT_PTR m_nWindowTimer;
 // Operations
 public:
 
@@ -61,6 +63,9 @@ public:
 	afx_msg void OnUpdateTiVoDecode(CCmdUI *pCmdUI);
 	afx_msg void OnFFMPEG();
 	afx_msg void OnUpdateFFMPEG(CCmdUI *pCmdUI);
+	afx_msg void OnTivoGetFiles();
+	afx_msg void OnUpdateTivoGetFiles(CCmdUI *pCmdUI);
+	afx_msg void OnTimer(UINT_PTR nIDEvent);
 };
 
 #ifndef _DEBUG  // debug version in WimTiVoClientView.cpp

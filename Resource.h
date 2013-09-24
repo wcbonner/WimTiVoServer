@@ -51,15 +51,23 @@
 #define ID_TIVO_GET_FILES               32777
 #define ID_TIVO_FILE_LOCATION           32778
 #define ID_TIVO_TOTAL_TIME              32779
-#define ID_EDIT3                        32780
 #define ID_TIVO_TOTAL_SIZE              32780
+#define ID_TRANSFER_COUNT               32781
+#define ID_TRANSFER_CURRENT_FILE_NAME   32782
+#define ID_TRANSFER_CURRENT_FILE_SIZE   32783
+#define ID_TRANSFER_CURRENT_FILE_PROGRESS 32784
+#define ID_TRANSFER_SIZE                32785
+#define ID_TRANSFER_SPEED               32786
+#define ID_TRANSFER_ETR                 32787
+#define ID_EDIT2                        32788
+#define ID_TRANSFER_TTR                 32788
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        312
-#define _APS_NEXT_COMMAND_VALUE         32781
+#define _APS_NEXT_COMMAND_VALUE         32789
 #define _APS_NEXT_CONTROL_VALUE         1003
 #define _APS_NEXT_SYMED_VALUE           310
 #endif

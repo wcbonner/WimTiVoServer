@@ -82,6 +82,12 @@ bool cTiVoServer::operator==(const cTiVoServer & other) const
 		m_machine == other.m_machine
 		);
 }
+bool cTiVoFile::operator==(const cTiVoFile & other) const
+{
+	return(
+		m_csPathName == other.m_csPathName
+		);
+}
 const CString csUrlPrefix(_T("/TiVoConnect/TivoNowPlaying/"));
 void cTiVoFile::SetPathName(const CString csNewPath)
 {
@@ -187,6 +193,7 @@ void cTiVoFile::SetFromTiVoItem(const CString &csTitle, const CString &csEpisode
 		ssFileName << L" - ''" << csEpisodeTitle.GetString() << L"''";
 	ssFileName << L" (Recorded " << m_CaptureDate.Format(_T("%b %d, %Y, ")).GetString() << m_SourceStation.GetString() << L").TiVo";
 	m_csPathName = ssFileName.str().c_str();
+	m_csPathName.Replace(_T(":"),_T("_")); // http://msdn.microsoft.com/en-us/library/system.io.path.getinvalidfilenamechars.aspx should be further examined
 }
 #ifdef AVCODEC_AVCODEC_H
 void cTiVoFile::PopulateFromFFMPEG(void)
@@ -734,6 +741,7 @@ bool XML_Parse_TiVoNowPlaying(const CString & Source, std::vector<cTiVoFile> & T
 				}
 			}
 		}
+		serverConnection->Close();
 	}
 	return(rval);
 }
