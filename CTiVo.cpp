@@ -319,7 +319,7 @@ void cTiVoFile::SetPathName(const CFileFind & csNewPath)
 	if (m_SourceSize == 0)
 		m_SourceSize = csNewPath.GetLength();
 	// Final Output of object values
-	TRACE(__FUNCTION__ " m_csPathName %s %s\n", CStringA(m_csPathName).GetString(), CStringA(m_SourceFormat).GetString());
+	TRACE("%s %s m_csPathName %s %s\n", CStringA(CTime::GetCurrentTime().Format(_T("[%Y-%m-%dT%H:%M:%S]"))).GetString(), __FUNCTION__, CStringA(m_csPathName).GetString(), CStringA(m_SourceFormat).GetString());
 	//wcout << L"[                   ] " << setw(20) << right << L"m_csPathName" << L" : " << m_csPathName.GetString() << endl;
 	//wcout << L"[                   ] " << setw(20) << right << L"m_Title" << L" : " << m_Title.GetString() << endl;
 	//wcout << L"[                   ] " << setw(20) << right << L"m_EpisodeTitle" << L" : " << m_EpisodeTitle.GetString() << endl;

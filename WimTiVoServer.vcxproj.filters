@@ -53,6 +53,9 @@
     <ClCompile Include="CTiVo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="WimTiVoTestCode.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="WimTiVoServer.rc">
