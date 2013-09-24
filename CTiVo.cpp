@@ -140,7 +140,7 @@ std::string CTiVoContainer::WriteTXT(const char seperator) const
 	std::stringstream ssValue;
 	ssValue << "title=" << m_title;
 	if (!m_url.empty()) ssValue << seperator << "url=" << m_url;
-	if (!m_MAK.empty()) ssValue << seperator << "MAK=" << m_MAK;
+	//if (!m_MAK.empty()) ssValue << seperator << "MAK=" << m_MAK;
 	//if (!m_ContentType.empty()) ssValue << seperator << "ContentType=" << m_ContentType;
 	//if (!m_SourceFormat.empty()) ssValue << seperator << "SourceFormat=" << m_SourceFormat;
 	return(ssValue.str());
@@ -289,7 +289,13 @@ void cTiVoFile::SetFromTiVoItem(const CString &csTitle, const CString &csEpisode
 		ssFileName << ", " << m_SourceStation.GetString();
 	ssFileName << L").TiVo";
 	m_csPathName = ssFileName.str().c_str();
+	m_csPathName.Replace(_T("\""),_T("''")); // http://msdn.microsoft.com/en-us/library/system.io.path.getinvalidfilenamechars.aspx should be further examined
 	m_csPathName.Replace(_T(":"),_T("_")); // http://msdn.microsoft.com/en-us/library/system.io.path.getinvalidfilenamechars.aspx should be further examined
+	m_csPathName.Replace(_T("?"),_T("")); // http://msdn.microsoft.com/en-us/library/system.io.path.getinvalidfilenamechars.aspx should be further examined
+	m_csPathName.Replace(_T("*"),_T("")); // http://msdn.microsoft.com/en-us/library/system.io.path.getinvalidfilenamechars.aspx should be further examined
+	m_csPathName.Replace(_T("<"),_T("")); // http://msdn.microsoft.com/en-us/library/system.io.path.getinvalidfilenamechars.aspx should be further examined
+	m_csPathName.Replace(_T(">"),_T("")); // http://msdn.microsoft.com/en-us/library/system.io.path.getinvalidfilenamechars.aspx should be further examined
+	m_csPathName.Replace(_T("|"),_T("")); // http://msdn.microsoft.com/en-us/library/system.io.path.getinvalidfilenamechars.aspx should be further examined
 }
 #ifdef AVCODEC_AVCODEC_H
 void cTiVoFile::PopulateFromFFMPEG(void)
