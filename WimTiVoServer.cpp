@@ -217,7 +217,7 @@ HRESULT WriteAttributes(IXmlReader* pReader)
     } 
     return hr; 
 } 
-void XML_Test_Read(void)
+void XML_Test_Read(const CString csFileName = CString(_T("WimTivoServer.0.xml")))
 {
 	HRESULT hr = S_OK;
 	CComPtr<IXmlReader> pReader; 
@@ -231,7 +231,7 @@ void XML_Test_Read(void)
 		{
 			//Open read-only input stream 
 			CComPtr<IStream> pFileStream;
-			if (FAILED(hr = SHCreateStreamOnFile(_T("WimTivoServer.0.xml"), STGM_READ, &pFileStream))) 
+			if (FAILED(hr = SHCreateStreamOnFile(csFileName.GetString(), STGM_READ, &pFileStream))) 
 				std::cout << "[" << getTimeISO8601() << "] Error creating file reader, error is: " << hex << hr << endl;
 			else
 			{
@@ -303,6 +303,111 @@ void XML_Test_Read(void)
 							break; 
 						case XmlNodeType_DocumentType: 
 							wprintf(L"DOCTYPE is not printed\n"); 
+							break; 
+						} 
+					} 
+				}
+			}
+		}
+	}
+}
+std::wstring Indent(const int count = 1)
+{
+	std::wstring rval;
+	for (auto i = 0; i < count; i++)
+		rval.append(L"  ");
+	return(rval);
+}
+void XML_Test_Read_ElementsOnly(CString csFileName = CString(_T("WimTivoServer.0.xml")))
+{
+	HRESULT hr = S_OK;
+	CComPtr<IXmlReader> pReader; 
+	if (FAILED(hr = CreateXmlReader(__uuidof(IXmlReader), (void**) &pReader, NULL))) 
+		std::cout << "[" << getTimeISO8601() << "] Error creating xml reader, error is: " << hex << hr << endl;
+	else
+	{
+		if (FAILED(hr = pReader->SetProperty(XmlReaderProperty_DtdProcessing, DtdProcessing_Prohibit))) 
+			std::cout << "[" << getTimeISO8601() << "] Error setting XmlReaderProperty_DtdProcessing, error is: " << hex << showbase << setfill('0') << setw(8) << hr << endl;
+		else
+		{
+			//Open read-only input stream 
+			CComPtr<IStream> pFileStream;
+			if (FAILED(hr = SHCreateStreamOnFile(csFileName.GetString(), STGM_READ, &pFileStream))) 
+				std::cout << "[" << getTimeISO8601() << "] Error creating file reader, error is: " << hex << hr << endl;
+			else
+			{
+				if (FAILED(hr = pReader->SetInput(pFileStream))) 
+					std::cout << "[" << getTimeISO8601() << "] Error setting input for reader, error is: " << hex << hr << endl;
+				else
+				{
+					int indentlevel = 0;
+				 	XmlNodeType nodeType; 
+					const WCHAR* pwszPrefix; 
+					const WCHAR* pwszLocalName; 
+					const WCHAR* pwszValue; 
+					UINT cwchPrefix; 
+					//read until there are no more nodes 
+					while (S_OK == (hr = pReader->Read(&nodeType))) 
+					{ 
+						switch (nodeType) 
+						{ 
+						case XmlNodeType_XmlDeclaration: 
+							std::cout << "[                   ] XmlDeclaration" << endl;
+							//wprintf(L"XmlDeclaration\n"); 
+							//if (FAILED(hr = WriteAttributes(pReader))) 
+							//	wprintf(L"Error writing attributes, error is %08.8lx", hr); 
+							break; 
+						case XmlNodeType_Element: 
+							if (FAILED(hr = pReader->GetPrefix(&pwszPrefix, &cwchPrefix))) 
+								std::cout << "[                   ] Error getting prefix, error is " << hex << hr << endl;
+							if (FAILED(hr = pReader->GetLocalName(&pwszLocalName, NULL))) 
+								std::cout << "[                   ] Error getting local name, error is" << hex << hr << endl;
+							if (cwchPrefix > 0) 
+								std::wcout << L"[                   ] " << Indent(indentlevel) << L"Element: " << pwszPrefix << L":" << pwszLocalName << endl;
+							else 
+								std::wcout << L"[                   ] " << Indent(indentlevel) << L"Element: " << pwszLocalName << endl;
+							//if (FAILED(hr = WriteAttributes(pReader))) 
+							//	wprintf(L"Error writing attributes, error is %08.8lx", hr); 
+							if (pReader->IsEmptyElement() ) 
+								std::cout << "[                   ] (empty)" << endl;
+							indentlevel++;
+							break; 
+						case XmlNodeType_EndElement: 
+							if (FAILED(hr = pReader->GetPrefix(&pwszPrefix, &cwchPrefix))) 
+								std::cout << "[                   ] Error getting prefix, error is " << hex << hr << endl;
+							if (FAILED(hr = pReader->GetLocalName(&pwszLocalName, NULL))) 
+								std::cout << "[                   ] Error getting local name, error is" << hex << hr << endl;
+							if (cwchPrefix > 0) 
+								std::wcout << L"[                   ] " << Indent(indentlevel) << L"End Element: " << pwszPrefix << L":" << pwszLocalName << endl;
+							else 
+								std::wcout << L"[                   ] " << Indent(indentlevel) << L"End Element: " << pwszLocalName << endl;
+							indentlevel--;
+							break; 
+						case XmlNodeType_Text: 
+						case XmlNodeType_Whitespace: 
+							if (FAILED(hr = pReader->GetValue(&pwszValue, NULL))) 
+								std::cout << "[                   ] Error getting value, error is " << hex << hr << endl;
+							std::wcout << L"[                   ] " << Indent(indentlevel) << L"Text: >" << pwszValue << L"<" << endl;
+							break; 
+						case XmlNodeType_CDATA: 
+							//if (FAILED(hr = pReader->GetValue(&pwszValue, NULL))) 
+							//	wprintf(L"Error getting value, error is %08.8lx", hr); 
+							//wprintf(L"CDATA: %s\n", pwszValue); 
+							break; 
+						case XmlNodeType_ProcessingInstruction: 
+							//if (FAILED(hr = pReader->GetLocalName(&pwszLocalName, NULL))) 
+							//	wprintf(L"Error getting name, error is %08.8lx", hr); 
+							//if (FAILED(hr = pReader->GetValue(&pwszValue, NULL))) 
+							//	wprintf(L"Error getting value, error is %08.8lx", hr); 
+							//wprintf(L"Processing Instruction name:%s value:%s\n", pwszLocalName, pwszValue); 
+							break; 
+						case XmlNodeType_Comment: 
+							if (FAILED(hr = pReader->GetValue(&pwszValue, NULL))) 
+								std::cout << "[                   ] Error getting value, error is " << hex << hr << endl;
+							std::wcout << L"[                   ] " << Indent(indentlevel) << L"Comment: " << pwszValue << endl;
+							break; 
+						case XmlNodeType_DocumentType: 
+							std::cout << "[                   ] DOCTYPE is not printed" << endl;
 							break; 
 						} 
 					} 
@@ -408,7 +513,7 @@ void XML_Test_Write_InMemory(void)
 		}
 	}
 }
-void XML_Test_Write(void)
+void XML_Test_Write(const CString csFileName = CString(_T("WimTivoServer.8.xml")))
 {
 	HRESULT hr = S_OK;
 	CComPtr<IXmlWriter> pWriter;
@@ -418,7 +523,7 @@ void XML_Test_Write(void)
 	{
 		//Open writeable output stream 
 		CComPtr<IStream> pOutFileStream;
-		if (FAILED(hr = SHCreateStreamOnFile(_T("WimTivoServer.8.xml"), STGM_CREATE | STGM_WRITE, &pOutFileStream))) 
+		if (FAILED(hr = SHCreateStreamOnFile(csFileName.GetString(), STGM_CREATE | STGM_WRITE, &pOutFileStream))) 
 			cout << "[" << getTimeISO8601() << "] Error creating file writer, error is: " << hex << hr << endl;
 		else
 		{ 
@@ -1931,6 +2036,7 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 
 			if (S_OK == CoInitializeEx(0, COINIT_MULTITHREADED)) // COINIT_APARTMENTTHREADED
 			{
+				XML_Test_Read_ElementsOnly();
 				XML_Test_Read();
 				XML_Test_Write();
 				XML_Test_Write_InMemory();
