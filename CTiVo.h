@@ -11,6 +11,7 @@ public:
 	std::string m_machine;
 	std::string m_platform;
 	std::string m_services;
+	bool operator==(const cTiVoServer & other) const;
 };
 class cTiVoFile
 {

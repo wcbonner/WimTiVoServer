@@ -285,6 +285,11 @@ UINT CWimTiVoClientDoc::TiVoBeaconListenThread(LPVOID lvp)
 						std::stringstream ss;
 						ss << "[                   ] " << inet_ntoa(saServer.sin_addr) << " " << csServerBroadcast.GetString() << std::endl;
 						TRACE(ss.str().c_str());
+						if (myServer.m_services.find("TiVoMediaServer") == 0)
+						{
+							if (pDoc->m_TiVoServers.end() == std::find(pDoc->m_TiVoServers.begin(), pDoc->m_TiVoServers.end(), myServer))
+								pDoc->m_TiVoServers.push_back(myServer);
+						}
 					}
 				}
 				closesocket(theSocket);

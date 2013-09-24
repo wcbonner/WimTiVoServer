@@ -47,6 +47,18 @@ static std::string getTimeISO8601(void)
 	time(&timer);
 	return(timeToISO8601(timer));
 }
+bool cTiVoServer::operator==(const cTiVoServer & other) const
+{
+	return(
+		(m_address == other.m_address) && 
+		(m_swversion == other.m_swversion) && 
+		(m_method == other.m_method) && 
+		(m_identity == other.m_identity) && 
+		(m_machine == other.m_machine) && 
+		(m_platform == other.m_platform) && 
+		(m_services == other.m_services)
+		);
+}
 const CString csUrlPrefix(_T("/TiVoConnect/TivoNowPlaying/"));
 void cTiVoFile::SetPathName(const CString csNewPath)
 {
