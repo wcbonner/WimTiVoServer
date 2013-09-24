@@ -35,9 +35,6 @@ public:
 
 // Implementation
 	UINT  m_nAppLook;
-	virtual void PreLoadState();
-	virtual void LoadCustomState();
-	virtual void SaveCustomState();
 
 	afx_msg void OnAppAbout();
 	DECLARE_MESSAGE_MAP()

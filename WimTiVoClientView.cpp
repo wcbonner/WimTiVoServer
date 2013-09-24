@@ -86,8 +86,8 @@ void CWimTiVoClientView::OnInitialUpdate()
 
 	// http://www.microsoft.com/mspress/books/sampchap/4110c.aspx
 	// insert columns
-	ListCtrl.InsertColumn(0, _T("Local File Name"), LVCFMT_LEFT, 300, 0);
-	ListCtrl.InsertColumn(1, _T("Title"), LVCFMT_LEFT, 100, 1);
+	ListCtrl.InsertColumn(0, _T("Local File Name"), LVCFMT_LEFT, 330, 0);
+	ListCtrl.InsertColumn(1, _T("Title"), LVCFMT_LEFT, 110, 1);
 	ListCtrl.InsertColumn(2, _T("EpisodeTitle"), LVCFMT_LEFT, 100, 2);
 	ListCtrl.InsertColumn(3, _T("Description"), LVCFMT_LEFT, 100, 3);
 	ListCtrl.InsertColumn(4, _T("CaptureDate"), LVCFMT_LEFT, 105, 4);
@@ -223,26 +223,88 @@ void CWimTiVoClientView::OnTiviNowplaying()
 	CWimTiVoClientDoc * pDoc = GetDocument();
 	if (pDoc)
 	{
-		if (pDoc->m_TiVoContainer.m_MAK.empty())
+		CWaitCursor wait;
+		CString csURL(pDoc->m_TiVoContainer.m_url.c_str());
+		csURL.Append(_T("&Recurse=Yes"));
+
+		if (pDoc->m_LogFile.is_open())
+			pDoc->m_LogFile << "[                   ] XML_Parse_TiVoNowPlaying: " << CStringA(csURL).GetString() << std::endl;
+			//pDoc->m_LogFile << "[" << getTimeISO8601() << "] XML_Parse_TiVoNowPlaying: " << CStringA(csURL).GetString() << " ContainerCount: " << m_TiVoContainers.size() << std::endl;
+
+		pDoc->m_TiVoFiles.clear();
+		std::vector<CTiVoContainer> TiVoContainers;
+		if (!XML_Parse_TiVoNowPlaying(csURL, pDoc->m_TiVoFiles, TiVoContainers, pDoc->m_InternetSession))
 		{
-			CTiVoMAKDlg myDlg;
-			if (IDOK == myDlg.DoModal())
+			if (pDoc->m_TiVoContainer.m_MAK.empty())
 			{
-				myDlg.m_csMediaAccessKey.Trim();
-				pDoc->m_TiVoContainer.m_MAK = CStringA(myDlg.m_csMediaAccessKey).GetString();
-				pDoc->m_ccTiVoContainers.Lock();
-				auto pContainer = std::find(pDoc->m_TiVoContainers.begin(), pDoc->m_TiVoContainers.end(), pDoc->m_TiVoContainer);
-				if (pContainer != pDoc->m_TiVoContainers.end())
-					*pContainer = pDoc->m_TiVoContainer;
-				pDoc->m_ccTiVoContainers.Unlock();
+				CTiVoMAKDlg myDlg;
+				if (IDOK == myDlg.DoModal())
+				{
+					myDlg.m_csMediaAccessKey.Trim();
+					pDoc->m_TiVoContainer.m_MAK = CStringA(myDlg.m_csMediaAccessKey).GetString();
+					pDoc->m_ccTiVoContainers.Lock();
+					auto pContainer = std::find(pDoc->m_TiVoContainers.begin(), pDoc->m_TiVoContainers.end(), pDoc->m_TiVoContainer);
+					if (pContainer != pDoc->m_TiVoContainers.end())
+						*pContainer = pDoc->m_TiVoContainer;
+					pDoc->m_ccTiVoContainers.Unlock();
+				}
+			}
+			TCHAR szScheme[_MAX_PATH];
+			DWORD dwSchemeLength = sizeof(szScheme) / sizeof(TCHAR);
+			TCHAR szHostName[_MAX_PATH];
+			DWORD dwHostNameLength = sizeof(szHostName) / sizeof(TCHAR);
+			TCHAR szUserName[_MAX_PATH];
+			DWORD dwUserNameLength = sizeof(szUserName) / sizeof(TCHAR);
+			TCHAR szPassword[_MAX_PATH];
+			DWORD dwPasswordLength = sizeof(szPassword) / sizeof(TCHAR);
+			TCHAR szUrlPath[_MAX_PATH];
+			DWORD dwUrlPathLength = sizeof(szUrlPath) / sizeof(TCHAR);
+			TCHAR szExtraInfo[_MAX_PATH];
+			DWORD dwExtraInfoLength = sizeof(szExtraInfo) / sizeof(TCHAR);		
+			URL_COMPONENTS crackedURL;
+			crackedURL.dwStructSize = sizeof(URL_COMPONENTS);
+			crackedURL.lpszScheme = szScheme;					// pointer to scheme name
+			crackedURL.dwSchemeLength = dwSchemeLength;			// length of scheme name
+			crackedURL.nScheme;									// enumerated scheme type (if known)
+			crackedURL.lpszHostName = szHostName;				// pointer to host name
+			crackedURL.dwHostNameLength = dwHostNameLength;		// length of host name
+			crackedURL.nPort;									// converted port number
+			crackedURL.lpszUserName = szUserName;				// pointer to user name
+			crackedURL.dwUserNameLength = dwUserNameLength;		// length of user name
+			crackedURL.lpszPassword = szPassword;				// pointer to password
+			crackedURL.dwPasswordLength = dwPasswordLength;		// length of password
+			crackedURL.lpszUrlPath = szUrlPath;					// pointer to URL-path
+			crackedURL.dwUrlPathLength = dwUrlPathLength;		// length of URL-path
+			crackedURL.lpszExtraInfo = szExtraInfo;				// pointer to extra information (e.g. ?foo or #foo)
+			crackedURL.dwExtraInfoLength = dwExtraInfoLength;	// length of extra information
+			if (TRUE == InternetCrackUrl(csURL.GetString(), csURL.GetLength(), ICU_DECODE, &crackedURL))
+			{
+				std::stringstream ss;
+				ss << CStringA(crackedURL.lpszScheme).GetString() << "://";
+				ss << "tivo:" << pDoc->m_TiVoContainer.m_MAK << "@";
+				ss << CStringA(crackedURL.lpszHostName).GetString() << ":" << crackedURL.nPort;
+				ss << CStringA(crackedURL.lpszUrlPath).GetString() << CStringA(crackedURL.lpszExtraInfo).GetString(); // << "&Recurse=Yes" "&SortOrder=!CaptureDate";
+				if (pDoc->m_LogFile.is_open())
+					pDoc->m_LogFile << "[                   ] XML_Parse_TiVoNowPlaying: " << CStringA(csURL).GetString() << std::endl;
+					//pDoc->m_LogFile << "[" << getTimeISO8601() << "] XML_Parse_TiVoNowPlaying: " << CStringA(csURL).GetString() << " ContainerCount: " << m_TiVoContainers.size() << std::endl;
+				XML_Parse_TiVoNowPlaying(CString(ss.str().c_str()), pDoc->m_TiVoFiles, TiVoContainers, pDoc->m_InternetSession);
 			}
 		}
-		if (!pDoc->m_TiVoContainer.m_MAK.empty())
+		for (auto TiVoFile = pDoc->m_TiVoFiles.begin(); TiVoFile != pDoc->m_TiVoFiles.end(); TiVoFile++)
+			TiVoFile->SetURL(CString(DereferenceURL(CStringA(TiVoFile->GetURL()).GetString(), CStringA(csURL).GetString()).c_str()));
+
+		pDoc->m_TiVoTotalTime = CTimeSpan::CTimeSpan();
+		pDoc->m_TiVoTotalSize = 0;
+		for (auto TiVoFile = pDoc->m_TiVoFiles.begin(); TiVoFile != pDoc->m_TiVoFiles.end(); TiVoFile++)
 		{
-			CWaitCursor wait;
-			pDoc->GetNowPlaying();
-			pDoc->UpdateAllViews(NULL);
+			pDoc->m_TiVoTotalTime += CTimeSpan(TiVoFile->GetDuration()/1000);
+			pDoc->m_TiVoTotalSize += TiVoFile->GetSourceSize();
 		}
+
+		if (pDoc->m_LogFile.is_open())
+			pDoc->m_LogFile << "[                   ] TiVoNowPlaying Details: Total Time: " << CStringA(pDoc->m_TiVoTotalTime.Format(_T("%D Days, %H:%M:%S"))).GetString() << " Total Size: " << pDoc->m_TiVoTotalSize << " ContainerCount: " << pDoc->m_TiVoContainers.size() << std::endl;
+			//pDoc->m_LogFile << "[" << getTimeISO8601() << "] TiVoNowPlaying Details: Total Time: " << CStringA(pDoc->m_TiVoTotalTime.Format(_T("%D Days, %H:%M:%S"))).GetString() << " Total Size: " << pDoc->m_TiVoTotalSize << " ContainerCount: " << pDoc->m_TiVoContainers.size() << std::endl;
+		pDoc->UpdateAllViews(NULL);
 	}
 	TRACE(__FUNCTION__ " Exiting\n");
 }
@@ -535,6 +597,7 @@ void CWimTiVoClientView::OnTimer(UINT_PTR nIDEvent)
 							ListCtrl.SetItemText(nItem, 3, TiVoFilesToTransfer.front().GetDescription());
 							ListCtrl.SetItemText(nItem, 4, TiVoFilesToTransfer.front().GetCaptureDate().Format(_T("%c")));
 							ListCtrl.SetItemText(nItem, 5, CTimeSpan(TiVoFilesToTransfer.front().GetDuration()/1000).Format(_T("%H:%M:%S")));
+							ListCtrl.SetCheck(nItem);
 							std::stringstream ss;
 							std::locale mylocale("");   // get global locale
 							ss.imbue(mylocale);  // imbue global locale

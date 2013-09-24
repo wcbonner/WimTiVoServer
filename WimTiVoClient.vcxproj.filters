@@ -111,5 +111,14 @@
     <Image Include="res\Toolbar256.bmp">
       <Filter>Resource Files</Filter>
     </Image>
+    <Image Include="res\List-Drive.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="res\TV-Drive.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="res\TV-List.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
 </Project>

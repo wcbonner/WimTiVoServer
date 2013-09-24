@@ -220,9 +220,12 @@
     <Image Include="res\buttons.bmp" />
     <Image Include="res\filelarge.bmp" />
     <Image Include="res\filesmall.bmp" />
+    <Image Include="res\List-Drive.ico" />
     <Image Include="res\main.bmp" />
     <Image Include="res\Toolbar.bmp" />
     <Image Include="res\Toolbar256.bmp" />
+    <Image Include="res\TV-Drive.ico" />
+    <Image Include="res\TV-List.ico" />
     <Image Include="res\WimTiVoClient.ico" />
     <Image Include="res\WimTiVoClientDoc.ico" />
     <Image Include="res\writelarge.bmp" />

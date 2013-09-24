@@ -153,8 +153,6 @@ void DelimitedTextToVector(std::vector<CString> &record, const CString& line, TC
 BEGIN_MESSAGE_MAP(CWimTiVoClientApp, CWinAppEx)
 	ON_COMMAND(ID_APP_ABOUT, &CWimTiVoClientApp::OnAppAbout)
 	// Standard file based document commands
-	ON_COMMAND(ID_FILE_NEW, &CWinAppEx::OnFileNew)
-	ON_COMMAND(ID_FILE_OPEN, &CWinAppEx::OnFileOpen)
 END_MESSAGE_MAP()
 
 // CWimTiVoClientApp construction
@@ -208,8 +206,7 @@ BOOL CWimTiVoClientApp::InitInstance()
 	InitTooltipManager();
 	CMFCToolTipInfo ttParams;
 	ttParams.m_bVislManagerTheme = TRUE;
-	theApp.GetTooltipManager()->SetTooltipParams(AFX_TOOLTIP_TYPE_ALL,
-		RUNTIME_CLASS(CMFCToolTipCtrl), &ttParams);
+	theApp.GetTooltipManager()->SetTooltipParams(AFX_TOOLTIP_TYPE_ALL, RUNTIME_CLASS(CMFCToolTipCtrl), &ttParams);
 
 	// Register the application's document templates.  Document templates
 	//  serve as the connection between documents, frame windows and views
@@ -426,23 +423,6 @@ void CWimTiVoClientApp::OnAppAbout()
 }
 
 // CWimTiVoClientApp customization load/save methods
-
-void CWimTiVoClientApp::PreLoadState()
-{
-	BOOL bNameValid;
-	CString strName;
-	bNameValid = strName.LoadString(IDS_EDIT_MENU);
-	ASSERT(bNameValid);
-	GetContextMenuManager()->AddMenu(strName, IDR_POPUP_EDIT);
-}
-
-void CWimTiVoClientApp::LoadCustomState()
-{
-}
-
-void CWimTiVoClientApp::SaveCustomState()
-{
-}
 
 // CWimTiVoClientApp message handlers
 

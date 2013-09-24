@@ -166,7 +166,7 @@ CWimTiVoClientDoc::CWimTiVoClientDoc()
 			m_ccTiVoContainers.Unlock();
 		}
 	}
-	CString TiVoContainer(AfxGetApp()->GetProfileString(_T("TiVo"), _T("TiVoContainerName")));
+	CString TiVoContainer(AfxGetApp()->GetProfileString(_T("TiVo"), _T("ContainerName")));
 	if (!TiVoContainer.IsEmpty())
 	{
 		m_TiVoContainer.m_title = CStringA(TiVoContainer).GetString();
@@ -231,7 +231,7 @@ CWimTiVoClientDoc::~CWimTiVoClientDoc()
 		AfxGetApp()->WriteProfileString(_T("TiVo"), CString(ssKey.str().c_str()), CString(Container->WriteTXT().c_str()));
 	}
 	m_ccTiVoContainers.Unlock();
-	if (!m_TiVoContainer.m_title.empty()) AfxGetApp()->WriteProfileString(_T("TiVo"), _T("TiVoContainerName"), CString(m_TiVoContainer.m_title.c_str()));
+	if (!m_TiVoContainer.m_title.empty()) AfxGetApp()->WriteProfileString(_T("TiVo"), _T("ContainerName"), CString(m_TiVoContainer.m_title.c_str()));
 	if (!m_csTiVoFileDestination.IsEmpty()) AfxGetApp()->WriteProfileString(_T("TiVo"),_T("TiVoFileDestination"),m_csTiVoFileDestination);
 	AfxGetApp()->WriteProfileInt(_T("TiVo"), _T("LogFile"), LogFileClose());
 }
@@ -338,95 +338,55 @@ void CWimTiVoClientDoc::Dump(CDumpContext& dc) const
 #endif //_DEBUG
 
 // CWimTiVoClientDoc commands
-std::string DereferenceURL(const std::string & URL, const std::string & URLParent)
-{
-	TCHAR szScheme[_MAX_PATH] = _T("");
-	DWORD dwSchemeLength = sizeof(szScheme) / sizeof(TCHAR);
-	TCHAR szHostName[_MAX_PATH] = _T("");
-	DWORD dwHostNameLength = sizeof(szHostName) / sizeof(TCHAR);
-	TCHAR szUserName[_MAX_PATH] = _T("");
-	DWORD dwUserNameLength = sizeof(szUserName) / sizeof(TCHAR);
-	TCHAR szPassword[_MAX_PATH] = _T("");
-	DWORD dwPasswordLength = sizeof(szPassword) / sizeof(TCHAR);
-	TCHAR szUrlPath[_MAX_PATH] = _T("");
-	DWORD dwUrlPathLength = sizeof(szUrlPath) / sizeof(TCHAR);
-	TCHAR szExtraInfo[_MAX_PATH] = _T("");
-	DWORD dwExtraInfoLength = sizeof(szExtraInfo) / sizeof(TCHAR);		
-	URL_COMPONENTS crackedURL;
-	crackedURL.dwStructSize = sizeof(URL_COMPONENTS);
-	crackedURL.lpszScheme = szScheme;					// pointer to scheme name
-	crackedURL.dwSchemeLength = dwSchemeLength;			// length of scheme name
-	crackedURL.nScheme;									// enumerated scheme type (if known)
-	crackedURL.lpszHostName = szHostName;				// pointer to host name
-	crackedURL.dwHostNameLength = dwHostNameLength;		// length of host name
-	crackedURL.nPort;									// converted port number
-	crackedURL.lpszUserName = szUserName;				// pointer to user name
-	crackedURL.dwUserNameLength = dwUserNameLength;		// length of user name
-	crackedURL.lpszPassword = szPassword;				// pointer to password
-	crackedURL.dwPasswordLength = dwPasswordLength;		// length of password
-	crackedURL.lpszUrlPath = szUrlPath;					// pointer to URL-path
-	crackedURL.dwUrlPathLength = dwUrlPathLength;		// length of URL-path
-	crackedURL.lpszExtraInfo = szExtraInfo;				// pointer to extra information (e.g. ?foo or #foo)
-	crackedURL.dwExtraInfoLength = dwExtraInfoLength;	// length of extra information
-	BOOL Crack1 = InternetCrackUrl(CString(URLParent.c_str()).GetString(), CString(URLParent.c_str()).GetLength(), ICU_DECODE, &crackedURL);
-	szUrlPath[0] = _T('');
-	szExtraInfo[0] = _T('');
-	BOOL Crack2 = InternetCrackUrl(CString(URL.c_str()).GetString(), CString(URL.c_str()).GetLength(), ICU_DECODE, &crackedURL);
-	TCHAR rVal[512] = _T("");
-	DWORD rValSize = sizeof(rVal) / sizeof(TCHAR);
-	if (FALSE == Crack2)
-		Crack2 = InternetCombineUrl(CString(URLParent.c_str()).GetString(), CString(URL.c_str()).GetString(), rVal, &rValSize, 0);
-	else
-		Crack2 = InternetCreateUrl(&crackedURL, ICU_ESCAPE, rVal, &rValSize);
-	return(std::string(CStringA(rVal).GetString()));
-}
 bool CWimTiVoClientDoc::GetNowPlaying(void)
 {
 	TRACE(__FUNCTION__ "\n");
-	TCHAR szScheme[_MAX_PATH];
-	DWORD dwSchemeLength = sizeof(szScheme) / sizeof(TCHAR);
-	TCHAR szHostName[_MAX_PATH];
-	DWORD dwHostNameLength = sizeof(szHostName) / sizeof(TCHAR);
-	TCHAR szUserName[_MAX_PATH];
-	DWORD dwUserNameLength = sizeof(szUserName) / sizeof(TCHAR);
-	TCHAR szPassword[_MAX_PATH];
-	DWORD dwPasswordLength = sizeof(szPassword) / sizeof(TCHAR);
-	TCHAR szUrlPath[_MAX_PATH];
-	DWORD dwUrlPathLength = sizeof(szUrlPath) / sizeof(TCHAR);
-	TCHAR szExtraInfo[_MAX_PATH];
-	DWORD dwExtraInfoLength = sizeof(szExtraInfo) / sizeof(TCHAR);		
-	URL_COMPONENTS crackedURL;
-	crackedURL.dwStructSize = sizeof(URL_COMPONENTS);
-	crackedURL.lpszScheme = szScheme;					// pointer to scheme name
-	crackedURL.dwSchemeLength = dwSchemeLength;			// length of scheme name
-	crackedURL.nScheme;									// enumerated scheme type (if known)
-	crackedURL.lpszHostName = szHostName;				// pointer to host name
-	crackedURL.dwHostNameLength = dwHostNameLength;		// length of host name
-	crackedURL.nPort;									// converted port number
-	crackedURL.lpszUserName = szUserName;				// pointer to user name
-	crackedURL.dwUserNameLength = dwUserNameLength;		// length of user name
-	crackedURL.lpszPassword = szPassword;				// pointer to password
-	crackedURL.dwPasswordLength = dwPasswordLength;		// length of password
-	crackedURL.lpszUrlPath = szUrlPath;					// pointer to URL-path
-	crackedURL.dwUrlPathLength = dwUrlPathLength;		// length of URL-path
-	crackedURL.lpszExtraInfo = szExtraInfo;				// pointer to extra information (e.g. ?foo or #foo)
-	crackedURL.dwExtraInfoLength = dwExtraInfoLength;	// length of extra information
 	CString csURL(m_TiVoContainer.m_url.c_str());
-	InternetCrackUrl(csURL.GetString(), csURL.GetLength(), ICU_DECODE, &crackedURL);
-
-	std::stringstream ss;
-	ss << CStringA(crackedURL.lpszScheme).GetString() << "://";
-	ss << "tivo:" << m_TiVoContainer.m_MAK << "@";
-	ss << CStringA(crackedURL.lpszHostName).GetString() << ":" << crackedURL.nPort;
-	ss << CStringA(crackedURL.lpszUrlPath).GetString() << CStringA(crackedURL.lpszExtraInfo).GetString() << "&Recurse=Yes"; // "&SortOrder=!CaptureDate";
-	csURL = CString(ss.str().c_str());
 
 	if (m_LogFile.is_open())
 		m_LogFile << "[" << getTimeISO8601() << "] XML_Parse_TiVoNowPlaying: " << CStringA(csURL).GetString() << " ContainerCount: " << m_TiVoContainers.size() << std::endl;
 
 	m_TiVoFiles.clear();
 	std::vector<CTiVoContainer> TiVoContainers;
-	XML_Parse_TiVoNowPlaying(csURL, m_TiVoFiles, TiVoContainers, m_InternetSession);
+	if (!XML_Parse_TiVoNowPlaying(csURL, m_TiVoFiles, TiVoContainers, m_InternetSession))
+	{
+		TCHAR szScheme[_MAX_PATH];
+		DWORD dwSchemeLength = sizeof(szScheme) / sizeof(TCHAR);
+		TCHAR szHostName[_MAX_PATH];
+		DWORD dwHostNameLength = sizeof(szHostName) / sizeof(TCHAR);
+		TCHAR szUserName[_MAX_PATH];
+		DWORD dwUserNameLength = sizeof(szUserName) / sizeof(TCHAR);
+		TCHAR szPassword[_MAX_PATH];
+		DWORD dwPasswordLength = sizeof(szPassword) / sizeof(TCHAR);
+		TCHAR szUrlPath[_MAX_PATH];
+		DWORD dwUrlPathLength = sizeof(szUrlPath) / sizeof(TCHAR);
+		TCHAR szExtraInfo[_MAX_PATH];
+		DWORD dwExtraInfoLength = sizeof(szExtraInfo) / sizeof(TCHAR);		
+		URL_COMPONENTS crackedURL;
+		crackedURL.dwStructSize = sizeof(URL_COMPONENTS);
+		crackedURL.lpszScheme = szScheme;					// pointer to scheme name
+		crackedURL.dwSchemeLength = dwSchemeLength;			// length of scheme name
+		crackedURL.nScheme;									// enumerated scheme type (if known)
+		crackedURL.lpszHostName = szHostName;				// pointer to host name
+		crackedURL.dwHostNameLength = dwHostNameLength;		// length of host name
+		crackedURL.nPort;									// converted port number
+		crackedURL.lpszUserName = szUserName;				// pointer to user name
+		crackedURL.dwUserNameLength = dwUserNameLength;		// length of user name
+		crackedURL.lpszPassword = szPassword;				// pointer to password
+		crackedURL.dwPasswordLength = dwPasswordLength;		// length of password
+		crackedURL.lpszUrlPath = szUrlPath;					// pointer to URL-path
+		crackedURL.dwUrlPathLength = dwUrlPathLength;		// length of URL-path
+		crackedURL.lpszExtraInfo = szExtraInfo;				// pointer to extra information (e.g. ?foo or #foo)
+		crackedURL.dwExtraInfoLength = dwExtraInfoLength;	// length of extra information
+		InternetCrackUrl(csURL.GetString(), csURL.GetLength(), ICU_DECODE, &crackedURL);
+
+		std::stringstream ss;
+		ss << CStringA(crackedURL.lpszScheme).GetString() << "://";
+		ss << "tivo:" << m_TiVoContainer.m_MAK << "@";
+		ss << CStringA(crackedURL.lpszHostName).GetString() << ":" << crackedURL.nPort;
+		ss << CStringA(crackedURL.lpszUrlPath).GetString() << CStringA(crackedURL.lpszExtraInfo).GetString() << "&Recurse=Yes"; // "&SortOrder=!CaptureDate";
+		XML_Parse_TiVoNowPlaying(CString(ss.str().c_str()), m_TiVoFiles, TiVoContainers, m_InternetSession);
+	}
 	m_ccTiVoContainers.Lock();
 	for (auto Container = TiVoContainers.begin(); Container != TiVoContainers.end(); Container++)
 	{
