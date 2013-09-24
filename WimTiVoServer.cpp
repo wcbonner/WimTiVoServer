@@ -69,7 +69,9 @@ CWinApp theApp;
 using namespace std;
 
 //////////////////////////////////////////////////////////////////////////////
-HANDLE terminateEvent = NULL;
+HANDLE terminateEvent_http = NULL;
+HANDLE terminateEvent_beacon = NULL;
+HANDLE terminateEvent_populate = NULL;
 SERVICE_STATUS_HANDLE serviceStatusHandle = NULL;
 bool pauseService = false;
 CWinThread * threadHandle = NULL;
@@ -774,6 +776,10 @@ void PopulateTiVoFileList(std::vector<cTiVoFile> & TiVoFileList, CCriticalSectio
 			for (auto TiVoFile = TiVoFileList.begin(); TiVoFile != TiVoFileList.end(); TiVoFile++)
 				if (!TiVoFile->GetPathName().CompareNoCase(finder.GetFilePath()))
 				{
+					CTime FinderTime;
+					if (finder.GetLastWriteTime(FinderTime))
+						if (FinderTime > TiVoFile->GetLastWriteTime())
+							TiVoFile->SetPathName(finder);
 					bNotInList = false;
 					break;
 				}
@@ -899,26 +905,42 @@ std::vector<cTiVoFile> TiVoFileList;
 std::queue<cTiVoFile> TiVoFilesToConvert;
 UINT PopulateTiVoFileList(LPVOID lvp)
 {
-	//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/*.TiVo");
-	//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/Evening*.TiVo");
-	//PopulateTiVoFileList(TiVoFileList, "D:/Videos/Evening Magazine (Recorded Mar 26, 2010, KINGDT).TiVo");
-	PopulateTiVoFileList(TiVoFileList, ccTiVoFileListCritSec, "D:/Videos/*");
-	ccTiVoFileListCritSec.Lock(); std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate); ccTiVoFileListCritSec.Unlock();
-	PopulateTiVoFileList(TiVoFileList, ccTiVoFileListCritSec, "D:/Recorded TV/*");
-	ccTiVoFileListCritSec.Lock(); std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate); ccTiVoFileListCritSec.Unlock();
-	PopulateTiVoFileList(TiVoFileList, ccTiVoFileListCritSec, "//Acid/Recorded TV/*");
-	ccTiVoFileListCritSec.Lock(); std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate); ccTiVoFileListCritSec.Unlock();
-	PopulateTiVoFileList(TiVoFileList, ccTiVoFileListCritSec, "//Acid/TiVo/*");
-	//ccTiVoFileListCritSec.Lock(); std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate); ccTiVoFileListCritSec.Unlock();
-	//PopulateTiVoFileList(TiVoFileList, ccTiVoFileListCritSec, "//Acid/Videos/*");
-	//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/*.TiVo");
-	//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/the.daily*");
-	//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/Archer.*");
-	CleanTiVoFileList(TiVoFileList, ccTiVoFileListCritSec);
-	ccTiVoFileListCritSec.Lock(); 
-	std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate); 
-	std::cout << "[" << getTimeISO8601() << "] TiVoFileList Size: " << TiVoFileList.size() << endl;
-	ccTiVoFileListCritSec.Unlock();
+	if (ApplicationLogHandle != NULL) 
+	{
+		CString csSubstitutionText(__FUNCTION__);
+		csSubstitutionText.Append(_T(" Has Started"));
+		LPCTSTR lpStrings[] = { csSubstitutionText.GetString(), NULL };
+		ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
+	}
+	do {
+		//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/*.TiVo");
+		//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/Evening*.TiVo");
+		//PopulateTiVoFileList(TiVoFileList, "D:/Videos/Evening Magazine (Recorded Mar 26, 2010, KINGDT).TiVo");
+		PopulateTiVoFileList(TiVoFileList, ccTiVoFileListCritSec, "D:/Videos/*");
+		ccTiVoFileListCritSec.Lock(); std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate); ccTiVoFileListCritSec.Unlock();
+		PopulateTiVoFileList(TiVoFileList, ccTiVoFileListCritSec, "D:/Recorded TV/*");
+		ccTiVoFileListCritSec.Lock(); std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate); ccTiVoFileListCritSec.Unlock();
+		PopulateTiVoFileList(TiVoFileList, ccTiVoFileListCritSec, "//Acid/Recorded TV/*");
+		ccTiVoFileListCritSec.Lock(); std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate); ccTiVoFileListCritSec.Unlock();
+		PopulateTiVoFileList(TiVoFileList, ccTiVoFileListCritSec, "//Acid/TiVo/*");
+		//ccTiVoFileListCritSec.Lock(); std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate); ccTiVoFileListCritSec.Unlock();
+		//PopulateTiVoFileList(TiVoFileList, ccTiVoFileListCritSec, "//Acid/Videos/*");
+		//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/*.TiVo");
+		//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/the.daily*");
+		//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/Archer.*");
+		CleanTiVoFileList(TiVoFileList, ccTiVoFileListCritSec);
+		ccTiVoFileListCritSec.Lock(); 
+		std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate); 
+		std::cout << "[" << getTimeISO8601() << "] TiVoFileList Size: " << TiVoFileList.size() << endl;
+		ccTiVoFileListCritSec.Unlock();
+	} while (WAIT_TIMEOUT == WaitForSingleObject(terminateEvent_populate, 15*60*1000));
+	if (ApplicationLogHandle != NULL) 
+	{
+		CString csSubstitutionText(__FUNCTION__);
+		csSubstitutionText.Append(_T(" Has Stopped"));
+		LPCTSTR lpStrings[] = { csSubstitutionText.GetString(), NULL };
+		ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
+	}
 	return(0);
 }
 UINT WatchTiVoDirectories(LPVOID lvp)
@@ -1027,45 +1049,48 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 			csAnchorItem = TiVoFileList.begin()->GetURL();
 		int iItemCount = TiVoFileList.size();
 		ccTiVoFileListCritSec.Unlock();
-		CString csCommand(InBuffer);
+		CStringA csCommand(InBuffer);
 		int curPos = 0;
-		CString csToken(csCommand.Tokenize(_T("& ?"),curPos));
-		while (csToken != _T(""))
+		CStringA csToken(csCommand.Tokenize("& ?",curPos));
+		while (csToken != "")
 		{
-			CString csKey(csToken.Left(csToken.Find(_T("="))));
-			CString csValue(csToken.Right(csToken.GetLength() - (csToken.Find(_T("="))+1)));
-			if (!csKey.CompareNoCase(_T("Container")))
+			CStringA csKey(csToken.Left(csToken.Find("=")));
+			CStringA csValue(csToken.Right(csToken.GetLength() - (csToken.Find("=")+1)));
+			if (!csKey.CompareNoCase("Container"))
 			{
-				std::wcout << L"[                   ] " << csToken.GetString() << endl;
+				std::cout << "[" << getTimeISO8601() << "] " << csToken.GetString() << std::endl;
 				csContainer = csValue;
 			}
-			else if (!csKey.CompareNoCase(_T("Recurse")))
-				std::wcout << L"[                   ] " << csToken.GetString() << endl;
-			else if (!csKey.CompareNoCase(_T("SortOrder")))
+			else if (!csKey.CompareNoCase("Recurse"))
+				std::cout << "[                   ] " << csToken.GetString() << std::endl;
+			else if (!csKey.CompareNoCase("SortOrder"))
 			{
-				std::wcout << L"[                   ] " << csToken.GetString() << endl;
+				std::cout << "[                   ] " << csToken.GetString() << std::endl;
 				//std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate);
 			}
-			else if (!csKey.CompareNoCase(_T("RandomSeed")))
-				std::wcout << L"[                   ] " << csToken.GetString() << endl;
-			else if (!csKey.CompareNoCase(_T("RandomStart")))
-				std::wcout << L"[                   ] " << csToken.GetString() << endl;
-			else if (!csKey.CompareNoCase(_T("AnchorOffset")))
+			else if (!csKey.CompareNoCase("RandomSeed"))
+				std::cout << "[                   ] " << csToken.GetString() << std::endl;
+			else if (!csKey.CompareNoCase("RandomStart"))
+				std::cout << "[                   ] " << csToken.GetString() << std::endl;
+			else if (!csKey.CompareNoCase("AnchorOffset"))
 			{
-				std::wcout << L"[                   ] " << csToken.GetString() << endl;
-				iAnchorOffset = atoi(CStringA(csValue).GetString());
+				std::cout << "[                   ] " << csToken.GetString() << std::endl;
+				iAnchorOffset = atoi(csValue.GetString());
 				iAnchorOffset++; // Simplify for the -1 offset that the TiVo actually uses.
 			}
-			else if (!csKey.CompareNoCase(_T("Filter")))
-				std::wcout << L"[                   ] " << csToken.GetString() << endl;
-			else if (!csKey.CompareNoCase(_T("ItemCount")))
+			else if (!csKey.CompareNoCase("Filter"))
 			{
-				std::wcout << L"[                   ] " << csToken.GetString() << endl;
+				csToken.Replace("%2F","/");
+				std::cout << "[                   ] " << csToken.GetString() << std::endl;
+			}
+			else if (!csKey.CompareNoCase("ItemCount"))
+			{
+				std::cout << "[                   ] " << csToken.GetString() << std::endl;
 				iItemCount = min(iItemCount, atoi(CStringA(csValue).GetString()));
 			}
-			else if (!csKey.CompareNoCase(_T("AnchorItem")))
+			else if (!csKey.CompareNoCase("AnchorItem"))
 			{
-				std::wcout << L"[                   ] " << csToken.GetString() << endl;
+				std::cout << "[                   ] " << csToken.GetString() << std::endl;
 				csAnchorItem = csValue;
 				TCHAR lpszBuffer[_MAX_PATH];
 				DWORD dwBufferLength = sizeof(lpszBuffer) / sizeof(TCHAR);
@@ -1093,7 +1118,7 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 				InternetCanonicalizeUrl(csAnchorItem.GetString(), lpszBuffer, &dwBufferLength, 0);
 				csAnchorItem = CString(lpszBuffer, dwBufferLength);
 			}
-			csToken = csCommand.Tokenize(_T("& ?"),curPos);
+			csToken = csCommand.Tokenize("& ?",curPos);
 		}
 		CString csTemporary;
 		pWriter->SetOutput(spMemoryStream);
@@ -1177,7 +1202,7 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 				while ((pItem != TiVoFileList.end()) && (iItemCount > 0))
 				{
 					std::wcout << L"[                   ] Item: " << pItem->GetPathName().GetString() << std::endl;
-					pItem->GetXML(pWriter);
+					pItem->GetTiVoItem(pWriter);
 					pItem++;
 					iItemCount--;
 				}
@@ -1600,8 +1625,9 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
  
 					static const CString csFFMPEGPath(FindEXEFromPath(_T("ffmpeg.exe")));
 					CString csCommandLine(TiVoFileToSend.GetFFMPEGCommandLine(csFFMPEGPath));
-					std::wcout << L"[                   ] CreateProcess: " << csCommandLine.GetString() << std::endl;
-					// Create the child process.     
+					std::cout << "[" << getTimeISO8601() << "] CreateProcess: ";
+					std::wcout << csCommandLine.GetString() << std::endl;
+					// Create the child process.
 					BOOL bSuccess = CreateProcess(NULL, 
 						(LPTSTR) csCommandLine.GetString(),     // command line 
 						NULL,          // process security attributes 
@@ -1645,19 +1671,8 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 								ssChunkHeader.str("");
 								ssChunkHeader << hex << dwRead << "\r\n";
 								int nRet = 0;
-								//char * Payload = new char[ssChunkHeader.str().length()+dwRead+2];
-								//if (Payload != NULL)
-								//{
-								//	memcpy(Payload, ssChunkHeader.str().c_str(), ssChunkHeader.str().length());
-								//	memcpy(Payload+ssChunkHeader.str().length(), RAWDataBuff, dwRead);
-								//	memcpy(Payload+ssChunkHeader.str().length()+dwRead, "\r\n", 2);
-								//	nRet = send(DataSocket, Payload, ssChunkHeader.str().length()+dwRead+2, 0);
-								//}
-								//else
-								//{
-									send(DataSocket, ssChunkHeader.str().c_str(), ssChunkHeader.str().length(), 0);
-									nRet = send(DataSocket, RAWDataBuff, dwRead, 0);
-								//}
+								send(DataSocket, ssChunkHeader.str().c_str(), ssChunkHeader.str().length(), 0);
+								nRet = send(DataSocket, RAWDataBuff, dwRead, 0);
 								if (SOCKET_ERROR == nRet)
 								{
 									TerminateProcess(piProcInfo.hProcess, 0);
@@ -1683,8 +1698,6 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 										0,			// min size for buffer
 										NULL );		// 0, since getting message from system tables
 									std::cout << "\n\r[                   ] Error code: " << errCode << " " << CStringA(errString, size).Trim().GetString() << std::endl;
-												// WSAECONNRESET is 10054L
-												//[                   ] Error code: 10054 An existing connection was forcibly closed by the remote host.
 									LocalFree(errString);	// if you don't do this, you will get an
 															// ever so slight memory leak, since we asked
 															// FormatMessage to FORMAT_MESSAGE_ALLOCATE_BUFFER,
@@ -1693,23 +1706,8 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 									WSASetLastError(0);		// Reset this so that subsequent calls may be accurate
 									break;
 								}
-								//else if (Payload == NULL)
-									send(DataSocket, "\r\n", 2, 0);	// Chunk Footer
-								//if (Payload != NULL)
-								//	delete[] Payload;
+								send(DataSocket, "\r\n", 2, 0);	// Chunk Footer
 								bytessent += nRet;
-								//if (nRet != dwRead)
-								//{
-								//	std::cout << "\n\r[                   ] Not all Read Data was Sent. Read: " << dwRead << " Send: " << nRet << std::endl;
-								//	char * ptrData = RAWDataBuff + nRet;
-								//	int DataToSend = dwRead - nRet;
-								//	while ((DataSocket != INVALID_SOCKET) && (DataToSend > 0) && (SOCKET_ERROR != nRet))
-								//	{
-								//		nRet = send(DataSocket, ptrData, DataToSend, 0);
-								//		ptrData += nRet;
-								//		DataToSend -= nRet;
-								//	}
-								//}
 								CurrentFileSize += nRet;
 								ctsTotal = CTime::GetCurrentTime() - ctStart;
 								// This is another experiment trying to find out why I'm failing to send files to the TiVo
@@ -1788,6 +1786,13 @@ UINT HTTPChild(LPVOID lvp)
 }
 UINT HTTPMain(LPVOID lvp)
 {
+	if (ApplicationLogHandle != NULL) 
+	{
+		CString csSubstitutionText(__FUNCTION__);
+		csSubstitutionText.Append(_T(" Has Started"));
+		LPCTSTR lpStrings[] = { csSubstitutionText.GetString(), NULL };
+		ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
+	}
 	if (AfxSocketInit())
 	{
 		/* Open a listening socket */
@@ -1808,11 +1813,11 @@ UINT HTTPMain(LPVOID lvp)
 		{
 			DWORD on = TRUE;
 			DWORD off = FALSE;
-			DWORD BigBuffSize = 0x8000;
+			//DWORD BigBuffSize = 0x8000;
 			setsockopt(ControlSocket, SOL_SOCKET, SO_REUSEADDR, (char *)&on, sizeof(on));
 			setsockopt(ControlSocket, SOL_SOCKET, SO_KEEPALIVE, (char *)&off, sizeof(off));	// Attempt to see if this is related to why many of my transfers are failing.
-			setsockopt(ControlSocket, SOL_SOCKET, SO_SNDBUF, (char *)&BigBuffSize, sizeof(BigBuffSize));	// Attempt to see if this is related to why many of my transfers are failing.
-			setsockopt(ControlSocket, SOL_SOCKET, SO_RCVBUF, (char *)&BigBuffSize, sizeof(BigBuffSize));	// Attempt to see if this is related to why many of my transfers are failing.
+			//setsockopt(ControlSocket, SOL_SOCKET, SO_SNDBUF, (char *)&BigBuffSize, sizeof(BigBuffSize));	// Attempt to see if this is related to why many of my transfers are failing.
+			//setsockopt(ControlSocket, SOL_SOCKET, SO_RCVBUF, (char *)&BigBuffSize, sizeof(BigBuffSize));	// Attempt to see if this is related to why many of my transfers are failing.
 			//setsockopt(ControlSocket, IPPROTO_TCP, TCP_EXPEDITED_1122, (char *)&on, sizeof(on));	// Attempt to see if this is related to why many of my transfers are failing.
 			//setsockopt(ControlSocket, IPPROTO_TCP, TCP_BSDURGENT, (char *)&on, sizeof(on));	// Attempt to see if this is related to why many of my transfers are failing.
 			//setsockopt(ControlSocket, IPPROTO_TCP, TCP_NODELAY, (char *)&off, sizeof(off));	// Attempt to see if this is related to why many of my transfers are failing.
@@ -1861,42 +1866,20 @@ UINT HTTPMain(LPVOID lvp)
 					{
 						SOCKET remoteSocket = accept(ControlSocket,NULL,NULL);
 						if (remoteSocket != INVALID_SOCKET)
-						{
-							#ifdef _DEBUG
-							stringstream ss;
-							ss << __FUNCTION__;
-							DWORD optval = FALSE;
-							int optlen = sizeof(optval);
-							getsockopt(remoteSocket, SOL_SOCKET, SO_KEEPALIVE, (char *)&optval, &optlen);
-							ss << " SO_KEEPALIVE: " << optval;
-							optval = FALSE;optlen = sizeof(optval);
-							getsockopt(remoteSocket, SOL_SOCKET, SO_SNDBUF, (char *)&optval, &optlen);
-							ss << " SO_SNDBUF: " << optval;
-							optval = FALSE;optlen = sizeof(optval);
-							getsockopt(remoteSocket, SOL_SOCKET, SO_RCVBUF, (char *)&optval, &optlen);
-							ss << " SO_RCVBUF: " << optval;
-							optval = FALSE;optlen = sizeof(optval);
-							getsockopt(remoteSocket, IPPROTO_TCP, TCP_BSDURGENT, (char *)&optval, &optlen);
-							ss << " TCP_BSDURGENT: " << optval;
-							optval = FALSE;optlen = sizeof(optval);
-							getsockopt(remoteSocket, IPPROTO_TCP, TCP_EXPEDITED_1122, (char *)&optval, &optlen);
-							ss << " TCP_EXPEDITED_1122: " << optval;
-							optval = FALSE;optlen = sizeof(optval);
-							getsockopt(remoteSocket, IPPROTO_TCP, TCP_NODELAY, (char *)&optval, &optlen);
-							ss << " TCP_NODELAY: " << optval;
-							ss << std::endl;
-							TRACE(ss.str().c_str());
-							HTTPChild((LPVOID)remoteSocket);
-							#else
 							AfxBeginThread(HTTPChild, (LPVOID)remoteSocket);
-							#endif
-						}
 					}
 				}
 			}
 		}
 	}
-	SetEvent(terminateEvent);
+	SetEvent(terminateEvent_http);
+	if (ApplicationLogHandle != NULL) 
+	{
+		CString csSubstitutionText(__FUNCTION__);
+		csSubstitutionText.Append(_T(" Has Stopped"));
+		LPCTSTR lpStrings[] = { csSubstitutionText.GetString(), NULL };
+		ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
+	}
 	return(0);
 }
 UINT TiVoConvertFileThread(LPVOID lvp)
@@ -2006,6 +1989,81 @@ bool TiVoBeaconSend(const std::string csServerBroadcast)
 		closesocket(theSocket);
 	}
 	return(rval);
+}
+UINT TiVoBeaconSendThread(LPVOID lvp)
+{
+	if (ApplicationLogHandle != NULL) 
+	{
+		CString csSubstitutionText(__FUNCTION__);
+		csSubstitutionText.Append(_T(" Has Started"));
+		LPCTSTR lpStrings[] = { csSubstitutionText.GetString(), NULL };
+		ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
+	}
+	DWORD dwVersion = GetVersion();
+	int dwMajorVersion = (int)(LOBYTE(LOWORD(dwVersion)));
+	int dwMinorVersion = (int)(HIBYTE(LOWORD(dwVersion)));
+	int dwBuild = 0;
+	if (dwVersion < 0x80000000)              
+		dwBuild = (int)(HIWORD(dwVersion));
+
+	TCHAR buffer[256] = TEXT("");
+	DWORD dwSize = sizeof(buffer);
+	GetComputerNameEx(ComputerNameDnsHostname, buffer, &dwSize);
+	CString csMyHostName(buffer);
+
+	const char * BuildDateTime = "<BuildDateTime>" __DATE__ " " __TIME__ "</BuildDateTime>";
+	char cmonth[4];
+	int year, day, hour, min, sec;
+	sscanf(&(BuildDateTime[15]),"%s %d %d %d:%d:%d",cmonth,&day,&year,&hour,&min,&sec);
+	const char * Months[] = { "Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec" };
+	int month = 0;
+	while (strcmp(cmonth,Months[month]) != 0)
+		month++;
+	month++;
+	CString csBuildDateTime;
+	csBuildDateTime.Format(_T("%04d%02d%02d%02d%02d%02d"),year,month,day,hour,min,sec);
+
+	CString csMyProgramGuid(theApp.GetProfileString(_T("Settings"), _T("GUID")));
+	if (csMyProgramGuid.IsEmpty())
+	{
+		GUID MyProgramGuid;
+		if (SUCCEEDED(CoCreateGuid(&MyProgramGuid)))
+		{
+			OLECHAR MyProgramGuidString[40] = {0};
+			StringFromGUID2(MyProgramGuid, MyProgramGuidString, sizeof(MyProgramGuidString) / sizeof(OLECHAR));
+			csMyProgramGuid = CString(MyProgramGuidString);
+			theApp.WriteProfileString(_T("Settings"), _T("GUID"), csMyProgramGuid);
+		}
+	}
+
+	myServer.m_method = true?"broadcast":"connect";
+	std::stringstream ss;
+	ss << "pc/WinNT:" << dwMajorVersion << "." << dwMinorVersion << "." << dwBuild;
+	myServer.m_platform = ss.str();
+	myServer.m_machine = CStringA(csMyHostName).GetString();
+	myServer.m_identity = CStringA(csMyProgramGuid).GetString();
+	myServer.m_swversion = CStringA(csBuildDateTime).GetString();
+
+	if (ApplicationLogHandle != NULL) 
+	{
+		CString csSubstitutionText(__FUNCTION__);
+		csSubstitutionText.Append(_T(" TiVoBeacon: "));
+		csSubstitutionText.Append(CString(myServer.WriteTXT().c_str()));
+		LPCTSTR lpStrings[] = { csSubstitutionText.GetString(), NULL };
+		ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
+	}
+
+	do {
+		TiVoBeaconSend(myServer.WriteTXT('\n'));
+	} while (WAIT_TIMEOUT == WaitForSingleObject(terminateEvent_beacon, 60*1000));
+	if (ApplicationLogHandle != NULL) 
+	{
+		CString csSubstitutionText(__FUNCTION__);
+		csSubstitutionText.Append(_T(" Has Stopped"));
+		LPCTSTR lpStrings[] = { csSubstitutionText.GetString(), NULL };
+		ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
+	}
+	return(0);
 }
 bool TiVoBeaconListen(SOCKADDR_IN &saServer)
 {
@@ -2243,7 +2301,8 @@ DWORD WINAPI ServiceCtrlHandler(
 		csSubstitutionText.Format(_T("Service %s is stopping"),theApp.m_pszAppName);
 		closesocket(ControlSocket);
 		ControlSocket = INVALID_SOCKET;
-		//		SetEvent(terminateEvent);
+		//		SetEvent(terminateEvent_http);
+		SetEvent(terminateEvent_populate);
 		break;
 	case SERVICE_CONTROL_PAUSE:
 		if (pauseService == false)
@@ -2305,13 +2364,13 @@ VOID ServiceMain(DWORD argc, LPTSTR * argv)
 		}
 		else
 		{
-			terminateEvent = CreateEvent(0,TRUE,FALSE,0);
-			if (terminateEvent == NULL) // error
+			terminateEvent_http = CreateEvent(0,TRUE,FALSE,0);
+			if (terminateEvent_http == NULL) // error
 			{
 				//#ifdef _DEBUG
 				//if (ApplicationLogHandle != NULL) 
 				//{
-				//	LPCTSTR lpStrings[] = { _T("terminateEvent == NULL"), NULL };
+				//	LPCTSTR lpStrings[] = { _T("terminateEvent_http == NULL"), NULL };
 				//	ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
 				//}
 				//#endif
@@ -2322,11 +2381,15 @@ VOID ServiceMain(DWORD argc, LPTSTR * argv)
 				success = SendStatusToSCM(SERVICE_START_PENDING,NO_ERROR,0,2,1000);
 				if (success == FALSE) // error
 				{
-					CloseHandle(terminateEvent);
+					CloseHandle(terminateEvent_http);
 					SendStatusToSCM(SERVICE_STOPPED,GetLastError(),0,0,0);
 				}
 				else
 				{
+					terminateEvent_populate = CreateEvent(0,TRUE,FALSE,0);
+					AfxBeginThread(PopulateTiVoFileList, NULL);
+					terminateEvent_beacon = CreateEvent(0,TRUE,FALSE,0);
+					AfxBeginThread(TiVoBeaconSendThread, NULL);
 					//theApp.FFTWLoad();
 					//threadHandle = AfxBeginThread(HTTPDecodeClientThread, NULL);
 					threadHandle = AfxBeginThread(HTTPMain, NULL, THREAD_PRIORITY_NORMAL, 0, CREATE_SUSPENDED);
@@ -2347,10 +2410,12 @@ VOID ServiceMain(DWORD argc, LPTSTR * argv)
 								LPCTSTR lpStrings[] = { csSubstitutionText.GetString(), NULL };
 								//ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
 							}
-							WaitForSingleObject(terminateEvent,INFINITE);
+							WaitForSingleObject(terminateEvent_http,INFINITE);
+							SetEvent(terminateEvent_populate);
+							SetEvent(terminateEvent_beacon);
 						}
-						if (terminateEvent)
-							CloseHandle(terminateEvent);
+						if (terminateEvent_http)
+							CloseHandle(terminateEvent_http);
 						if (threadHandle)
 						{
 							delete threadHandle;
@@ -2359,6 +2424,10 @@ VOID ServiceMain(DWORD argc, LPTSTR * argv)
 						if (serviceStatusHandle)
 							SendStatusToSCM(SERVICE_STOPPED,GetLastError(),0,0,500);
 					}
+					if (terminateEvent_populate)
+						CloseHandle(terminateEvent_populate);
+					if (terminateEvent_beacon)
+						CloseHandle(terminateEvent_beacon);
 				}
 			}
 		}
@@ -2641,7 +2710,7 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 				ZeroMemory(buffer, dwSize);
 			}
 
-			CTime ctLastPopulate(CTime::GetCurrentTime());
+			terminateEvent_populate = CreateEvent(0,TRUE,FALSE,0);
 			TiVoFileList.reserve(1000);
 			if (!csMyHostName.CompareNoCase(_T("WimsDM1")))
 				PopulateTiVoFileList(TiVoFileList, ccTiVoFileListCritSec, "C:/Users/Wim/Videos/*");
@@ -3082,47 +3151,29 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 			}
 			#endif
 
-			terminateEvent = CreateEvent(0,TRUE,FALSE,0);
-			if (terminateEvent != NULL) 
+			terminateEvent_http = CreateEvent(0,TRUE,FALSE,0);
+			if (terminateEvent_http != NULL) 
 			{
 				threadHandle = AfxBeginThread(HTTPMain, NULL);
 				if (threadHandle != NULL)
 				{
-					DWORD dwVersion = GetVersion();
-					int dwMajorVersion = (int)(LOBYTE(LOWORD(dwVersion)));
-					int dwMinorVersion = (int)(HIBYTE(LOWORD(dwVersion)));
-					int dwBuild = 0;
-					if (dwVersion < 0x80000000)              
-						dwBuild = (int)(HIWORD(dwVersion));
-
-					myServer.m_method = true?"broadcast":"connect";
-					std::stringstream ss;
-					ss << "pc/WinNT:" << dwMajorVersion << "." << dwMinorVersion << "." << dwBuild;
-					myServer.m_platform = ss.str();
-					myServer.m_machine = CStringA(csMyHostName).GetString();
-					myServer.m_identity = CStringA(csMyProgramGuid).GetString();
-					myServer.m_swversion = CStringA(csBuildDateTime).GetString();
-					for (auto index = 12*60; index > 0; --index)
-					{
-						TiVoBeaconSend(myServer.WriteTXT('\n'));
-						Sleep(60 * 1000);
-						CTime ctCurrent(CTime::GetCurrentTime());
-						if ((ctCurrent - ctLastPopulate) > CTimeSpan(0,0,30,0))
-						{
-							ctLastPopulate = ctCurrent;
-							AfxBeginThread(PopulateTiVoFileList, NULL);
-						}
-					}
+					terminateEvent_beacon = CreateEvent(0,TRUE,FALSE,0);
+					AfxBeginThread(TiVoBeaconSendThread, NULL);
+					Sleep(12 * 60 * 60 * 1000); // Sleep 12 hours
+					SetEvent(terminateEvent_beacon);
+					SetEvent(terminateEvent_populate);
 					closesocket(ControlSocket);
 					ControlSocket = INVALID_SOCKET;
-
 					TRACE(__FUNCTION__ " Waiting for Thread to end\n");
-					WaitForSingleObject(terminateEvent,INFINITE);
-
-					if (terminateEvent)
-						CloseHandle(terminateEvent);
+					WaitForSingleObject(terminateEvent_http,INFINITE);
+					if (terminateEvent_beacon)
+						CloseHandle(terminateEvent_beacon);
 				}
+				if (terminateEvent_http)
+					CloseHandle(terminateEvent_http);
 			}
+			if (terminateEvent_populate)
+				CloseHandle(terminateEvent_populate);
 			std::cout << "[" << getTimeISO8601() << "] Exiting" << std::endl;
 		}
 	}
