@@ -48,6 +48,7 @@
 // This one I copied some of the commands from the pyTiVo examples and it came out looking pretty good.
 // "c:\\Users\\Wim\\Downloads\\ffmpeg-20130306-git-28adecf-win64-static\\bin\\ffmpeg.exe" -report -i THE_INTOUCHABLES_t08.mkv -vcodec mpeg2video -b 16384k -maxrate 30000k -bufsize 4096k -ab 448k -ar 48000 -filter_complex "[0:0][0:2]overlay" -acodec copy THE_INTOUCHABLES.vob
 // "c:\\Users\\Wim\\Downloads\\ffmpeg-20130306-git-28adecf-win64-static\\bin\\ffmpeg.exe" -report -i THE_INTOUCHABLES_t08.mkv -vcodec mpeg2video -b 16384k -maxrate 30000k -bufsize 4096k -ab 448k -ar 48000 -filter_complex "[0:0][0:2]overlay" -acodec copy -sn THE_INTOUCHABLES.mkv
+// ffmpeg.exe -report -i \\Acid\Videos\LIFE_OF_PI\Life_of_Pi_t00.mkv -vcodec mpeg2video -b 16384k -maxrate 30000k -bufsize 4096k -ab 448k -ar 48000 -filter_complex "[0:0][0:7]overlay" -acodec copy -sn \\Acid\TiVo\Life_of_Pi.mkv
 
 // Here's an experiment in making a decent quality file for the ipad with subtitles, it seemed to compare favorbly with the original.
 // "c:\\Users\\Wim\\Downloads\\ffmpeg-20130318-git-519ebb5-win64-static\\bin\\ffmpeg.exe" -report -i THE_INTOUCHABLES_t08.mkv -filter_complex "[0:0][0:2]overlay" -ac 2 THE_INTOUCHABLES.mp4
@@ -1279,7 +1280,7 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 						ss << L"ffmpeg.exe -i " << QuoteFileName(csFileName).GetString() << L" -vcodec mpeg2video -b 16384k -maxrate 30000k -bufsize 4096k -ab 448k -ar 48000 -acodec ac3 -copyts -map 0:0 -map 0:1 -report -f vob -";
 						//CString csCommandLine(ss.str().c_str());
 						TCHAR szCmdline[1024];
-						ss >> szCmdline;
+						ss.str().copy(szCmdline, 0, sizeof(szCmdline)/sizeof(TCHAR));
 
 						// Create the child process.     
 						//TCHAR szCmdline[]=TEXT("child");
@@ -2175,6 +2176,24 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 				ZeroMemory(buffer, dwSize);
 			}
 
+			if (!csMyHostName.CompareNoCase(_T("INSPIRON")))
+			{
+				//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/*.TiVo");
+				//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/Evening*.TiVo");
+				//PopulateTiVoFileList(TiVoFileList, "D:/Videos/Evening Magazine (Recorded Mar 26, 2010, KINGDT).TiVo");
+				PopulateTiVoFileList(TiVoFileList, "D:/Recorded TV/Gold*");
+				PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/Evening*.TiVo");
+				PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/Archer.2009.S02E1*");
+				//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/Archer.*");
+			}
+			else
+			{
+				PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/Evening*.TiVo");
+				PopulateTiVoFileList(TiVoFileList, "C:/Users/Wim/Videos/*.mp4");
+			}
+			std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate);
+
+			#ifdef _Original_Download_Tests_
 			if (SUCCEEDED(CoInitializeEx(0, COINIT_MULTITHREADED))) // COINIT_APARTMENTTHREADED
 			{
 				//XML_Test_FileReformat(_T("D:\\Videos\\chunk-01-0001.xml"), _T("D:/Videos/Evening Magazine (Recorded Mar 26, 2010, KINGDT).1.xml"));
@@ -2189,7 +2208,7 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 				//std::sort(FilesToGetFromTiVo.begin(),FilesToGetFromTiVo.end(),cTiVoFileCompareDateReverse);
 				FilesToGetFromTiVo.clear();
 				CInternetSession serverSession0;
-				XML_Parse_TiVoNowPlaying(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying&Recurse=Yes&SortOrder=!CaptureDate")), _T("1760168186"), FilesToGetFromTiVo, TiVoContainers, serverSession0);
+				XML_Parse_TiVoNowPlaying(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying&Recurse=Yes&SortOrder=!CaptureDate")), FilesToGetFromTiVo, TiVoContainers, serverSession0);
 				std::sort(FilesToGetFromTiVo.begin(),FilesToGetFromTiVo.end(),cTiVoFileCompareDateReverse);				
 				FilesToGetFromTiVo.clear();	// This line is temporary just to make sure that no files are downloaded or converted
 				for (auto TiVoFileToGet = FilesToGetFromTiVo.begin(); TiVoFileToGet != FilesToGetFromTiVo.end(); TiVoFileToGet++)
@@ -2261,23 +2280,6 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 						}
 					}
 				}
-
-				if (!csMyHostName.CompareNoCase(_T("INSPIRON")))
-				{
-					//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/*.TiVo");
-					//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/Evening*.TiVo");
-					//PopulateTiVoFileList(TiVoFileList, "D:/Videos/Evening Magazine (Recorded Mar 26, 2010, KINGDT).TiVo");
-					PopulateTiVoFileList(TiVoFileList, "D:/Recorded TV/Gold*");
-					PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/Evening*.TiVo");
-					PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/Archer.2009.S02E1*");
-					//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/Archer.*");
-				}
-				else
-				{
-					PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/Evening*.TiVo");
-					PopulateTiVoFileList(TiVoFileList, "C:/Users/Wim/Videos/*.mp4");
-				}
-				std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate);
 
 				std::vector<CString> myURLS;
 				//myURLS.push_back(CString(_T("http://192.168.0.108/TiVoConnect?Command=ResetServer")));
@@ -2540,6 +2542,8 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 				signal(SIGINT, previousHandler);
 				std::cout << "\n[" << getTimeISO8601() << "] No longer listening for TiVo Broadcast packets on UDP port 2190" << endl;
 			}
+			#endif
+
 			terminateEvent = CreateEvent(0,TRUE,FALSE,0);
 			if (terminateEvent != NULL) 
 			{
