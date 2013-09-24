@@ -2339,6 +2339,11 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 			std::cout << "[" << getTimeISO8601() << "] Built on " << __DATE__ << " at " <<  __TIME__ << endl;
 			//std::wcout << L"[                   ] Snowman: ☃" << endl;
 			std::cout << "[" << getTimeISO8601() << "] Use key combination Ctrl-C to end the program." << endl;
+			std::locale mylocale("");   // get global locale
+			std::locale OriginalLocale(std::cout.imbue(mylocale));  // imbue global locale
+			std::cout << "[" << getTimeISO8601() << "] Test of digit grouping: " << 1024000 << endl;
+			std::cout.imbue(OriginalLocale);
+			std::cout << "[" << getTimeISO8601() << "] Test of digit grouping: " << 1024000 << endl;
 
 			char szDescription[8][32] = {
 				"NetBIOS", 
@@ -2392,6 +2397,8 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 				myURLS.push_back(CString(_T("http://192.168.0.108/TiVoConnect?Command=QueryContainer&Container=/")));
 				myURLS.push_back(CString(_T("http://192.168.0.108/TiVoConnect?Command=QueryFormats&SourceFormat=video%2Fx-tivo-mpeg")));
 				myURLS.push_back(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying")));
+				myURLS.push_back(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying/9948")));
+				myURLS.push_back(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoVideoDetails?id=984268")));
 				//myURLS.push_back(CString(_T("http://192.168.1.11/TiVoConnect?Command=QueryContainer&Container=/")));
 				//myURLS.push_back(CString(_T("https://tivo:9371539867@192.168.1.11:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying")));
 				//myURLS.push_back(CString(_T("http://192.168.0.5:8080/TiVoConnect?Command=QueryContainer&Container=/")));
@@ -2428,6 +2435,32 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 								serverFile->QueryInfoStatusCode(dwRet);
 								if(dwRet == HTTP_STATUS_OK)
 								{
+									CString csCookie;
+									serverFile->QueryInfo(HTTP_QUERY_SET_COOKIE,csCookie);
+									if (!csCookie.IsEmpty())
+									{
+										std::wcout << L"[                   ] HTTP_QUERY_SET_COOKIE: " << csCookie.GetString() << endl;
+										// sid=1BFA53E13BDF178B; path=/; expires="Saturday, 16-Feb-2013 00:00:00 GMT";
+										CString csCookieName(csCookie.Left(csCookie.Find(_T("="))));
+										CString csCookieData(csCookie.Left(csCookie.Find(_T(";"))));;
+										csCookieData.Delete(0,csCookieData.Find(_T("="))+1);
+										CString csCookiePath(csCookie);
+										csCookiePath.Delete(0,csCookiePath.Find(_T("path="))+5);
+										csCookiePath.Delete(csCookiePath.Find(_T(";")),csCookiePath.GetLength());
+										CString csCookieURL;
+										if (dwServiceType == AFX_INET_SERVICE_HTTPS)
+											csCookieURL = _T("https://");
+										else
+											csCookieURL = _T("https://");
+										csCookieURL.Append(strServer);
+										csCookieURL.AppendFormat(_T(":%d"), nPort);
+										csCookieURL.Append(csCookiePath);
+										std::wcout << L"[                   ] csCookieURL: " << csCookieURL.GetString() << endl;
+										std::wcout << L"[                   ] csCookieName: " << csCookieName.GetString() << endl;
+										std::wcout << L"[                   ] csCookieData: " << csCookieData.GetString() << endl;
+										serverSession.SetCookie(csCookieURL,csCookieName,csCookieData);
+									}
+
 									CComPtr<IStream> spMemoryStreamOne(::SHCreateMemStream(NULL, 0));
 									CComPtr<IStream> spMemoryStreamTwo(::SHCreateMemStream(NULL, 0));
 									if ((spMemoryStreamOne != NULL) && (spMemoryStreamTwo != NULL))
@@ -2504,6 +2537,122 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 									serverFile->SetOption(INTERNET_OPTION_SECURITY_FLAGS, SECURITY_SET_MASK);
 									if (BadCertErrorCount++ < 2)
 										goto AGAIN;
+								}
+							}
+						}
+					}
+				}
+				// Here I'm going to transfer a raw file and see what I get.
+				// 
+				myURLS.clear();
+				myURLS.push_back(CString(_T("http://tivo:1760168186@192.168.0.108:80/download/Evening Magazine.TiVo?Container=/NowPlaying&id=984268")));
+				myURLS.push_back(CString(_T("http://tivo:1760168186@192.168.0.108:80/download/Evening Magazine.TiVo?Container=/NowPlaying&id=879493")));
+				myURLS.push_back(CString(_T("http://tivo:1760168186@192.168.0.108:80/download/Community.TiVo?Container=/NowPlaying&id=3002485")));
+				for (auto csURL = myURLS.begin(); csURL != myURLS.end(); csURL++)
+				{
+					std::cout << "[" << getTimeISO8601() << "] Attempting: " << CStringA(*csURL).GetString() << endl;
+					DWORD dwServiceType;
+					CString strServer;
+					CString strObject; 
+					INTERNET_PORT nPort; 
+					CString strUsername; 
+					CString strPassword; 
+					AfxParseURLEx(csURL->GetString(), dwServiceType, strServer, strObject, nPort, strUsername, strPassword);
+					std::wcout << L"[                   ] strServer: " << strServer.GetString() << endl;
+					std::wcout << L"[                   ] strObject: " << strObject.GetString() << endl;
+					std::wcout << L"[                   ] nPort: " << nPort << endl;
+					std::wcout << L"[                   ] strUsername: " << strUsername.GetString() << endl;
+					std::wcout << L"[                   ] strPassword: " << strPassword.GetString() << endl;
+					std::unique_ptr<CHttpConnection> serverConnection(serverSession.GetHttpConnection(strServer,nPort,strUsername,strPassword));
+					if (NULL != serverConnection)
+					{
+						DWORD dwFlags = INTERNET_FLAG_TRANSFER_BINARY | SECURITY_IGNORE_ERROR_MASK;
+						if (dwServiceType == AFX_INET_SERVICE_HTTPS)
+							dwFlags |= INTERNET_FLAG_SECURE;
+						std::unique_ptr<CHttpFile> serverFile(serverConnection->OpenRequest(1, strObject, NULL, 1, NULL, NULL, dwFlags));
+						if (serverFile != NULL)
+						{
+							int BadCertErrorCount = 0;
+							AGAIN2:
+							try 
+							{
+								//std::unique_ptr<CHttpFile> serverFile((CHttpFile*) serverSession.OpenURL(*csURL, 1, INTERNET_FLAG_TRANSFER_BINARY));
+								serverFile->SendRequest();
+								DWORD dwRet;
+								serverFile->QueryInfoStatusCode(dwRet);
+								#ifdef _DEBUG
+								//std::wcout << L"[                   ] Server Status Code: " << dwRet << endl;
+								CString headers;
+								serverFile->QueryInfo(HTTP_QUERY_RAW_HEADERS_CRLF,headers);
+								headers.Trim();
+								headers.Replace(_T("\r\n"),_T("\r\n[                   ] HTTP_QUERY_RAW_HEADERS_CRLF: "));
+								std::wcout << L"[                   ] HTTP_QUERY_RAW_HEADERS_CRLF: " << headers.GetString() << endl;
+								#endif
+								if(dwRet == HTTP_STATUS_OK)
+								{
+									std::stringstream OutPutFileName;
+									OutPutFileName << "WimTivoServer." << FileIndex++ << ".TiVo";
+									std::ofstream OutputFile(OutPutFileName.str(), ios_base::binary);
+									if (OutputFile.is_open())
+									{
+										static size_t ReadWriteBufferSize = 1024;
+										char* ReadWriteBuffer = new char[ReadWriteBufferSize];
+										long long TotalRead = 0;
+										UINT uiRead;
+										CTime ctCurrent(CTime::GetCurrentTime());
+										CTime ctStart(ctCurrent);
+										CTime ctLastOutput(ctStart);
+										CTimeSpan ctsTotal = ctCurrent - ctStart;
+										std::locale mylocale("");   // get global locale
+										std::locale OriginalLocale(std::cout.imbue(mylocale));  // imbue global locale
+										std::cout << "[" << getTimeISO8601() << "] ReadWriteBufferSize: " << ReadWriteBufferSize << endl;
+										while (0 < (uiRead = serverFile->Read(ReadWriteBuffer, ReadWriteBufferSize)))
+										{
+											OutputFile.write(ReadWriteBuffer,uiRead);
+											TotalRead += uiRead;
+											ctCurrent = CTime::GetCurrentTime();
+											ctsTotal = ctCurrent - ctStart;
+											if ((ctCurrent - ctLastOutput) > CTimeSpan(0,0,0,10))
+											{
+												std::cout << "[" << getTimeISO8601() << "] Elapsed: " << CStringA(ctsTotal.Format(_T("%H:%M:%S"))).GetString() << " Bytes: " << TotalRead << " bytes/second: " <<  (TotalRead / ctsTotal.GetTotalSeconds()) << "\r";
+												ctLastOutput = ctCurrent;
+											}
+										}
+										std::wcout << endl;
+										OutputFile.close();
+										delete[] ReadWriteBuffer;
+										std::cout << "[" << getTimeISO8601() << "] Elapsed: " << CStringA(ctsTotal.Format(_T("%H:%M:%S"))).GetString() << " Bytes: " << TotalRead << endl;
+										std::cout << "[" << getTimeISO8601() << "] ReadWriteBufferSize: " << ReadWriteBufferSize << " Total Bytes: " << TotalRead << " Total Seconds: " << ctsTotal.GetTotalSeconds() << " bytes/second: " <<  (TotalRead / ctsTotal.GetTotalSeconds()) << endl;
+										std::cout.imbue(OriginalLocale);
+										ReadWriteBufferSize *= 10;
+									}
+								}
+								else if (serverFile->GetLength() > 0)
+								{
+									char ittybittybuffer;
+									ULONG cbWritten;
+									std::string ss;
+									while (0 < serverFile->Read(&ittybittybuffer, sizeof(ittybittybuffer)))
+										ss += ittybittybuffer;
+									std::cout << "[                   ] Returned File: " << ss << endl;
+								}
+								serverFile->Close();
+							}
+							catch(CInternetException *e)
+							{
+								TCHAR   szCause[255];
+								e->GetErrorMessage(szCause,sizeof(szCause)/sizeof(TCHAR));
+								CStringA csErrorMessage(szCause);
+								csErrorMessage.Trim();
+								std::cout << "[" << getTimeISO8601() << "] InternetException: " <<  csErrorMessage.GetString() << " (" << e->m_dwError << ") " << endl;
+								if ((e->m_dwError == ERROR_INTERNET_INVALID_CA) || 
+									(e->m_dwError == ERROR_INTERNET_SEC_CERT_CN_INVALID) ||
+									(e->m_dwError == ERROR_INTERNET_SEC_CERT_DATE_INVALID) ||
+									(e->m_dwError == ERROR_INTERNET_SEC_INVALID_CERT) )
+								{
+									serverFile->SetOption(INTERNET_OPTION_SECURITY_FLAGS, SECURITY_SET_MASK);
+									if (BadCertErrorCount++ < 2)
+										goto AGAIN2;
 								}
 							}
 						}

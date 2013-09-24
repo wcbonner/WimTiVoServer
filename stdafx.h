@@ -31,6 +31,7 @@
 #include <afxsock.h>		// MFC socket extensions
 #include <afxinet.h>
 #include <iostream>
+#include <locale>
 #include <iomanip>
 #include <fstream>
 #include <sstream>
