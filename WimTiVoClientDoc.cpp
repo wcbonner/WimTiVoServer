@@ -43,14 +43,62 @@ CWimTiVoClientDoc::CWimTiVoClientDoc()
 	// TODO: add one-time construction code here
 	m_TiVoBeaconListenThreadRunning = false;
 	m_TiVoBeaconListenThreadStopRequested = false;
-	//m_csTiVoMAK = AfxGetApp()->GetProfileString(_T("TiVo"),_T("MAK"),_T("1760168186"));
 	m_csTiVoMAK = AfxGetApp()->GetProfileString(_T("TiVo"),_T("MAK"),_T(""));
+	for (auto index = 0; index < 16; index++)
+	{
+		std::stringstream ssKey;
+		ssKey << "TiVo-" << index;
+		CString regTiVo(AfxGetApp()->GetProfileString(_T("TiVo"),CString(ssKey.str().c_str()),_T("")));
+		if (!regTiVo.IsEmpty())
+		{
+			cTiVoServer myServer;
+			int SectPos = 0;
+			CString csSect(regTiVo.Tokenize(_T("\t"), SectPos));
+			while (csSect != _T(""))
+			{
+				int KeyPos = 0;
+				CString csKey(csSect.Tokenize(_T("="),KeyPos));
+				CString csValue(csSect.Tokenize(_T("="),KeyPos));
+				if (!csKey.CompareNoCase(_T("address")))
+					myServer.m_address = CStringA(csValue);
+				else if (!csKey.CompareNoCase(_T("identity")))
+					myServer.m_identity = CStringA(csValue);
+				else if (!csKey.CompareNoCase(_T("machine")))
+					myServer.m_machine = CStringA(csValue);
+				else if (!csKey.CompareNoCase(_T("method")))
+					myServer.m_method = CStringA(csValue);
+				else if (!csKey.CompareNoCase(_T("platform")))
+					myServer.m_platform = CStringA(csValue);
+				else if (!csKey.CompareNoCase(_T("services")))
+					myServer.m_services = CStringA(csValue);
+				else if (!csKey.CompareNoCase(_T("swversion")))
+					myServer.m_swversion = CStringA(csValue);
+				csSect = regTiVo.Tokenize(_T("\t"), SectPos);
+			}
+			m_TiVoServers.push_back(myServer);
+		}
+	}
 }
 
 CWimTiVoClientDoc::~CWimTiVoClientDoc()
 {
 	TRACE(__FUNCTION__ "\n");
 	AfxGetApp()->WriteProfileString(_T("TiVo"),_T("MAK"),m_csTiVoMAK);
+	for (auto TiVo = m_TiVoServers.begin(); TiVo != m_TiVoServers.end(); TiVo++)
+	{
+		std::stringstream ssKey;
+		ssKey << "TiVo-" << (TiVo - m_TiVoServers.begin());
+		std::stringstream ssValue;
+		ssValue << "address=" << TiVo->m_address;
+		ssValue << "\ttivoconnect=1";
+		ssValue << "\tmachine=" << TiVo->m_machine;
+		ssValue << "\tidentity=" << TiVo->m_identity;
+		ssValue << "\tmethod=" << TiVo->m_method;
+		ssValue << "\tplatform=" << TiVo->m_platform;
+		ssValue << "\tservices=" << TiVo->m_services;
+		ssValue << "\tswversion=" << TiVo->m_swversion;
+		AfxGetApp()->WriteProfileString(_T("TiVo"), CString(ssKey.str().c_str()), CString(ssValue.str().c_str()));
+	}
 }
 
 #ifdef SHARED_HANDLERS

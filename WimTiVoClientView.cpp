@@ -74,8 +74,8 @@ void CWimTiVoClientView::OnInitialUpdate()
 		CMFCRibbonComboBox * TiVoList = DYNAMIC_DOWNCAST(CMFCRibbonComboBox, pRibbon->FindByID(ID_TIVO_LIST));
 		if (TiVoList)
 		{
-			TiVoList->AddItem(_T("Test Value 1"));
-			TiVoList->AddItem(_T("Test Value 2"));
+			for (auto TiVo = pDoc->m_TiVoServers.begin(); TiVo != pDoc->m_TiVoServers.end(); TiVo++)
+				TiVoList->AddItem(CString(TiVo->m_machine.c_str()));
 			//CUIntArray ports;
 			//if (CEnumerateSerial::UsingQueryDosDevice(ports))
 			//	for (int i = 0; i < ports.GetSize(); i++)
@@ -91,7 +91,6 @@ void CWimTiVoClientView::OnInitialUpdate()
 			//pDoc->m_Model501PortName = Model501PortList->GetItem(Model501PortList->GetCurSel());
 		}
 	}
-
 
 	//  its list control through a call to GetListCtrl().
 	CListCtrl& ListCtrl = GetListCtrl();
