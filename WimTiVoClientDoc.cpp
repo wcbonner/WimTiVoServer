@@ -625,8 +625,11 @@ bool CWimTiVoClientDoc::GetTiVoFile(const cTiVoFile & TiVoFile) //, CInternetSes
 	CString strUsername; 
 	CString strPassword; 
 	AfxParseURLEx(TiVoFile.GetURL().GetString(), dwServiceType, strServer, strObject, nPort, strUsername, strPassword);
-	strUsername = _T("tivo");
-	strPassword = TiVoFile.GetMAK();
+	if (!TiVoFile.GetMAK().IsEmpty())
+	{
+		strUsername = _T("tivo");
+		strPassword = TiVoFile.GetMAK();
+	}
 	std::unique_ptr<CHttpConnection> serverConnection(m_InternetSession.GetHttpConnection(strServer,nPort,strUsername,strPassword));
 	if (NULL != serverConnection)
 	{
@@ -638,6 +641,14 @@ bool CWimTiVoClientDoc::GetTiVoFile(const cTiVoFile & TiVoFile) //, CInternetSes
 		std::unique_ptr<CHttpFile> serverFile(serverConnection->OpenRequest(1, strObject, NULL, 1, NULL, NULL, dwFlags));
 		if (serverFile != NULL)
 		{
+			//Host: 192.168.0.5:64321
+			//Range: bytes=0-
+			//User-Agent: TvHttpClient
+			//tsn: 6520001802E00C3
+			//Connection: close
+			serverFile->AddRequestHeaders(_T("Range: bytes=0-\r\n"));
+			serverFile->AddRequestHeaders(_T("User-Agent: TvHttpClient\r\n"));
+			serverFile->AddRequestHeaders(_T("tsn: 6520001802E00C3\r\n"));
 			int BadCertErrorCount = 0;
 			AGAIN:
 			try 
@@ -655,7 +666,7 @@ bool CWimTiVoClientDoc::GetTiVoFile(const cTiVoFile & TiVoFile) //, CInternetSes
 				if (m_LogFile.is_open())
 					m_LogFile << "[                   ] HTTP_QUERY_RAW_HEADERS_CRLF: " << CStringA(headers).GetString() << std::endl;
 				#endif
-				if(dwRet == HTTP_STATUS_OK)
+				if((dwRet == HTTP_STATUS_OK) || (dwRet == HTTP_STATUS_PARTIAL_CONTENT))
 				{
 					CString csCookie;
 					serverFile->QueryInfo(HTTP_QUERY_SET_COOKIE, csCookie);
