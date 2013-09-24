@@ -71,7 +71,9 @@ public:
 	const CString & GetEpisodeTitle(void) const { return(m_EpisodeTitle); }
 	const CString & GetDescription(void) const { return(m_Description); }
 	const CTime & GetCaptureDate(void) const { return(m_CaptureDate); }
+	const CString & SetMAK(const CString & csMAK);
 	const CString & GetMAK(void) const { return(m_csMAK); }
+	const CString & GetSourceFormat(void) const { return(m_SourceFormat); }
 	const unsigned long long & GetDuration(void) const { return(m_Duration); }
 	const unsigned long long & GetSourceSize(void) const { return(m_SourceSize); }
 	void GetXML(CComPtr<IXmlWriter> & pWriter) const;
