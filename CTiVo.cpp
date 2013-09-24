@@ -553,6 +553,7 @@ void XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, const CString & csMAK,
 				const CString ccsContentType(_T("ContentType"));
 				const CString ccsContentTypeVideo(_T("video/x-tivo-raw-tts"));
 				const CString ccsContentTypeContainer(_T("x-tivo-container/tivo-videos"));
+				const CString ccsContentTypeContainerAlternate(_T("x-container/tivo-videos"));
 				const CString ccsDetails(_T("Details"));
 				const CString ccsLinks(_T("Links"));
 				const CString ccsContent(_T("Content"));
@@ -609,7 +610,9 @@ void XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, const CString & csMAK,
 												csContentType = pwszValue;
 												if (!ccsContentTypeVideo.CompareNoCase(csContentType))
 													bIsItemVideo = true;
-												else if (!ccsContentTypeContainer.Compare(pwszValue))
+												else if (!ccsContentTypeContainer.Compare(csContentType))
+													bIsItemVideoContainer = true;
+												else if (!ccsContentTypeContainerAlternate.Compare(csContentType))
 													bIsItemVideoContainer = true;
 											}
 											else if (!ccsTitle.Compare(pwszLocalName))
@@ -656,7 +659,7 @@ void XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, const CString & csMAK,
 											if (!ccsUrl.Compare(pwszLocalName))
 												csContentURL = pwszValue;
 											else if (!ccsContentType.Compare(pwszLocalName))
-												if (!ccsContentTypeContainer.Compare(pwszValue))
+												if (!ccsContentTypeContainer.Compare(pwszValue) || !ccsContentTypeContainerAlternate.Compare(pwszValue))
 													bIsItemVideoContainer = true;
 							}
 						}
@@ -801,6 +804,19 @@ bool XML_Parse_TiVoNowPlaying(const CString & Source, std::vector<cTiVoFile> & T
 							position.QuadPart = 0;
 							spMemoryStreamOne->Seek(position, STREAM_SEEK_SET, NULL);
 							XML_Parse_TiVoNowPlaying(spMemoryStreamOne, strPassword, TiVoFileList, TiVoTiVoContainers);
+							//#ifdef _DEBUG
+							//CComPtr<IStream> spMemoryStreamTwo;
+							//static int iFileCount = 0;
+							//CString csFileName(AfxGetAppName());
+							//csFileName.AppendFormat(_T(".%d.xml"), iFileCount++);
+							//if (SUCCEEDED(SHCreateStreamOnFile(csFileName.GetString(), STGM_CREATE | STGM_WRITE, &spMemoryStreamTwo))) 
+							//{
+							//	STATSTG statstg;
+							//	spMemoryStreamOne->Stat(&statstg, STATFLAG_NONAME);
+							//	spMemoryStreamOne->Seek(position, STREAM_SEEK_SET, NULL);
+							//	spMemoryStreamOne->CopyTo(spMemoryStreamTwo, statstg.cbSize, NULL, NULL);
+							//}
+							//#endif
 						}
 					}
 					else
