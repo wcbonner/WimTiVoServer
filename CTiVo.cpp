@@ -379,6 +379,21 @@ void cTiVoFile::PopulateFromFFMPEG(void)
 					m_EpisodeTitle = CString(tag->value);
 				if (_stricmp("WM/SubTitleDescription", tag->key) == 0)
 					m_Description = CString(tag->value);
+				if (_stricmp("genre", tag->key) == 0)
+					m_vProgramGenre = CString(tag->value);
+				if (_stricmp("service_provider", tag->key) == 0)
+					m_SourceStation = CString(tag->value);
+				if (_stricmp("WM/MediaOriginalChannel", tag->key) == 0)
+					m_SourceChannel = CString(tag->value);
+				if (_stricmp("WM/MediaOriginalChannel", tag->key) == 0)
+					m_SourceChannel = CString(tag->value);
+				if (_stricmp("WM/MediaCredits", tag->key) == 0)
+				{
+					CString Value(tag->value);
+					while (0 < Value.Replace(_T(";;"),_T(";")));
+					while (0 < Value.Replace(_T("//"),_T("/")));
+					m_vActor = Value;
+				}
 				//if (_stricmp("m_Duration", tag->key) == 0)
 				//{
 				//	std::stringstream ss(std::string(tag->value), std::stringstream::in | std::stringstream::out);
@@ -412,6 +427,8 @@ void cTiVoFile::GetXML(CComPtr<IXmlWriter> & pWriter) const
 			pWriter->WriteElementString(NULL, L"Title", NULL, m_Title.GetString());
 			if (!m_EpisodeTitle.IsEmpty()) pWriter->WriteElementString(NULL, L"EpisodeTitle", NULL, m_EpisodeTitle.GetString());
 			if (!m_Description.IsEmpty()) pWriter->WriteElementString(NULL, L"Description", NULL, m_Description.GetString());
+			if (!m_SourceStation.IsEmpty()) pWriter->WriteElementString(NULL, L"SourceStation", NULL, m_SourceStation.GetString());
+			if (!m_SourceChannel.IsEmpty()) pWriter->WriteElementString(NULL, L"SourceChannel", NULL, m_SourceChannel.GetString());
 			if (!m_ContentType.IsEmpty()) pWriter->WriteElementString(NULL, L"ContentType", NULL, m_ContentType.GetString());
 			//if (!m_ContentType.IsEmpty()) pWriter->WriteElementString(NULL, L"SourceFormat", NULL, m_ContentType.GetString());
 			if (!m_SourceFormat.IsEmpty()) pWriter->WriteElementString(NULL, L"SourceFormat", NULL, m_SourceFormat.GetString());
@@ -477,6 +494,16 @@ void cTiVoFile::GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const
 		pWriter->WriteElementString(NULL, L"duration", NULL, CString(timeToISO8601(CTimeSpan(m_Duration/1000)).c_str()).GetString());
 		pWriter->WriteStartElement(NULL, L"program", NULL);
 			pWriter->WriteStartElement(NULL, L"vActor", NULL);
+			if (!m_vActor.IsEmpty())
+			{
+				int iStart = 0;
+				CString csToken(m_vActor.Tokenize(_T("/;"), iStart));
+				while (!csToken.IsEmpty())
+				{
+					pWriter->WriteElementString(NULL, L"element", NULL, csToken.GetString());
+					csToken = m_vActor.Tokenize(_T("/;"), iStart);
+				}
+			}
 			pWriter->WriteEndElement();				
 			pWriter->WriteStartElement(NULL, L"vAdvisory", NULL);
 			pWriter->WriteEndElement();
@@ -490,6 +517,16 @@ void cTiVoFile::GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const
 			pWriter->WriteStartElement(NULL, L"vExecProducer", NULL);
 			pWriter->WriteEndElement();
 			pWriter->WriteStartElement(NULL, L"vProgramGenre", NULL);
+			if (!m_vProgramGenre.IsEmpty())
+			{
+				int iStart = 0;
+				CString csToken(m_vProgramGenre.Tokenize(_T(";"), iStart));
+				while (!csToken.IsEmpty())
+				{
+					pWriter->WriteElementString(NULL, L"element", NULL, csToken.GetString());
+					csToken = m_vProgramGenre.Tokenize(_T(";"), iStart);
+				}
+			}
 			pWriter->WriteEndElement();
 			pWriter->WriteStartElement(NULL, L"vGuestStar", NULL);
 			pWriter->WriteEndElement();
@@ -502,10 +539,6 @@ void cTiVoFile::GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const
 			pWriter->WriteStartElement(NULL, L"series", NULL);
 				pWriter->WriteElementString(NULL, L"isEpisodic", NULL, L"false");
 				pWriter->WriteStartElement(NULL, L"vSeriesGenre", NULL);
-					//pWriter->WriteElementString(NULL, L"element", NULL, L"Talk Show");
-					//pWriter->WriteElementString(NULL, L"element", NULL, L"News Magazine");
-					//pWriter->WriteElementString(NULL, L"element", NULL, L"News and Business");
-					//pWriter->WriteElementString(NULL, L"element", NULL, L"Talk Shows");
 				pWriter->WriteEndElement();
 				pWriter->WriteElementString(NULL, L"seriesTitle", NULL, m_Title.GetString());
 			pWriter->WriteEndElement();
