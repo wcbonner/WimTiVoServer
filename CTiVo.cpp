@@ -681,10 +681,8 @@ bool XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, const CString & csMAK,
 			{
 				int indentlevel = 0;
 				XmlNodeType nodeType; 
-				const WCHAR* pwszPrefix; 
 				const WCHAR* pwszLocalName; 
 				const WCHAR* pwszValue; 
-				UINT cwchPrefix;
 				bool bIsItem = false;
 				bool bIsItemDetails = false;
 				bool bIsItemLinks = false;
