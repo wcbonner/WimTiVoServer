@@ -45,14 +45,21 @@
 #define ID_TIVI_NOWPLAYING              32772
 #define ID_TIVO_BEACON                  32773
 #define ID_CHECK2                       32774
+#define ID_TIVODECODE                   32774
 #define ID_TIVO_MAK                     32775
+#define ID_FFMPEG                       32776
+#define ID_TIVO_GET_FILES               32777
+#define ID_TIVO_FILE_LOCATION           32778
+#define ID_TIVO_TOTAL_TIME              32779
+#define ID_EDIT3                        32780
+#define ID_TIVO_TOTAL_SIZE              32780
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        312
-#define _APS_NEXT_COMMAND_VALUE         32776
+#define _APS_NEXT_COMMAND_VALUE         32781
 #define _APS_NEXT_CONTROL_VALUE         1003
 #define _APS_NEXT_SYMED_VALUE           310
 #endif

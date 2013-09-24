@@ -36,7 +36,39 @@ BEGIN_MESSAGE_MAP(CWimTiVoClientDoc, CDocument)
 END_MESSAGE_MAP()
 
 // CWimTiVoClientDoc construction/destruction
-
+CString FindEXEFromPath(const CString & csEXE)
+{
+	CString csFullPath;
+	CFileFind finder;
+	if (finder.FindFile(csEXE))
+	{
+		finder.FindNextFile();
+		csFullPath = finder.GetFilePath();
+		finder.Close();
+	}
+	else
+	{
+		CString csPATH;
+		csPATH.GetEnvironmentVariable(_T("PATH"));
+		int iStart = 0;
+		CString csToken(csPATH.Tokenize(_T(";"), iStart));
+		while (csToken != _T(""))
+		{
+			if (csToken.Right(1) != _T("\\"))
+				csToken.AppendChar(_T('\\'));
+			csToken.Append(csEXE);
+			if (finder.FindFile(csToken))
+			{
+				finder.FindNextFile();
+				csFullPath = finder.GetFilePath();
+				finder.Close();
+				break;
+			}
+			csToken = csPATH.Tokenize(_T(";"), iStart);
+		}
+	}
+	return(csFullPath);
+}
 CWimTiVoClientDoc::CWimTiVoClientDoc()
 {
 	TRACE(__FUNCTION__ "\n");
@@ -45,6 +77,11 @@ CWimTiVoClientDoc::CWimTiVoClientDoc()
 	m_TiVoBeaconListenThreadStopRequested = false;
 	m_csTiVoMAK = AfxGetApp()->GetProfileString(_T("TiVo"),_T("MAK"),_T(""));
 	m_TiVoServerName = AfxGetApp()->GetProfileString(_T("TiVo"),_T("TiVoServerName"),_T(""));
+	m_TiVoTotalSize = 0;
+	m_bFFMPEG = AfxGetApp()->GetProfileInt(_T("TiVo"), _T("FFMPEG"), false);
+	m_bTiVoDecode = AfxGetApp()->GetProfileInt(_T("TiVo"), _T("TiVoDecode"), false);
+	m_csFFMPEGPath = FindEXEFromPath(_T("ffmpeg.exe"));
+	m_csTiVoDecodePath = FindEXEFromPath(_T("tivodecode.exe"));
 	for (auto index = 0; index < 16; index++)
 	{
 		std::stringstream ssKey;
@@ -84,8 +121,10 @@ CWimTiVoClientDoc::CWimTiVoClientDoc()
 CWimTiVoClientDoc::~CWimTiVoClientDoc()
 {
 	TRACE(__FUNCTION__ "\n");
-	AfxGetApp()->WriteProfileString(_T("TiVo"),_T("MAK"),m_csTiVoMAK);
-	AfxGetApp()->WriteProfileString(_T("TiVo"),_T("TiVoServerName"),m_TiVoServerName);
+	AfxGetApp()->WriteProfileString(_T("TiVo"), _T("MAK"), m_csTiVoMAK);
+	AfxGetApp()->WriteProfileString(_T("TiVo"), _T("TiVoServerName"), m_TiVoServerName);
+	AfxGetApp()->WriteProfileInt(_T("TiVo"), _T("FFMPEG"), m_bFFMPEG);
+	AfxGetApp()->WriteProfileInt(_T("TiVo"), _T("TiVoDecode"), m_bTiVoDecode);
 	for (auto TiVo = m_TiVoServers.begin(); TiVo != m_TiVoServers.end(); TiVo++)
 	{
 		std::stringstream ssKey;
@@ -237,20 +276,18 @@ bool CWimTiVoClientDoc::GetNowPlaying(void)
 		CInternetSession serverSession0;
 		XML_Parse_TiVoNowPlaying(csURL, m_FilesToGetFromTiVo, serverSession0);
 
-		#ifdef _DEBUG
-		CTimeSpan TotalTime;
-		unsigned long long TotalSize = 0;
+		m_TiVoTotalTime = CTimeSpan::CTimeSpan();
+		m_TiVoTotalSize = 0;
 		for (auto TiVoFile = m_FilesToGetFromTiVo.begin(); TiVoFile != m_FilesToGetFromTiVo.end(); TiVoFile++)
 		{
-			TotalTime += CTimeSpan(TiVoFile->GetDuration()/1000);
-			TotalSize += TiVoFile->GetSourceSize();
+			m_TiVoTotalTime += CTimeSpan(TiVoFile->GetDuration()/1000);
+			m_TiVoTotalSize += TiVoFile->GetSourceSize();
 		}
 		std::stringstream  junk;
 		std::locale mylocale("");   // get global locale
 		junk.imbue(mylocale);  // imbue global locale
-		junk << "TiVo Details: Total Time: " << CStringA(TotalTime.Format(_T("%D Days, %H:%M:%S"))).GetString() << " Total Size: " << TotalSize << std::endl;
+		junk << "TiVo Details: Total Time: " << CStringA(m_TiVoTotalTime.Format(_T("%D Days, %H:%M:%S"))).GetString() << " Total Size: " << m_TiVoTotalSize << std::endl;
 		TRACE(junk.str().c_str());
-		#endif
 	//}
 	//CoUninitialize();
 	return false;

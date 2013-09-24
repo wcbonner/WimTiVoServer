@@ -26,6 +26,12 @@ public:
 	std::vector<cTiVoServer> m_TiVoServers;
 	CString m_TiVoServerName;
 	CString m_csTiVoMAK;
+	CTimeSpan m_TiVoTotalTime;
+	unsigned long long m_TiVoTotalSize;
+	CString m_csFFMPEGPath;
+	CString m_csTiVoDecodePath;
+	bool m_bFFMPEG;
+	bool m_bTiVoDecode;
 
 // Operations
 public:

@@ -39,6 +39,10 @@ BEGIN_MESSAGE_MAP(CWimTiVoClientView, CListView)
 	ON_UPDATE_COMMAND_UI(ID_TIVO_MAK, &CWimTiVoClientView::OnUpdateTivoMak)
 	ON_COMMAND(ID_TIVO_LIST, &CWimTiVoClientView::OnTivoList)
 	ON_NOTIFY_REFLECT(LVN_COLUMNCLICK, &CWimTiVoClientView::OnLvnColumnclick)
+	ON_UPDATE_COMMAND_UI(ID_TIVODECODE, &CWimTiVoClientView::OnUpdateTiVoDecode)
+	ON_COMMAND(ID_TIVODECODE, &CWimTiVoClientView::OnTiVoDecode)
+	ON_COMMAND(ID_FFMPEG, &CWimTiVoClientView::OnFFMPEG)
+	ON_UPDATE_COMMAND_UI(ID_FFMPEG, &CWimTiVoClientView::OnUpdateFFMPEG)
 END_MESSAGE_MAP()
 
 // CWimTiVoClientView construction/destruction
@@ -174,7 +178,7 @@ void CWimTiVoClientView::OnUpdate(CView* pSender, LPARAM lHint, CObject* pHint)
 			}
 		}
 		CMFCRibbonBar* pRibbon = ((CFrameWndEx*) GetTopLevelFrame())->GetRibbonBar();
-		if ((pRibbon) && (pDoc))
+		if (pRibbon)
 		{
 			CMFCRibbonComboBox * TiVoList = DYNAMIC_DOWNCAST(CMFCRibbonComboBox, pRibbon->FindByID(ID_TIVO_LIST));
 			if (TiVoList)
@@ -187,6 +191,20 @@ void CWimTiVoClientView::OnUpdate(CView* pSender, LPARAM lHint, CObject* pHint)
 					if (TiVoList->GetCount() > 0)
 						TiVoList->SelectItem(0);
 				pDoc->m_TiVoServerName = TiVoList->GetItem(TiVoList->GetCurSel());
+			}
+			CMFCRibbonEdit* pEditTotalTime = DYNAMIC_DOWNCAST(CMFCRibbonEdit, pRibbon->FindByID(ID_TIVO_TOTAL_TIME));
+			if (pEditTotalTime)
+				pEditTotalTime->SetEditText(pDoc->m_TiVoTotalTime.Format(_T("%D Days, %H:%M:%S")));
+			CMFCRibbonEdit* pEditTotalSize = DYNAMIC_DOWNCAST(CMFCRibbonEdit, pRibbon->FindByID(ID_TIVO_TOTAL_SIZE));
+			if (pEditTotalSize)
+			{
+				std::stringstream  junk;
+				std::locale mylocale("");   // get global locale
+				junk.imbue(mylocale);  // imbue global locale
+				junk << pDoc->m_TiVoTotalSize << std::endl;
+				pEditTotalSize->SetEditText(CString(junk.str().c_str()));
+				//pEditTotalSize->SetTextAlign(ES_RIGHT);
+				//pEditTotalSize->SetTextAlwaysOnRight();
 			}
 		}
 	}
@@ -312,4 +330,34 @@ void CWimTiVoClientView::OnLvnColumnclick(NMHDR *pNMHDR, LRESULT *pResult)
 	}
 	*pResult = 0;
 	TRACE(__FUNCTION__ " Exiting\n");
+}
+void CWimTiVoClientView::OnTiVoDecode()
+{
+	CWimTiVoClientDoc * pDoc = GetDocument();
+	if (pDoc)
+		pDoc->m_bTiVoDecode = !pDoc->m_bTiVoDecode;
+}
+void CWimTiVoClientView::OnUpdateTiVoDecode(CCmdUI *pCmdUI)
+{
+	CWimTiVoClientDoc * pDoc = GetDocument();
+	if (pDoc)
+	{
+		pCmdUI->Enable(!pDoc->m_csTiVoDecodePath.IsEmpty());
+		pCmdUI->SetCheck(pDoc->m_bTiVoDecode);
+	}
+}
+void CWimTiVoClientView::OnFFMPEG()
+{
+	CWimTiVoClientDoc * pDoc = GetDocument();
+	if (pDoc)
+		pDoc->m_bFFMPEG = !pDoc->m_bFFMPEG;
+}
+void CWimTiVoClientView::OnUpdateFFMPEG(CCmdUI *pCmdUI)
+{
+	CWimTiVoClientDoc * pDoc = GetDocument();
+	if (pDoc)
+	{
+		pCmdUI->Enable(!pDoc->m_csFFMPEGPath.IsEmpty());
+		pCmdUI->SetCheck(pDoc->m_bFFMPEG);
+	}
 }
