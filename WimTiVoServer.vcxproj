@@ -78,6 +78,9 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
+    <ExecutablePath>c:\Users\Wim\Downloads\ffmpeg-20130306-git-28adecf-win64-shared\bin;$(ExecutablePath)</ExecutablePath>
+    <IncludePath>c:\Users\Wim\Downloads\ffmpeg-20130306-git-28adecf-win64-dev\include;$(IncludePath)</IncludePath>
+    <LibraryPath>c:\Users\Wim\Downloads\ffmpeg-20130306-git-28adecf-win64-dev\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>

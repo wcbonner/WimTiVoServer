@@ -1,4 +1,4 @@
-// WimTiVoServer.cpp : Defines the entry point for the console application.
+﻿// WimTiVoServer.cpp : Defines the entry point for the console application.
 //
 
 // Other Things to look at:
@@ -25,6 +25,7 @@
 // STL Reference I like to use: http://cplusplus.com/reference/fstream/ofstream/ofstream/
 // I'm going to try to use XMLLite for XML Processing. http://msdn.microsoft.com/en-us/library/windows/desktop/ms752864(v=vs.85).aspx
 // XMLLite processes IStream objects. 
+// Is an MSDN article that I want to read more fully. I think it'll have good shortcuts for proper ways of dealing with IStreams. http://msdn.microsoft.com/en-us/magazine/cc163436.aspx#S5
 // SHCreateMemStream function http://msdn.microsoft.com/en-us/library/windows/desktop/bb773831(v=vs.85).aspx
 // SHCreateStreamOnFile function http://msdn.microsoft.com/en-us/library/windows/desktop/bb759864(v=vs.85).aspx
 
@@ -599,6 +600,115 @@ void XML_Test_Write(const CString csFileName = CString(_T("WimTivoServer.8.xml")
 	} 
 }
 /////////////////////////////////////////////////////////////////////////////
+class cTiVoServer
+{
+//192.168.1.11 tivoconnect=1 swversion=11.0k-01-2-652 method=broadcast identity=6520201806EEAAE machine=Living Room platform=tcd/Series3 services=TiVoMediaServer:80/http
+	std::string m_address;
+	std::string m_swversion;
+	std::string m_method;
+	std::string m_identity;
+	std::string m_machine;
+	std::string m_platform;
+	std::string m_services;
+};
+extern "C" {
+#include <libavformat/avformat.h>
+#include <libavutil/dict.h>
+}
+#pragma comment(lib, "avformat")
+#pragma comment(lib, "avcodec")
+#pragma comment(lib, "avutil")
+//#pragma comment(lib, "avdevice")
+//#pragma comment(lib, "avfilter")
+//#pragma comment(lib, "postproc")
+//#pragma comment(lib, "swresample")
+//#pragma comment(lib, "swscale")
+class cTiVoFile
+{
+public:
+	bool SetPathName(const CString csNewPath)
+	{
+		csPathName = csNewPath;
+		std::string isotime(getTimeISO8601());
+		std::wstring wistotime(isotime.begin(),isotime.end());
+		std::wcout << L"[" << wistotime << L"] " << csPathName.GetString() << endl;
+		struct _stat buf;
+		if (0 == _tstat( csPathName.GetString(), &buf ))
+		{
+			SourceSize = buf.st_size;
+			char timebuf[26];
+   			ctime_s(timebuf, 26, &buf.st_mtime);
+			timebuf[24] = 0; // Get rid of \n that ctime_s appends to end of string
+			cout << "[                   ] File size     : " << buf.st_size << endl;
+			cout << "[                   ] Drive         : " << char(buf.st_dev + 'A') << ":" << endl;
+			cout << "[                   ] Time modified : " << timebuf << endl;
+
+			CTime tempTime(buf.st_mtime);
+			std::wcout << L"[                   ] " << tempTime.Format(_T("%c")).GetString() << endl;
+			const CTime UnixEpochTime(1970,1,1,0,0,0);
+			CTimeSpan TimeDiff = tempTime - UnixEpochTime;
+			std::wcout << L"[                   ] " << showbase << dec << TimeDiff.GetTotalSeconds() << endl;
+			std::wcout << L"[                   ] " << showbase << hex << TimeDiff.GetTotalSeconds() << endl;
+			//	//const CTimeSpan OneWeek(7,0,0,0); // the time difference was ~8 hours, which makes sense as the diff between UTC and local time.
+			//	//std::wcout << L"[                   ] " << showbase << dec << 0x50976384 - TimeDiff.GetTotalSeconds() << endl;
+			//	//std::wcout << L"[                   ] " << showbase << dec << TimeDiff.GetTotalSeconds() - 0x50976384 << endl;
+			//	//std::wcout << L"[                   ] " << showbase << dec << TimeDiff.GetTotalSeconds() + OneWeek.GetTotalSeconds() - 0x50976384 << endl;
+			//	//std::wcout << L"[                   ] " << showbase << dec << TimeDiff.GetTotalSeconds() - OneWeek.GetTotalSeconds() - 0x50976384 << endl;
+			LastChangeDate.Format(_T("%#0x"),TimeDiff.GetTotalSeconds());
+
+			TCHAR path_buffer[_MAX_PATH];
+			TCHAR drive[_MAX_DRIVE];
+			TCHAR dir[_MAX_DIR];
+			TCHAR fname[_MAX_FNAME];
+			TCHAR ext[_MAX_EXT];
+			_tsplitpath_s(csPathName.GetString(), drive, _MAX_DRIVE, dir, _MAX_DIR, fname, _MAX_FNAME, ext, _MAX_EXT);
+			wcout << L"[                   ]         Drive : " << drive << endl;
+			wcout << L"[                   ]           dir : " << dir << endl;
+			wcout << L"[                   ]         fname : " << fname << endl;
+			wcout << L"[                   ]           ext : " << ext << endl;
+			Title = fname;
+			av_register_all();
+			AVFormatContext *fmt_ctx = NULL;
+			AVDictionaryEntry *tag = NULL;
+			int ret = avformat_open_input(&fmt_ctx, CStringA(csPathName).GetString(), NULL, NULL);
+			if (ret == 0)
+			{
+				while (tag = av_dict_get(fmt_ctx->metadata, "", tag, AV_DICT_IGNORE_SUFFIX))
+					cout << "[                   ] " << tag->key << " = " << tag->value << endl;
+				avformat_close_input(&fmt_ctx);
+			}
+		}
+		return(true);
+	}
+private:
+	CString csPathName;
+	CString ContentType;
+	CString SourceFormat;
+	CString Title;
+	CString LastChangeDate;
+	unsigned long SourceSize;
+    unsigned int Duration;
+	CString CaptureDate;
+	CString Description;
+};
+void PopulateTiVoFileList(std::vector<cTiVoFile> & TiVoFileList)
+{
+	TRACE(__FUNCTION__ "\n");
+	std::cout << "[" << getTimeISO8601() << "] " << __FUNCTION__ << endl;
+	CFileFind finder;
+	//BOOL bWorking = finder.FindFile(_T("//Acid/TiVo/fam*S11E03*.mp4"));
+	//BOOL bWorking = finder.FindFile(_T("//Acid/TiVo/*.TiVo"));
+	BOOL bWorking = finder.FindFile(_T("C:/Users/Wim/Videos/*.mp4"));
+	while (bWorking)
+	{
+		bWorking = finder.FindNextFile();
+		cTiVoFile myFile;
+		myFile.SetPathName(finder.GetFilePath());
+		TiVoFileList.push_back(myFile);
+	}
+	finder.Close();
+}
+/////////////////////////////////////////////////////////////////////////////
 void printerr(TCHAR * errormsg)
 {
 	if (bConsoleExists)
@@ -736,7 +846,7 @@ int GetTiVoConnect(SOCKET DataSocket)
 		strcat(XMLDataBuff,"  <ItemStart>0</ItemStart>\n");
 		strcat(XMLDataBuff,"  <ItemCount>1</ItemCount>\n");
 		strcat(XMLDataBuff,"</TiVoContainer>\n");
-		//strcat(XMLDataBuff,"<!-- Copyright � 2003-2010 TiVo Inc.-->\n");
+		//strcat(XMLDataBuff,"<!-- Copyright © 2003-2010 TiVo Inc.-->\n");
 	}
 	/* Create HTTP Header */
 	char tmpBuff[1024];
@@ -1764,7 +1874,6 @@ VOID ServiceMain(DWORD argc, LPTSTR * argv)
 	}
 }
 /////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////
 volatile bool bRun = true;
 void SignalHandler(int signal)
 {
@@ -2007,6 +2116,7 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 			bConsoleExists = true;
 			std::cout << "[" << getTimeISO8601() << "] Running Application from the command line." << endl;
 			std::cout << "[" << getTimeISO8601() << "] Built on " << __DATE__ << " at " <<  __TIME__ << endl;
+			//std::wcout << L"[                   ] Snowman: ☃" << endl;
 			std::cout << "[" << getTimeISO8601() << "] Use key combination Ctrl-C to end the program." << endl;
 
 			char szDescription[8][32] = {
@@ -2034,16 +2144,21 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 				ZeroMemory(buffer, dwSize);
 			}
 
+			std::vector<cTiVoFile> TiVoFileList;
+			PopulateTiVoFileList(TiVoFileList);
+
 			if (S_OK == CoInitializeEx(0, COINIT_MULTITHREADED)) // COINIT_APARTMENTTHREADED
 			{
-				XML_Test_Read_ElementsOnly();
-				XML_Test_Read();
-				XML_Test_Write();
-				XML_Test_Write_InMemory();
+				//XML_Test_Read_ElementsOnly();
+				//XML_Test_Read();
+				//XML_Test_Write();
+				//XML_Test_Write_InMemory();
 
 				std::vector<CString> myURLS;
-				myURLS.push_back(CString(_T("http://192.168.0.108/TiVoConnect?Command=QueryContainer&Container=/")));
-				myURLS.push_back(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying")));
+				//myURLS.push_back(CString(_T("http://192.168.0.108/TiVoConnect?Command=QueryContainer&Container=/")));
+				//myURLS.push_back(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying")));
+				myURLS.push_back(CString(_T("http://192.168.1.11/TiVoConnect?Command=QueryContainer&Container=/")));
+				myURLS.push_back(CString(_T("https://tivo:9371539867@192.168.1.11:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying")));
 				myURLS.push_back(CString(_T("http://192.168.0.5:8080/TiVoConnect?Command=QueryContainer&Container=/")));
 				myURLS.push_back(CString(_T("https://tivo:1760168186@192.168.0.5:4430/TiVoConnect?Command=QueryContainer&Container=/TivoNowPlaying")));
 				int FileIndex = 0;
@@ -2078,18 +2193,22 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 								if(dwRet == HTTP_STATUS_OK)
 								{
 									std::stringstream OutPutFileName;
+									//std::stringstream ReturnedData;
 									OutPutFileName << "WimTivoServer." << FileIndex++ << ".xml";
 									std::ofstream OutputFile(OutPutFileName.str());
 									std::cout << "[" << getTimeISO8601() << "] file contents: **--**" << endl;
 									char ittybittybuffer;
 									while (0 < serverFile->Read(&ittybittybuffer, sizeof(ittybittybuffer)))
 									{
-										std::cout << ittybittybuffer;
+										//ReturnedData << ittybittybuffer;
+										//std::cout << ittybittybuffer;
 										if (OutputFile.is_open())
 											OutputFile << ittybittybuffer;
 									}
 									std::cout << "**--**" << endl;
 									OutputFile.close();
+									XML_Test_Read_ElementsOnly(CString(OutPutFileName.str().c_str()));
+									//ReturnedData.str().c_str();
 								}
 								serverFile->Close();
 							}
