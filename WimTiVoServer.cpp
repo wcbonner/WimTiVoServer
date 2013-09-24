@@ -2184,13 +2184,14 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 				//XML_Test_Write();
 				//XML_Test_Write_InMemory();
 				std::vector<cTiVoFile> FilesToGetFromTiVo;
+				std::vector<CTiVoContainer> TiVoContainers;
 				//XML_Parse_TiVoNowPlaying(_T("WimTivoServer.3.xml"), FilesToGetFromTiVo);
 				//std::sort(FilesToGetFromTiVo.begin(),FilesToGetFromTiVo.end(),cTiVoFileCompareDateReverse);
 				FilesToGetFromTiVo.clear();
 				CInternetSession serverSession0;
-				XML_Parse_TiVoNowPlaying(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying&Recurse=Yes&SortOrder=!CaptureDate")), FilesToGetFromTiVo, serverSession0);
+				XML_Parse_TiVoNowPlaying(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying&Recurse=Yes&SortOrder=!CaptureDate")), _T("1760168186"), FilesToGetFromTiVo, TiVoContainers, serverSession0);
 				std::sort(FilesToGetFromTiVo.begin(),FilesToGetFromTiVo.end(),cTiVoFileCompareDateReverse);				
-				//FilesToGetFromTiVo.clear();	// This line is temporary just to make sure that no files are downloaded or converted
+				FilesToGetFromTiVo.clear();	// This line is temporary just to make sure that no files are downloaded or converted
 				for (auto TiVoFileToGet = FilesToGetFromTiVo.begin(); TiVoFileToGet != FilesToGetFromTiVo.end(); TiVoFileToGet++)
 				{
 					CString csPathName(_T("//Acid/TiVo/"));
