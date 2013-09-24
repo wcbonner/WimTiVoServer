@@ -1664,7 +1664,9 @@ VOID ServiceMain(DWORD argc, LPTSTR * argv)
 				}
 				else
 				{
+					#ifdef AVCODEC_AVCODEC_H
 					av_register_all(); // FFMPEG initialization
+					#endif
 					ApplicationLogHandle = RegisterEventSource(NULL, theApp.m_pszAppName);
 					terminateEvent_populate = CreateEvent(0,TRUE,FALSE,0);
 					AfxBeginThread(PopulateTiVoFileList, terminateEvent_populate);
@@ -1911,7 +1913,9 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 			else
 			{			
 				bConsoleExists = true;
+				#ifdef AVCODEC_AVCODEC_H
 				av_register_all(); // FFMPEG initialization
+				#endif
 
 				terminateEvent_populate = CreateEvent(0,TRUE,FALSE,0);
 				AfxBeginThread(PopulateTiVoFileList, terminateEvent_populate);

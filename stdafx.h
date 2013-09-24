@@ -47,14 +47,15 @@
 #pragma comment(lib, "xmllite")
 
 // FFMPEG Libraries
-extern "C" {
-#include <libavcodec/avcodec.h>
-#include <libavformat/avformat.h>
-#include <libavutil/dict.h>
-}
-#pragma comment(lib, "avformat")
-#pragma comment(lib, "avcodec")
-#pragma comment(lib, "avutil")
+//extern "C" {
+//#include <libavcodec/avcodec.h>
+//#include <libavformat/avformat.h>
+//#include <libavutil/dict.h>
+//}
+//#pragma comment(lib, "avformat")
+//#pragma comment(lib, "avcodec")
+//#pragma comment(lib, "avutil")
+
 //#pragma comment(lib, "avdevice")
 //#pragma comment(lib, "avfilter")
 //#pragma comment(lib, "postproc")

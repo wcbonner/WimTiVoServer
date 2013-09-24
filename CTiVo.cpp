@@ -242,6 +242,7 @@ void cTiVoFile::SetPathName(const CString csNewPath)
 		#ifdef AVCODEC_AVCODEC_H
 		PopulateFromFFMPEG();
 		#endif
+		PopulateFromFFProbe();
 		TCHAR path_buffer[_MAX_PATH];
 		TCHAR drive[_MAX_DRIVE];
 		TCHAR dir[_MAX_DIR];
@@ -315,6 +316,7 @@ void cTiVoFile::SetPathName(const CFileFind & csNewPath)
 		#ifdef AVCODEC_AVCODEC_H
 		PopulateFromFFMPEG();
 		#endif
+		PopulateFromFFProbe();
 	}
 	if (m_SourceSize == 0)
 		m_SourceSize = csNewPath.GetLength();
@@ -447,6 +449,10 @@ void cTiVoFile::PopulateFromFFMPEG(void)
 				//#endif
 				if (_stricmp("title", tag->key) == 0)
 					m_Title = CString(tag->value);
+				if (_stricmp("episode_id", tag->key) == 0)
+					m_EpisodeTitle = CString(tag->value);
+				if (_stricmp("description", tag->key) == 0)
+					m_Description = CString(tag->value);
 				if (_stricmp("WM/SubTitle", tag->key) == 0)
 					m_EpisodeTitle = CString(tag->value);
 				if (_stricmp("WM/SubTitleDescription", tag->key) == 0)
@@ -455,8 +461,6 @@ void cTiVoFile::PopulateFromFFMPEG(void)
 					m_vProgramGenre = CString(tag->value);
 				if (_stricmp("service_provider", tag->key) == 0)
 					m_SourceStation = CString(tag->value);
-				if (_stricmp("WM/MediaOriginalChannel", tag->key) == 0)
-					m_SourceChannel = CString(tag->value);
 				if (_stricmp("WM/MediaOriginalChannel", tag->key) == 0)
 					m_SourceChannel = CString(tag->value);
 				if (_stricmp("WM/MediaCredits", tag->key) == 0)
@@ -486,12 +490,271 @@ void cTiVoFile::PopulateFromFFMPEG(void)
 				//	m_Duration /= 1000;
 				//}
 			}
+			m_Description.Replace(_T("Copyright Tribune Media Services, Inc."), _T("")); // Hack to get rid of copyright notice in the descriptive text.
+			m_Description.Trim();
 		}
 		avformat_close_input(&fmt_ctx);
 	}
 	av_log_set_level(Oldavlog);
 }
 #endif
+extern CString FindEXEFromPath(const CString & csEXE);
+void cTiVoFile::PopulateFromFFProbe(void)
+{
+	static const CString csFFProbePath(FindEXEFromPath(_T("ffprobe.exe")));
+	if (!csFFProbePath.IsEmpty())
+	{
+		//csFFProbePath -show_streams -show_format -print_format xml "\\Acid\TiVo\NOVA - ''Ancient Computer'' (Recorded Apr 05, 2013, KCTSDT).mp4"
+		// Set the bInheritHandle flag so pipe handles are inherited. 
+		SECURITY_ATTRIBUTES saAttr;  
+		saAttr.nLength = sizeof(SECURITY_ATTRIBUTES); 
+		saAttr.bInheritHandle = TRUE; 
+		saAttr.lpSecurityDescriptor = NULL; 
+
+		// Create a pipe for the child process's STDOUT. 
+		HANDLE g_hChildStd_OUT_Rd = NULL;
+		HANDLE g_hChildStd_OUT_Wr = NULL;
+		if ( ! CreatePipe(&g_hChildStd_OUT_Rd, &g_hChildStd_OUT_Wr, &saAttr, 0x800000) ) 
+			std::cout << "[" << getTimeISO8601() << "] "  << __FUNCTION__ << "\t ERROR: StdoutRd CreatePipe" << endl;
+		else
+		{
+			// Ensure the read handle to the pipe for STDOUT is not inherited.
+			if ( ! SetHandleInformation(g_hChildStd_OUT_Rd, HANDLE_FLAG_INHERIT, 0) )
+				std::cout << "[" << getTimeISO8601() << "] "  << __FUNCTION__ << "\t ERROR: Stdout SetHandleInformation" << endl;
+			else
+			{
+				// http://msdn.microsoft.com/en-us/library/windows/desktop/ms682512(v=vs.85).aspx is the simple version of CreateProcess
+				// http://msdn.microsoft.com/en-us/library/windows/desktop/ms682499(v=vs.85).aspx is the CreateProcess example with redirection of stdout and stdin.
+				// Create a child process that uses the previously created pipes for STDIN and STDOUT.
+				// Set up members of the PROCESS_INFORMATION structure.  
+				PROCESS_INFORMATION piProcInfo; 
+				ZeroMemory( &piProcInfo, sizeof(PROCESS_INFORMATION) );
+ 
+				// Set up members of the STARTUPINFO structure. 
+				// This structure specifies the STDIN and STDOUT handles for redirection.
+				STARTUPINFO siStartInfo;
+				ZeroMemory( &siStartInfo, sizeof(STARTUPINFO) );
+				siStartInfo.cb = sizeof(STARTUPINFO); 
+				siStartInfo.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+				siStartInfo.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+				siStartInfo.hStdOutput = g_hChildStd_OUT_Wr;
+				siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
+ 
+				//static const CString csFFMPEGPath(FindEXEFromPath(_T("ffmpeg.exe")));
+				CString csCommandLine(QuoteFileName(csFFProbePath));
+				csCommandLine.Append(_T(" -show_streams -show_format -print_format xml "));
+				csCommandLine.Append(QuoteFileName(m_csPathName));
+
+				std::cout << "[" << getTimeISO8601() << "] CreateProcess: ";
+				std::wcout << csCommandLine.GetString() << std::endl;
+				TRACE(_T("CreateProcess: %s\n"), csCommandLine.GetString());
+				// Create the child process.
+				if (CreateProcess(NULL, 
+					(LPTSTR) csCommandLine.GetString(),     // command line 
+					NULL,          // process security attributes 
+					NULL,          // primary thread security attributes 
+					TRUE,          // handles are inherited 
+					0,             // creation flags 
+					NULL,          // use parent's environment 
+					NULL,          // use parent's current directory 
+					&siStartInfo,  // STARTUPINFO pointer 
+					&piProcInfo))  // receives PROCESS_INFORMATION 
+				{
+					CloseHandle(g_hChildStd_OUT_Wr);	// If I don't do this, then the parent will never exit!
+					CComPtr<IStream> spMemoryStreamOne(::SHCreateMemStream(NULL, 0));
+					if (spMemoryStreamOne != NULL)
+					{
+						const int RAWDataBuffSize = 0x1000;	// 0x1000 is 4k
+						char * RAWDataBuff = new char[RAWDataBuffSize];
+						for (;;)
+						{
+							DWORD dwRead = 0;
+							BOOL bSuccess = ReadFile(g_hChildStd_OUT_Rd, RAWDataBuff, RAWDataBuffSize, &dwRead, NULL);
+							if( (!bSuccess) || (dwRead == 0)) break;
+							ULONG cbWritten;
+							spMemoryStreamOne->Write(RAWDataBuff, dwRead, &cbWritten);
+						} 
+						delete[] RAWDataBuff;
+						// reposition back to beginning of stream
+						LARGE_INTEGER position;
+						position.QuadPart = 0;
+						spMemoryStreamOne->Seek(position, STREAM_SEEK_SET, NULL);
+						HRESULT hr = S_OK;
+						CComPtr<IXmlReader> pReader; 
+						if (SUCCEEDED(hr = CreateXmlReader(__uuidof(IXmlReader), (void**) &pReader, NULL))) 
+						{
+							if (SUCCEEDED(hr = pReader->SetProperty(XmlReaderProperty_DtdProcessing, DtdProcessing_Prohibit))) 
+							{
+								if (SUCCEEDED(hr = pReader->SetInput(spMemoryStreamOne))) 
+								{
+									int indentlevel = 0;
+									XmlNodeType nodeType; 
+									const WCHAR* pwszLocalName;
+									const WCHAR* pwszValue;
+									CString csLocalName;
+									bool bIsFormat = false;
+									bool bVideoStreamInfoNeeded = true;
+									bool bAudioStreamInfoNeeded = true;
+
+									//read until there are no more nodes 
+									while (S_OK == (hr = pReader->Read(&nodeType))) 
+									{
+										if (nodeType == XmlNodeType_Element)
+										{
+											if (SUCCEEDED(hr = pReader->GetLocalName(&pwszLocalName, NULL)))
+											{
+												csLocalName = CString(pwszLocalName);
+												if ((bVideoStreamInfoNeeded || bAudioStreamInfoNeeded) && !csLocalName.Compare(_T("stream")))
+												{
+													CString cs_codec_name;
+													CString cs_codec_type;
+													CString cs_codec_time_base;
+													CString cs_width;
+													CString cs_height;
+													CString cs_duration;
+													while (S_OK == pReader->MoveToNextAttribute())
+													{
+														if (SUCCEEDED(hr = pReader->GetLocalName(&pwszLocalName, NULL)))
+															if (SUCCEEDED(hr = pReader->GetValue(&pwszValue, NULL)))
+														{
+															csLocalName = CString(pwszLocalName);
+															if (!csLocalName.Compare(_T("codec_name")))
+																cs_codec_name = CString(pwszValue);
+															else if (!csLocalName.Compare(_T("codec_type")))
+																cs_codec_type = CString(pwszValue);
+															else if (!csLocalName.Compare(_T("codec_time_base")))
+																cs_codec_time_base = CString(pwszValue);
+															else if (!csLocalName.Compare(_T("width")))
+																cs_width = CString(pwszValue);
+															else if (!csLocalName.Compare(_T("height")))
+																cs_height = CString(pwszValue);
+															else if (!csLocalName.Compare(_T("duration")))
+																cs_duration = CString(pwszValue);
+														}
+													}
+													if (!cs_codec_type.Compare(_T("video")))
+													{
+														bVideoStreamInfoNeeded = false;
+														if (!cs_codec_name.Compare(_T("mpeg2video")))
+															m_VideoCompatible = true;
+														m_SourceFormat = cs_codec_type + CString(_T("/")) + cs_codec_name;
+														int width = 0;
+														std::wstringstream ss;
+														ss << cs_width.GetString();
+														ss >> width;
+														if (width >= 1280)
+															m_VideoHighDefinition = true;
+														double duration = 0;
+														ss = std::wstringstream();
+														ss << cs_duration.GetString();
+														ss >> duration;
+														//m_Duration = (duration + 5000) / (AV_TIME_BASE / 1000); // this makes at least my first example match the tivo desktop software
+														m_Duration = duration * 1000 + 5; // this makes at least my first example match the tivo desktop software
+													}
+													else if (!cs_codec_type.Compare(_T("audio")))
+													{
+														bAudioStreamInfoNeeded = false;
+														if (!cs_codec_name.Compare(_T("ac3")))
+															m_AudioCompatible = true;
+													}	
+												}
+												else if (!csLocalName.Compare(_T("format")))
+												{
+													bIsFormat = true;
+													const CString ccs_duration(_T("duration"));
+													while (S_OK == pReader->MoveToNextAttribute())
+													{
+														if (SUCCEEDED(hr = pReader->GetLocalName(&pwszLocalName, NULL)))
+															if (SUCCEEDED(hr = pReader->GetValue(&pwszValue, NULL)))
+														{
+															if (!ccs_duration.Compare(pwszLocalName))
+															{
+																double duration = 0;
+																std::wstringstream ss;
+																ss << pwszValue;
+																ss >> duration;
+																m_Duration = duration * 1000 + 5;
+															}
+														}
+													}
+												}
+												// Here's where I need to dig deeper.
+												else if (bIsFormat && (!csLocalName.Compare(_T("tag"))))
+												{
+													CString csAttributeKey;
+													CString csAttributeValue;
+													while (S_OK == pReader->MoveToNextAttribute())
+													{
+														if (SUCCEEDED(hr = pReader->GetLocalName(&pwszLocalName, NULL)))
+															if (SUCCEEDED(hr = pReader->GetValue(&pwszValue, NULL)))
+														{
+															if (!CString(_T("key")).Compare(pwszLocalName))
+																csAttributeKey = CString(pwszValue);
+															else if (!CString(_T("value")).Compare(pwszLocalName))
+																csAttributeValue = CString(pwszValue);
+														}
+													}
+													if (!csAttributeKey.CompareNoCase(_T("title")))
+														m_Title = csAttributeValue;
+													else if (!csAttributeKey.CompareNoCase(_T("episode_id")))
+														m_EpisodeTitle = csAttributeValue;
+													else if (!csAttributeKey.CompareNoCase(_T("description")))
+														m_Description = csAttributeValue;
+													else if (!csAttributeKey.CompareNoCase(_T("WM/SubTitle")))
+														m_EpisodeTitle = csAttributeValue;
+													else if (!csAttributeKey.CompareNoCase(_T("WM/SubTitleDescription")))
+														m_Description = csAttributeValue;
+													else if (!csAttributeKey.CompareNoCase(_T("genre")))
+														m_vProgramGenre = csAttributeValue;
+													else if (!csAttributeKey.CompareNoCase(_T("service_provider")))
+														m_SourceStation = csAttributeValue;
+													else if (!csAttributeKey.CompareNoCase(_T("WM/MediaOriginalChannel")))
+														m_SourceChannel = csAttributeValue;
+													else if (!csAttributeKey.CompareNoCase(_T("WM/MediaCredits")))
+													{
+														m_vActor = csAttributeValue;
+														while (0 < m_vActor.Replace(_T(";;"),_T(";")));
+														while (0 < m_vActor.Replace(_T("//"),_T("/")));
+													}
+													else if (!csAttributeKey.CompareNoCase(_T("WM/WMRVEncodeTime")))
+													{
+														CTime OriginalBroadcastDate = ISO8601totime(std::string(CStringA(csAttributeValue).GetString()));
+														if (OriginalBroadcastDate > 0)
+															m_CaptureDate = OriginalBroadcastDate;
+													}
+													else if (!csAttributeKey.CompareNoCase(_T("WM/MediaOriginalBroadcastDateTime")))
+													{
+														CTime OriginalBroadcastDate = ISO8601totime(std::string(CStringA(csAttributeValue).GetString()));
+														if (OriginalBroadcastDate > 0)
+															m_CaptureDate = OriginalBroadcastDate;
+													}
+													m_Description.Replace(_T("Copyright Tribune Media Services, Inc."), _T("")); // Hack to get rid of copyright notice in the descriptive text.
+													m_Description.Trim();
+												}
+											}
+										}
+										else if (nodeType == XmlNodeType_EndElement)
+										{
+											if (SUCCEEDED(hr = pReader->GetLocalName(&pwszLocalName, NULL)))
+												if (!CString(pwszLocalName).Compare(_T("format")))
+													bIsFormat = false;
+										}
+									}
+								}
+							}
+						}
+					}
+					// Close handles to the child process and its primary thread.
+					// Some applications might keep these handles to monitor the status
+					// of the child process, for example. 
+					CloseHandle(piProcInfo.hProcess);
+					CloseHandle(piProcInfo.hThread);
+				}
+			}
+			CloseHandle(g_hChildStd_OUT_Rd);
+		}
+	}
+}
 const CString & cTiVoFile::SetURL(const CString & csURL)
 {
 	CString csrVal(m_csURL);
@@ -520,7 +783,7 @@ void cTiVoFile::GetTiVoItem(CComPtr<IXmlWriter> & pWriter) const
 			{
 				std::wstringstream ss;
 				if (m_VideoHighDefinition)
-					ss << max(m_SourceSize, m_Duration * 2200);
+					ss << max(m_SourceSize, m_Duration * 10000);
 				else
 					ss << max(m_SourceSize, m_Duration * 1400);
 				pWriter->WriteElementString(NULL, L"SourceSize", NULL, ss.str().c_str());
