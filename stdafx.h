@@ -53,3 +53,4 @@
 #include <memory> // for smart pointers
 #include <xmllite.h>
 #pragma comment(lib, "xmllite")
+#include "CTiVo.h"

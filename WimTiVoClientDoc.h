@@ -22,6 +22,7 @@ protected: // create from serialization only
 
 // Attributes
 public:
+	std::vector<cTiVoFile> FilesToGetFromTiVo;
 
 // Operations
 public:

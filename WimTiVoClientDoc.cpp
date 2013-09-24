@@ -39,21 +39,37 @@ END_MESSAGE_MAP()
 
 CWimTiVoClientDoc::CWimTiVoClientDoc()
 {
+	TRACE(__FUNCTION__ "\n");
 	// TODO: add one-time construction code here
 
 }
 
 CWimTiVoClientDoc::~CWimTiVoClientDoc()
 {
+	TRACE(__FUNCTION__ "\n");
 }
 
 BOOL CWimTiVoClientDoc::OnNewDocument()
 {
+	TRACE(__FUNCTION__ "\n");
 	if (!CDocument::OnNewDocument())
 		return FALSE;
 
 	// TODO: add reinitialization code here
 	// (SDI documents will reuse this document)
+	//if (SUCCEEDED(CoInitializeEx(0, COINIT_MULTITHREADED))) // COINIT_APARTMENTTHREADED
+	//{
+		//XML_Test_FileReformat(_T("D:\\Videos\\chunk-01-0001.xml"), _T("D:/Videos/Evening Magazine (Recorded Mar 26, 2010, KINGDT).1.xml"));
+		//XML_Test_FileReformat(_T("D:\\Videos\\chunk-02-0002.xml"), _T("D:/Videos/Evening Magazine (Recorded Mar 26, 2010, KINGDT).2.xml"));
+		//XML_Test_Read_ElementsOnly();
+		//XML_Test_Read();
+		//XML_Test_Write();
+		//XML_Test_Write_InMemory();
+		CInternetSession serverSession0;
+		XML_Parse_TiVoNowPlaying(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying&Recurse=Yes&SortOrder=!CaptureDate")), FilesToGetFromTiVo, serverSession0);
+		std::sort(FilesToGetFromTiVo.begin(),FilesToGetFromTiVo.end(),cTiVoFileCompareDateReverse);
+	//}
+	//CoUninitialize();
 
 	return TRUE;
 }
@@ -62,6 +78,7 @@ BOOL CWimTiVoClientDoc::OnNewDocument()
 
 void CWimTiVoClientDoc::Serialize(CArchive& ar)
 {
+	TRACE(__FUNCTION__ "\n");
 	if (ar.IsStoring())
 	{
 		// TODO: add storing code here
