@@ -171,24 +171,8 @@ CWimTiVoClientDoc::CWimTiVoClientDoc()
 	if (m_csTiVoFileDestination.IsEmpty()) //HACK: This is temporary to fix a minor thing that Fred may have run into.
 		m_csTiVoFileDestination = szPath;
 
-	TCHAR szLogFilePath[MAX_PATH] = _T("");
-	SHGetFolderPath(NULL, CSIDL_PERSONAL, NULL, 0, szLogFilePath);
-	CString csLogFileName(AfxGetAppName());
-	PathAppend(szLogFilePath, csLogFileName.GetString());
-	PathAddExtension(szLogFilePath, _T(".txt"));
-	m_LogFile.open(szLogFilePath, std::ios_base::out | std::ios_base::app | std::ios_base::ate);
-	if (m_LogFile.is_open())
-	{
-		std::locale mylocale("");   // get global locale
-		m_LogFile.imbue(mylocale);  // imbue global locale
-		m_LogFile << "[" << getTimeISO8601() << "] LogFile Opened" << std::endl;
-		TCHAR filename[1024];
-		unsigned long buffersize = sizeof(filename) / sizeof(TCHAR);
-		// Get the file name that we are running from.
-		GetModuleFileName(AfxGetResourceHandle(), filename, buffersize );
-		m_LogFile << "[                   ] Program: " << CStringA(filename).GetString() << std::endl;
-		m_LogFile << "[                   ] Version: " << CStringA(GetFileVersion(filename)).GetString() << " Built: " __DATE__ " at " __TIME__ << std::endl;
-	}
+	if (AfxGetApp()->GetProfileInt(_T("TiVo"), _T("LogFile"), true)) // I should probably switch this to default to false at some point
+		LogFileOpen();
 }
 
 CWimTiVoClientDoc::~CWimTiVoClientDoc()
@@ -233,11 +217,40 @@ CWimTiVoClientDoc::~CWimTiVoClientDoc()
 	m_ccTiVoServers.Unlock();
 	AfxGetApp()->WriteProfileString(_T("TiVo"), _T("TiVoServerName"), CString(m_TiVoServer.m_machine.c_str()));
 	AfxGetApp()->WriteProfileString(_T("TiVo"),_T("TiVoFileDestination"),m_csTiVoFileDestination);
+	AfxGetApp()->WriteProfileInt(_T("TiVo"), _T("LogFile"), LogFileClose());
+}
+bool CWimTiVoClientDoc::LogFileOpen(void)
+{
+	TCHAR szLogFilePath[MAX_PATH] = _T("");
+	SHGetFolderPath(NULL, CSIDL_PERSONAL, NULL, 0, szLogFilePath);
+	CString csLogFileName(AfxGetAppName());
+	PathAppend(szLogFilePath, csLogFileName.GetString());
+	PathAddExtension(szLogFilePath, _T(".txt"));
+	m_LogFile.open(szLogFilePath, std::ios_base::out | std::ios_base::app | std::ios_base::ate);
+	if (m_LogFile.is_open())
+	{
+		std::locale mylocale("");   // get global locale
+		m_LogFile.imbue(mylocale);  // imbue global locale
+		m_LogFile << "[" << getTimeISO8601() << "] LogFile Opened" << std::endl;
+		TCHAR filename[1024];
+		unsigned long buffersize = sizeof(filename) / sizeof(TCHAR);
+		// Get the file name that we are running from.
+		GetModuleFileName(AfxGetResourceHandle(), filename, buffersize );
+		m_LogFile << "[                   ] Program: " << CStringA(filename).GetString() << std::endl;
+		m_LogFile << "[                   ] Version: " << CStringA(GetFileVersion(filename)).GetString() << " Built: " __DATE__ " at " __TIME__ << std::endl;
+	}
+	return(m_LogFile.is_open());
+}
+bool CWimTiVoClientDoc::LogFileClose(void)
+{
+	bool rval = false;
 	if (m_LogFile.is_open())
 	{
 		m_LogFile << "[" << getTimeISO8601() << "] LogFile Closed" << std::endl;
 		m_LogFile.close();
+		rval = true;
 	}
+	return(rval);
 }
 
 #ifdef SHARED_HANDLERS
@@ -489,23 +502,28 @@ UINT CWimTiVoClientDoc::TiVoTransferFileThread(LPVOID lvp)
 			)
 		{
 			TRACE(_T("Transfer: %s\n"), pDoc->m_TiVoFilesToTransfer.front().GetPathName().GetString());
-			if (pDoc->GetTiVoFile(pDoc->m_TiVoFilesToTransfer.front()))
+			auto TiVoFile = pDoc->m_TiVoFilesToTransfer.front();
+			if (pDoc->GetTiVoFile(TiVoFile))
 			{
 				RetryCount = 0;
-				pDoc->m_TiVoFilesToConvert.push(pDoc->m_TiVoFilesToTransfer.front());
-				TRACE(_T("Pop: %s\n"), pDoc->m_TiVoFilesToTransfer.front().GetPathName().GetString());
-				pDoc->m_TiVoFilesToTransferTotalSize -= pDoc->m_TiVoFilesToTransfer.front().GetSourceSize();
+				pDoc->m_TiVoFilesToConvert.push(TiVoFile);
+				pDoc->m_TiVoFilesToTransferTotalSize -= TiVoFile.GetSourceSize();
+				TRACE(_T("Pop: %s\n"), TiVoFile.GetPathName().GetString());
+				pDoc->m_ccTiVoFilesToTransfer.Lock();
 				pDoc->m_TiVoFilesToTransfer.pop();
+				pDoc->m_ccTiVoFilesToTransfer.Unlock();
 			}
 			else
 			{
 				RetryCount++;
-				TRACE(_T("Retry: %d Transfer Failed: %s \n"), RetryCount, pDoc->m_TiVoFilesToTransfer.front().GetPathName().GetString());
+				TRACE(_T("Retry: %d Transfer Failed: %s \n"), RetryCount, TiVoFile.GetPathName().GetString());
 				if (RetryCount > 2)
 				{
-					TRACE(_T("Pop: %s\n"), pDoc->m_TiVoFilesToTransfer.front().GetPathName().GetString());
-					pDoc->m_TiVoFilesToTransferTotalSize -= pDoc->m_TiVoFilesToTransfer.front().GetSourceSize();
+					TRACE(_T("Pop: %s\n"), TiVoFile.GetPathName().GetString());
+					pDoc->m_TiVoFilesToTransferTotalSize -= TiVoFile.GetSourceSize();
+					pDoc->m_ccTiVoFilesToTransfer.Lock();
 					pDoc->m_TiVoFilesToTransfer.pop();
+					pDoc->m_ccTiVoFilesToTransfer.Unlock();
 				}
 			}
 		}

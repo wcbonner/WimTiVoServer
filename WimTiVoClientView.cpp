@@ -46,6 +46,8 @@ BEGIN_MESSAGE_MAP(CWimTiVoClientView, CListView)
 	ON_UPDATE_COMMAND_UI(ID_FFMPEG, &CWimTiVoClientView::OnUpdateFFMPEG)
 	ON_COMMAND(ID_TIVO_GET_FILES, &CWimTiVoClientView::OnTivoGetFiles)
 	ON_UPDATE_COMMAND_UI(ID_TIVO_GET_FILES, &CWimTiVoClientView::OnUpdateTivoGetFiles)
+	ON_COMMAND(ID_TRANSFER_LOG, &CWimTiVoClientView::OnTransferLog)
+	ON_UPDATE_COMMAND_UI(ID_TRANSFER_LOG, &CWimTiVoClientView::OnUpdateTransferLog)
 	ON_WM_TIMER()
 END_MESSAGE_MAP()
 
@@ -75,37 +77,6 @@ void CWimTiVoClientView::OnInitialUpdate()
 {
 	TRACE(__FUNCTION__ "\n");
 	// TODO: You may populate your ListView with items by directly accessing
-
-	CWimTiVoClientDoc * pDoc = GetDocument();
-	//CMFCRibbonBar* pRibbon = ((CFrameWndEx*) GetTopLevelFrame())->GetRibbonBar();
-	//if ((pRibbon) && (pDoc))
-	//{
-	//	CMFCRibbonComboBox * TiVoList = DYNAMIC_DOWNCAST(CMFCRibbonComboBox, pRibbon->FindByID(ID_TIVO_LIST));
-	//	if (TiVoList)
-	//	{
-	//		for (auto TiVo = pDoc->m_TiVoServers.begin(); TiVo != pDoc->m_TiVoServers.end(); TiVo++)
-	//			TiVoList->AddItem(CString(TiVo->m_machine.c_str()));
-	//		TiVoList->SelectItem(CString(pDoc->m_TiVoServer.m_machine.c_str()));
-	//		// Make sure that something is selected, in case that m_PortName didn't match anything in the list.
-	//		if (TiVoList->GetCurSel() == LB_ERR)
-	//			if (TiVoList->GetCount() > 0)
-	//				TiVoList->SelectItem(0);
-	//		pDoc->m_TiVoServer.m_machine = CStringA(TiVoList->GetItem(TiVoList->GetCurSel())).GetString();
-	//		pDoc->m_ccTiVoServers.Lock();
-	//		auto pServer = std::find(pDoc->m_TiVoServers.begin(), pDoc->m_TiVoServers.end(), pDoc->m_TiVoServer);
-	//		if (pServer != pDoc->m_TiVoServers.end())
-	//			pDoc->m_TiVoServer = *pServer;
-	//		pDoc->m_ccTiVoServers.Unlock();
-	//	}
-	//	// I really want to right align most of the numbers in the edit bozes, but when I use the following code it causes the desriptive label to disapear.
-	//	//CMFCRibbonEdit* pEditTotalSize = DYNAMIC_DOWNCAST(CMFCRibbonEdit, pRibbon->FindByID(ID_TIVO_TOTAL_SIZE));
-	//	//if (pEditTotalSize)
-	//	//{
-	//	//	int TextAlignment = pEditTotalSize->GetTextAlign();
-	//	//	pEditTotalSize->SetTextAlign(ES_RIGHT);
-	//	//}
-	//}
-
 	//  its list control through a call to GetListCtrl().
 	CListCtrl& ListCtrl = GetListCtrl();
 	ListCtrl.ModifyStyle(NULL, LVS_REPORT); // LVS_SORTASCENDING | 
@@ -122,6 +93,7 @@ void CWimTiVoClientView::OnInitialUpdate()
 	ListCtrl.InsertColumn(5, _T("Duration"), LVCFMT_LEFT, 55, 5);
 	ListCtrl.InsertColumn(6, _T("Estimated Size"), LVCFMT_RIGHT, 90, 6);
 
+	CWimTiVoClientDoc * pDoc = GetDocument();
 	if (pDoc)
 	{
 		pDoc->m_TiVoBeaconListenThreadStopRequested = false;
@@ -174,11 +146,11 @@ void CWimTiVoClientView::OnUpdate(CView* pSender, LPARAM lHint, CObject* pHint)
 	if (pDoc)
 	{
 		CListCtrl& ListCtrl = GetListCtrl();
-		if (0 != ListCtrl.DeleteAllItems())
+		if (!(pDoc->m_TiVoTransferFileThreadRunning || pDoc->m_TiVoConvertFileThreadRunning))
 		{
-			ASSERT(ListCtrl.GetItemCount() == 0);
-			//if (!(pDoc->m_TiVoTransferFileThreadRunning || pDoc->m_TiVoConvertFileThreadRunning))
-			//{
+			if (0 != ListCtrl.DeleteAllItems())
+			{
+				ASSERT(ListCtrl.GetItemCount() == 0);
 				for(auto TiVoFile = pDoc->m_TiVoFiles.begin(); TiVoFile != pDoc->m_TiVoFiles.end(); TiVoFile++)
 				{
 					int nItem = ListCtrl.InsertItem(
@@ -200,7 +172,7 @@ void CWimTiVoClientView::OnUpdate(CView* pSender, LPARAM lHint, CObject* pHint)
 					ss << TiVoFile->GetSourceSize();
 					ListCtrl.SetItemText(nItem, 6, CString(ss.str().c_str()));
 				}
-			//}
+			}
 		}
 		CMFCRibbonBar* pRibbon = ((CFrameWndEx*) GetTopLevelFrame())->GetRibbonBar();
 		if (pRibbon)
@@ -420,8 +392,11 @@ void CWimTiVoClientView::OnTivoGetFiles()
 	CWimTiVoClientDoc * pDoc = GetDocument();
 	if (pDoc)
 	{
+		pDoc->m_ccTiVoFilesToTransfer.Lock();
 		while (!pDoc->m_TiVoFilesToTransfer.empty())
 			pDoc->m_TiVoFilesToTransfer.pop();
+		pDoc->m_ccTiVoFilesToTransfer.Unlock();
+
 		pDoc->m_TiVoFilesToTransferTotalSize = 0;
 		CListCtrl& ListCtrl = GetListCtrl();
 		int nItem = -1;
@@ -448,7 +423,9 @@ void CWimTiVoClientView::OnTivoGetFiles()
 							if (pDoc->m_TiVoFiles.end() != TiVoFile)
 							{
 								pDoc->m_TiVoFilesToTransferTotalSize += TiVoFile->GetSourceSize();
+								pDoc->m_ccTiVoFilesToTransfer.Lock();
 								pDoc->m_TiVoFilesToTransfer.push(*TiVoFile);
+								pDoc->m_ccTiVoFilesToTransfer.Unlock();
 							}
 						}
 						#ifdef _DEBUG
@@ -473,7 +450,9 @@ void CWimTiVoClientView::OnTivoGetFiles()
 				std::stringstream  junk;
 				std::locale mylocale("");   // get global locale
 				junk.imbue(mylocale);  // imbue global locale
+				pDoc->m_ccTiVoFilesToTransfer.Lock();
 				junk << pDoc->m_TiVoFilesToTransfer.size();
+				pDoc->m_ccTiVoFilesToTransfer.Unlock();
 				pEditTransferCount->SetEditText(CString(junk.str().c_str()));
 			}
 			CMFCRibbonEdit* pEditTransferSize = DYNAMIC_DOWNCAST(CMFCRibbonEdit, pRibbon->FindByID(ID_TRANSFER_SIZE));
@@ -529,6 +508,40 @@ void CWimTiVoClientView::OnTimer(UINT_PTR nIDEvent)
 				CFrameWndEx* mainFrm = dynamic_cast<CFrameWndEx*>(GetTopLevelFrame());
 				if (mainFrm)
 					mainFrm->SetProgressBarPosition(pDoc->m_CurrentFileProgress);
+				pDoc->m_ccTiVoFilesToTransfer.Lock();
+				std::queue<cTiVoFile> TiVoFilesToTransfer(pDoc->m_TiVoFilesToTransfer);
+				pDoc->m_ccTiVoFilesToTransfer.Unlock();
+				CListCtrl& ListCtrl = GetListCtrl();
+				if (ListCtrl.GetItemCount() != TiVoFilesToTransfer.size())
+				{
+					if (0 != ListCtrl.DeleteAllItems())
+					{
+						int ItemNum = 0;
+						ASSERT(ListCtrl.GetItemCount() == 0);
+						while (!TiVoFilesToTransfer.empty())
+						{
+							int nItem = ListCtrl.InsertItem(
+								LVIF_TEXT | LVIF_STATE,
+								ItemNum++,
+								TiVoFilesToTransfer.front().GetPathName(), 
+								INDEXTOSTATEIMAGEMASK(1), 
+								LVIS_STATEIMAGEMASK, 
+								0,
+								NULL);
+							ListCtrl.SetItemText(nItem, 1, TiVoFilesToTransfer.front().GetTitle());
+							ListCtrl.SetItemText(nItem, 2, TiVoFilesToTransfer.front().GetEpisodeTitle());
+							ListCtrl.SetItemText(nItem, 3, TiVoFilesToTransfer.front().GetDescription());
+							ListCtrl.SetItemText(nItem, 4, TiVoFilesToTransfer.front().GetCaptureDate().Format(_T("%c")));
+							ListCtrl.SetItemText(nItem, 5, CTimeSpan(TiVoFilesToTransfer.front().GetDuration()/1000).Format(_T("%H:%M:%S")));
+							std::stringstream ss;
+							std::locale mylocale("");   // get global locale
+							ss.imbue(mylocale);  // imbue global locale
+							ss << TiVoFilesToTransfer.front().GetSourceSize();
+							ListCtrl.SetItemText(nItem, 6, CString(ss.str().c_str()));
+							TiVoFilesToTransfer.pop();
+						}
+					}
+				}
 			}
 			CString csTitleBar(m_csOriginalTitle);
 			csTitleBar.AppendFormat(_T(" Transferring File: %s %ld %ld B/s"), pDoc->m_CurrentFileName.GetString(), pDoc->m_TiVoFilesToTransferTotalSize, pDoc->m_CurrentFileSpeed);
@@ -572,7 +585,9 @@ void CWimTiVoClientView::OnTimer(UINT_PTR nIDEvent)
 					std::stringstream  junk;
 					std::locale mylocale("");   // get global locale
 					junk.imbue(mylocale);  // imbue global locale
+					pDoc->m_ccTiVoFilesToTransfer.Lock();
 					junk << pDoc->m_TiVoFilesToTransfer.size();
+					pDoc->m_ccTiVoFilesToTransfer.Unlock();
 					pEditTransferCount->SetEditText(CString(junk.str().c_str()));
 				}
 				CMFCRibbonEdit* pEditTransferSize = DYNAMIC_DOWNCAST(CMFCRibbonEdit, pRibbon->FindByID(ID_TRANSFER_SIZE));
@@ -594,4 +609,18 @@ void CWimTiVoClientView::OnTimer(UINT_PTR nIDEvent)
 		CListView::OnTimer(nIDEvent); // If you pass your own timer event to the parent class it will kill off the timer.
 }
 
-
+void CWimTiVoClientView::OnTransferLog()
+{
+	CWimTiVoClientDoc * pDoc = GetDocument();
+	if (pDoc)
+		if (pDoc->m_LogFile.is_open())
+			pDoc->LogFileClose();
+		else
+			pDoc->LogFileOpen();
+}
+void CWimTiVoClientView::OnUpdateTransferLog(CCmdUI *pCmdUI)
+{
+	CWimTiVoClientDoc * pDoc = GetDocument();
+	if (pDoc)
+		pCmdUI->Enable(pDoc->m_LogFile.is_open());
+}

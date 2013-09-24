@@ -38,6 +38,7 @@ public:
 	bool m_bFFMPEG;	// Do we want to convert mpg to an MP4 container file with metadata?
 	bool m_bTiVoDecode;	// Do we want to convert from a .TiVo file to an mpg file with no metadata?
 	CString m_csTiVoFileDestination;	// Location that we will download tivo files
+	CCriticalSection m_ccTiVoFilesToTransfer;
 	std::queue<cTiVoFile> m_TiVoFilesToTransfer;
 	unsigned long long m_TiVoFilesToTransferTotalSize;
 	CTimeSpan m_TotalFileEstimatedTimeRemaining;
@@ -90,4 +91,6 @@ protected:
 #endif // SHARED_HANDLERS
 public:
 	bool GetNowPlaying(void);
+	bool LogFileOpen(void);
+	bool LogFileClose(void);
 };
