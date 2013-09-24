@@ -39,6 +39,9 @@ private:
 	CString m_ContentType;
 	CString m_SourceFormat;
 	CString m_SourceStation;
+	CString m_SourceChannel;
+	CString m_vProgramGenre;
+	CString m_vActor;
 	unsigned long long m_SourceSize;
     unsigned long long m_Duration;
 	CTime m_CaptureDate;

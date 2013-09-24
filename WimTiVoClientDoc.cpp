@@ -818,83 +818,171 @@ UINT CWimTiVoClientDoc::TiVoConvertFileThread(LPVOID lvp)
 	if (pDoc != 0)
 	{
 		pDoc->m_TiVoConvertFileThreadRunning = true;
-		while (!pDoc->m_TiVoConvertFileThreadStopRequested)
+		if (SUCCEEDED(CoInitializeEx(0, COINIT_MULTITHREADED))) // COINIT_APARTMENTTHREADED
 		{
-			if (!pDoc->m_TiVoFilesToConvert.empty())
+			while (!pDoc->m_TiVoConvertFileThreadStopRequested)
 			{
-				pDoc->m_ccTiVoFilesToConvert.Lock();
-				cTiVoFile TiVoFile = pDoc->m_TiVoFilesToConvert.front();
-				pDoc->m_TiVoFilesToConvert.pop();
-				pDoc->m_ccTiVoFilesToConvert.Unlock();
-				CString csTiVoFileName(pDoc->m_csTiVoFileDestination);
-				csTiVoFileName.Append(TiVoFile.GetPathName());
-				CFileStatus status;
-				if (TRUE == CFile::GetStatus(csTiVoFileName, status)) // Test to make sure the .TiVo file exists!
+				if (!pDoc->m_TiVoFilesToConvert.empty())
 				{
-					CString csMPEGPathName(csTiVoFileName);
-					csMPEGPathName.Replace(_T(".TiVo"), _T(".mpeg"));
-					CString csXMLPathName(csTiVoFileName);
-					csXMLPathName.Replace(_T(".TiVo"), _T(".xml"));
-					CString csMP4PathName(csTiVoFileName);
-					csMP4PathName.Replace(_T(".TiVo"), _T(".mp4"));
-					if ((pDoc->m_bTiVoDecode) && (TRUE != CFile::GetStatus(csMPEGPathName, status)))
+					pDoc->m_ccTiVoFilesToConvert.Lock();
+					cTiVoFile TiVoFile = pDoc->m_TiVoFilesToConvert.front();
+					pDoc->m_TiVoFilesToConvert.pop();
+					pDoc->m_ccTiVoFilesToConvert.Unlock();
+					CString csTiVoFileName(pDoc->m_csTiVoFileDestination);
+					csTiVoFileName.Append(TiVoFile.GetPathName());
+					CFileStatus status;
+					if (TRUE == CFile::GetStatus(csTiVoFileName, status)) // Test to make sure the .TiVo file exists!
 					{
-						if (!pDoc->m_csTDCatPath.IsEmpty())
+						CString csMPEGPathName(csTiVoFileName);
+						csMPEGPathName.Replace(_T(".TiVo"), _T(".mpeg"));
+						CString csXMLPathName(csTiVoFileName);
+						csXMLPathName.Replace(_T(".TiVo"), _T(".xml"));
+						CString csMP4PathName(csTiVoFileName);
+						csMP4PathName.Replace(_T(".TiVo"), _T(".mp4"));
+						if ((pDoc->m_bTiVoDecode) && (TRUE != CFile::GetStatus(csMPEGPathName, status)))
 						{
-							if (pDoc->m_LogFile.is_open())
-								pDoc->m_LogFile << "[" << getTimeISO8601() << "]\tspawn: " << CStringA(pDoc->m_csTDCatPath).GetString() << " " << CStringA(pDoc->m_csTDCatPath).GetString() << "  --mak  " << CStringA(TiVoFile.GetMAK()).GetString() << " --out " << CStringA(QuoteFileName(csXMLPathName)).GetString() << " " << CStringA(csXMLPathName).GetString() << " --chunk-2 " << CStringA(QuoteFileName(csTiVoFileName)).GetString() << std::endl;
-							if (-1 == _tspawnl(_P_WAIT, pDoc->m_csTDCatPath.GetString(), pDoc->m_csTDCatPath.GetString(), _T("--mak"), TiVoFile.GetMAK(), _T("--out"), QuoteFileName(csXMLPathName).GetString(), _T("--chunk-2"), QuoteFileName(csTiVoFileName).GetString(), NULL))
-								if (pDoc->m_LogFile.is_open())
-									pDoc->m_LogFile << "[                   ]  _tspawnlp failed: " /* << strerror(errno) */ << std::endl;
-						}
-						if (TRUE == CFile::GetStatus(csXMLPathName, status))
-						{
-							status.m_ctime = status.m_mtime = TiVoFile.GetCaptureDate();
-							CFile::SetStatus(csXMLPathName, status);
-						}
-
-						if (pDoc->m_LogFile.is_open())
-							pDoc->m_LogFile << "[" << getTimeISO8601() << "]\tspawn: " << CStringA(pDoc->m_csTiVoDecodePath).GetString() << " " << CStringA(pDoc->m_csTiVoDecodePath).GetString() << " --mak " << CStringA(TiVoFile.GetMAK()).GetString() << " --out " << CStringA(QuoteFileName(csMPEGPathName)).GetString() << " " << CStringA(QuoteFileName(csTiVoFileName)).GetString() << std::endl;
-						if (-1 == _tspawnl(_P_WAIT, pDoc->m_csTiVoDecodePath.GetString(), pDoc->m_csTiVoDecodePath.GetString(), _T("--mak"), TiVoFile.GetMAK(), _T("--out"), QuoteFileName(csMPEGPathName).GetString(), QuoteFileName(csTiVoFileName).GetString(), NULL))
-							if (pDoc->m_LogFile.is_open())
-								pDoc->m_LogFile << "[                   ]  _tspawnlp failed: " /* << strerror(errno) */ << std::endl;
-						if (TRUE == CFile::GetStatus(csMPEGPathName, status))
-						{
-							status.m_ctime = status.m_mtime = TiVoFile.GetCaptureDate();
-							CFile::SetStatus(csMPEGPathName, status);
-							DeleteFile(csTiVoFileName);
-							if ((pDoc->m_bFFMPEG) && (TRUE != CFile::GetStatus(csMP4PathName, status)))
+							if (!pDoc->m_csTDCatPath.IsEmpty())
 							{
-								CString csTitle(TiVoFile.GetTitle()); while(0 < csTitle.Replace(_T("\""), _T("'"))); csTitle.Insert(0,_T("title=\""));csTitle.Append(_T("\""));
-								CString csShow(TiVoFile.GetTitle()); while(0 < csShow.Replace(_T("\""), _T("'"))); csShow.Insert(0,_T("show=\""));csShow.Append(_T("\""));
-								CString csDescription(TiVoFile.GetDescription()); while(0 < csDescription.Replace(_T("\""), _T("'"))); csDescription.Insert(0,_T("description=\""));csDescription.Append(_T("\""));
-								CString csEpisodeID(TiVoFile.GetEpisodeTitle()); while(0 < csEpisodeID.Replace(_T("\""), _T("'"))); csEpisodeID.Insert(0,_T("episode_id=\""));csEpisodeID.Append(_T("\""));
+								TCHAR lpTempPathBuffer[MAX_PATH];
+								DWORD dwRetVal = GetTempPath(MAX_PATH, lpTempPathBuffer);
+								if (dwRetVal > MAX_PATH || (dwRetVal == 0))
+									_tcscpy_s(lpTempPathBuffer, MAX_PATH, _T("."));
+								//  Generates a temporary file name. 
+								TCHAR szTempFileName[MAX_PATH];  
+								UINT uRetVal = GetTempFileName(lpTempPathBuffer, AfxGetAppName(), 0, szTempFileName);
+								if (uRetVal == 0)
+									std::cout << "[" << getTimeISO8601() << "] GetTempFileName failed" << std::endl;
 								if (pDoc->m_LogFile.is_open())
-									pDoc->m_LogFile << "[" << getTimeISO8601() << "]\tspawn: " << CStringA(pDoc->m_csFFMPEGPath).GetString() << " " << CStringA(pDoc->m_csFFMPEGPath).GetString() << " -i " << CStringA(QuoteFileName(csMPEGPathName)).GetString() << " -metadata " << CStringA(csTitle).GetString() << " -metadata " << CStringA(csShow).GetString() << " -metadata " << CStringA(csDescription).GetString() << " -metadata " << CStringA(csEpisodeID).GetString() << " -vcodec copy -acodec copy -y " << CStringA(QuoteFileName(csMP4PathName)).GetString() << std::endl;
-								if (-1 == _tspawnlp(_P_WAIT, pDoc->m_csFFMPEGPath.GetString(), pDoc->m_csFFMPEGPath.GetString(), _T("-i"), QuoteFileName(csMPEGPathName).GetString(), 
-									_T("-metadata"), csTitle.GetString(),
-									_T("-metadata"), csShow.GetString(),
-									_T("-metadata"), csDescription.GetString(),
-									_T("-metadata"), csEpisodeID.GetString(),
-									_T("-vcodec"), _T("copy"),
-									_T("-acodec"), _T("copy"),
-									_T("-y"), // Cause it to overwrite exiting output files
-									QuoteFileName(csMP4PathName).GetString(), NULL))
+									pDoc->m_LogFile << "[" << getTimeISO8601() << "]\tspawn: " << CStringA(pDoc->m_csTDCatPath).GetString() << " " << CStringA(pDoc->m_csTDCatPath).GetString() << "  --mak  " << CStringA(TiVoFile.GetMAK()).GetString() << " --out " << CStringA(QuoteFileName(szTempFileName)).GetString() << " " << " --chunk-2 " << CStringA(QuoteFileName(csTiVoFileName)).GetString() << std::endl;
+								if (-1 == _tspawnl(_P_WAIT, pDoc->m_csTDCatPath.GetString(), pDoc->m_csTDCatPath.GetString(), _T("--mak"), TiVoFile.GetMAK(), _T("--out"), szTempFileName, _T("--chunk-2"), QuoteFileName(csTiVoFileName).GetString(), NULL))
 									if (pDoc->m_LogFile.is_open())
-										pDoc->m_LogFile << "[                   ]  _tspawnlp failed: " /* << _sys_errlist[errno] */ << std::endl;
+										pDoc->m_LogFile << "[                   ]  _tspawnlp failed: " /* << strerror(errno) */ << std::endl;
+								// crap to clean up a file...  
+								HRESULT hr = S_OK;
+								CComPtr<IXmlReader> pReader; 
+								if (SUCCEEDED(hr = CreateXmlReader(__uuidof(IXmlReader), (void**) &pReader, NULL))) 
+								{
+									if (SUCCEEDED(hr = pReader->SetProperty(XmlReaderProperty_DtdProcessing, DtdProcessing_Prohibit))) 
+									{
+										CComPtr<IStream> spFileStreamOne;
+										if (SUCCEEDED(hr = SHCreateStreamOnFile(szTempFileName, STGM_READ, &spFileStreamOne)))
+										{
+											if (SUCCEEDED(hr = pReader->SetInput(spFileStreamOne))) 
+											{
+												CComPtr<IXmlWriter> pWriter;
+												if (SUCCEEDED(hr = CreateXmlWriter(__uuidof(IXmlWriter), (void**) &pWriter, NULL))) 
+												{
+													CComPtr<IStream> spFileStreamTwo;
+													if (SUCCEEDED(hr = SHCreateStreamOnFile(csXMLPathName.GetString(), STGM_CREATE | STGM_WRITE, &spFileStreamTwo)))
+													{
+														if (SUCCEEDED(hr = pWriter->SetOutput(spFileStreamTwo)))
+														{
+															pWriter->SetProperty(XmlWriterProperty_Indent, TRUE);
+															while (S_OK == (hr = pWriter->WriteNode(pReader, TRUE)));	// loops over entire xml file, writing it out with indenting
+															pWriter->Flush();
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+								DeleteFile(szTempFileName);	// I must delete this file because the zero in the unique field up above causes a file to be created.
+								#ifdef _DEBUG
+								{
+									csXMLPathName.Replace(_T(".xml"), _T(".chunk-1.xml"));
+									uRetVal = GetTempFileName(lpTempPathBuffer, AfxGetAppName(), 0, szTempFileName);
+									if (uRetVal == 0)
+										std::cout << "[" << getTimeISO8601() << "] GetTempFileName failed" << std::endl;
+									if (pDoc->m_LogFile.is_open())
+										pDoc->m_LogFile << "[" << getTimeISO8601() << "]\tspawn: " << CStringA(pDoc->m_csTDCatPath).GetString() << " " << CStringA(pDoc->m_csTDCatPath).GetString() << "  --mak  " << CStringA(TiVoFile.GetMAK()).GetString() << " --out " << CStringA(QuoteFileName(szTempFileName)).GetString() << " " << " --chunk-1 " << CStringA(QuoteFileName(csTiVoFileName)).GetString() << std::endl;
+									if (-1 == _tspawnl(_P_WAIT, pDoc->m_csTDCatPath.GetString(), pDoc->m_csTDCatPath.GetString(), _T("--mak"), TiVoFile.GetMAK(), _T("--out"), szTempFileName, _T("--chunk-1"), QuoteFileName(csTiVoFileName).GetString(), NULL))
+										if (pDoc->m_LogFile.is_open())
+											pDoc->m_LogFile << "[                   ]  _tspawnlp failed: " /* << strerror(errno) */ << std::endl;
+									// crap to clean up a file...  
+									HRESULT hr = S_OK;
+									CComPtr<IXmlReader> pReader; 
+									if (SUCCEEDED(hr = CreateXmlReader(__uuidof(IXmlReader), (void**) &pReader, NULL))) 
+									{
+										if (SUCCEEDED(hr = pReader->SetProperty(XmlReaderProperty_DtdProcessing, DtdProcessing_Prohibit))) 
+										{
+											CComPtr<IStream> spFileStreamOne;
+											if (SUCCEEDED(hr = SHCreateStreamOnFile(szTempFileName, STGM_READ, &spFileStreamOne)))
+											{
+												if (SUCCEEDED(hr = pReader->SetInput(spFileStreamOne))) 
+												{
+													CComPtr<IXmlWriter> pWriter;
+													if (SUCCEEDED(hr = CreateXmlWriter(__uuidof(IXmlWriter), (void**) &pWriter, NULL))) 
+													{
+														CComPtr<IStream> spFileStreamTwo;
+														if (SUCCEEDED(hr = SHCreateStreamOnFile(csXMLPathName.GetString(), STGM_CREATE | STGM_WRITE, &spFileStreamTwo)))
+														{
+															if (SUCCEEDED(hr = pWriter->SetOutput(spFileStreamTwo)))
+															{
+																pWriter->SetProperty(XmlWriterProperty_Indent, TRUE);
+																while (S_OK == (hr = pWriter->WriteNode(pReader, TRUE)));	// loops over entire xml file, writing it out with indenting
+																pWriter->Flush();
+															}
+														}
+													}
+												}
+											}
+										}
+									}
+									DeleteFile(szTempFileName);	// I must delete this file because the zero in the unique field up above causes a file to be created.
+								}
+								#endif
 							}
-							if (TRUE == CFile::GetStatus(csMP4PathName, status))
+							if (TRUE == CFile::GetStatus(csXMLPathName, status))
 							{
 								status.m_ctime = status.m_mtime = TiVoFile.GetCaptureDate();
-								CFile::SetStatus(csMP4PathName, status);
-								DeleteFile(csMPEGPathName);
+								CFile::SetStatus(csXMLPathName, status);
+							}
+
+							if (pDoc->m_LogFile.is_open())
+								pDoc->m_LogFile << "[" << getTimeISO8601() << "]\tspawn: " << CStringA(pDoc->m_csTiVoDecodePath).GetString() << " " << CStringA(pDoc->m_csTiVoDecodePath).GetString() << " --mak " << CStringA(TiVoFile.GetMAK()).GetString() << " --out " << CStringA(QuoteFileName(csMPEGPathName)).GetString() << " " << CStringA(QuoteFileName(csTiVoFileName)).GetString() << std::endl;
+							if (-1 == _tspawnl(_P_WAIT, pDoc->m_csTiVoDecodePath.GetString(), pDoc->m_csTiVoDecodePath.GetString(), _T("--mak"), TiVoFile.GetMAK(), _T("--out"), QuoteFileName(csMPEGPathName).GetString(), QuoteFileName(csTiVoFileName).GetString(), NULL))
+								if (pDoc->m_LogFile.is_open())
+									pDoc->m_LogFile << "[                   ]  _tspawnlp failed: " /* << strerror(errno) */ << std::endl;
+							if (TRUE == CFile::GetStatus(csMPEGPathName, status))
+							{
+								status.m_ctime = status.m_mtime = TiVoFile.GetCaptureDate();
+								CFile::SetStatus(csMPEGPathName, status);
+								DeleteFile(csTiVoFileName);
+								if ((pDoc->m_bFFMPEG) && (TRUE != CFile::GetStatus(csMP4PathName, status)))
+								{
+									CString csTitle(TiVoFile.GetTitle()); while(0 < csTitle.Replace(_T("\""), _T("'"))); csTitle.Insert(0,_T("title=\""));csTitle.Append(_T("\""));
+									CString csShow(TiVoFile.GetTitle()); while(0 < csShow.Replace(_T("\""), _T("'"))); csShow.Insert(0,_T("show=\""));csShow.Append(_T("\""));
+									CString csDescription(TiVoFile.GetDescription()); while(0 < csDescription.Replace(_T("\""), _T("'"))); csDescription.Insert(0,_T("description=\""));csDescription.Append(_T("\""));
+									CString csEpisodeID(TiVoFile.GetEpisodeTitle()); while(0 < csEpisodeID.Replace(_T("\""), _T("'"))); csEpisodeID.Insert(0,_T("episode_id=\""));csEpisodeID.Append(_T("\""));
+									if (pDoc->m_LogFile.is_open())
+										pDoc->m_LogFile << "[" << getTimeISO8601() << "]\tspawn: " << CStringA(pDoc->m_csFFMPEGPath).GetString() << " " << CStringA(pDoc->m_csFFMPEGPath).GetString() << " -i " << CStringA(QuoteFileName(csMPEGPathName)).GetString() << " -metadata " << CStringA(csTitle).GetString() << " -metadata " << CStringA(csShow).GetString() << " -metadata " << CStringA(csDescription).GetString() << " -metadata " << CStringA(csEpisodeID).GetString() << " -vcodec copy -acodec copy -y " << CStringA(QuoteFileName(csMP4PathName)).GetString() << std::endl;
+									if (-1 == _tspawnlp(_P_WAIT, pDoc->m_csFFMPEGPath.GetString(), pDoc->m_csFFMPEGPath.GetString(), _T("-i"), QuoteFileName(csMPEGPathName).GetString(), 
+										_T("-metadata"), csTitle.GetString(),
+										_T("-metadata"), csShow.GetString(),
+										_T("-metadata"), csDescription.GetString(),
+										_T("-metadata"), csEpisodeID.GetString(),
+										_T("-vcodec"), _T("copy"),
+										_T("-acodec"), _T("copy"),
+										_T("-y"), // Cause it to overwrite exiting output files
+										QuoteFileName(csMP4PathName).GetString(), NULL))
+										if (pDoc->m_LogFile.is_open())
+											pDoc->m_LogFile << "[                   ]  _tspawnlp failed: " /* << _sys_errlist[errno] */ << std::endl;
+								}
+								if (TRUE == CFile::GetStatus(csMP4PathName, status))
+								{
+									status.m_ctime = status.m_mtime = TiVoFile.GetCaptureDate();
+									CFile::SetStatus(csMP4PathName, status);
+									DeleteFile(csMPEGPathName);
+								}
 							}
 						}
 					}
 				}
+				else
+					Sleep(1000);
 			}
-			else
-				Sleep(1000);
+			CoUninitialize();
 		}
 		pDoc->m_TiVoConvertFileThreadRunning = false;
 	}
