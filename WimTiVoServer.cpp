@@ -612,6 +612,7 @@ class cTiVoServer
 	std::string m_services;
 };
 extern "C" {
+#include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavutil/dict.h>
 }
@@ -662,31 +663,81 @@ public:
 			LastChangeDate.Format(_T("%#0x"),TimeDiff.GetTotalSeconds());
 
 			AVFormatContext *fmt_ctx = NULL;
-			AVDictionaryEntry *tag = NULL;
-			int ret = avformat_open_input(&fmt_ctx, CStringA(csPathName).GetString(), NULL, NULL);
-			if (ret == 0)
+			if (0 == avformat_open_input(&fmt_ctx, CStringA(csPathName).GetString(), NULL, NULL))
 			{
-				while (tag = av_dict_get(fmt_ctx->metadata, "", tag, AV_DICT_IGNORE_SUFFIX))
+				if(0 <= avformat_find_stream_info(fmt_ctx, NULL))					
 				{
-					#ifdef _DEBUG
-					cout << "[                   ] " << setw(20) << right << tag->key << " : " << tag->value << endl;
-					#endif
-					if (_stricmp("title", tag->key) == 0)
-						Title = CString(tag->value);
-					if (_stricmp("WM/SubTitle", tag->key) == 0)
-						EpisodeTitle = CString(tag->value);
-					if (_stricmp("WM/SubTitleDescription", tag->key) == 0)
-						Description = CString(tag->value);
-					if (_stricmp("Duration", tag->key) == 0)
+					if (fmt_ctx->duration != AV_NOPTS_VALUE) 
 					{
-						std::stringstream ss(std::string(tag->value), std::stringstream::in | std::stringstream::out);
-						ss >> Duration;
-						// Duration should now be in 100-nanosecond units. The TiVo wants it in 1/1000 of a second units. http://msdn.microsoft.com/en-us/library/windows/desktop/ff384862(v=vs.85).aspx
-						Duration /= 1000;
+						Duration = fmt_ctx->duration + 5000;
+						int secs = Duration / AV_TIME_BASE;
+						int us = Duration % AV_TIME_BASE;
+						int mins = secs / 60;
+						secs %= 60;
+						int hours = mins / 60;
+						mins %= 60;
+						cout << "[                   ] " << setw(20) << right << "Duration: " << " : ";
+						char oldfill = cout.fill('0');
+						streamsize oldwidth = cout.width(2);
+						cout << hours << ":" << mins << ":" << secs << "." << ((100 * us) / AV_TIME_BASE) << endl;
+						cout.width(oldwidth);
+						cout.fill(oldfill);
+					}
+					SourceFormat.Append(_T("video/"));
+					SourceFormat.Append(CString(CStringA(fmt_ctx->iformat->name)));
+					//av_dump_format(fmt_ctx, 0, CStringA(csPathName).GetString(), 0);
+
+					//// Find the first video stream
+					//int videoStream=-1;
+					//for(int i = 0; i < fmt_ctx->nb_streams; i++)
+					//	if(fmt_ctx->streams[i]->codec->codec_type == AVMEDIA_TYPE_VIDEO) 
+					//	{
+					//		videoStream=i;
+					//		break;
+					//	}
+					//if(videoStream != -1)
+					//{
+					//	//Duration = fmt_ctx->streams[videoStream]->duration;
+					//	//cout << "fmt_ctx->streams[videoStream]->duration " << fmt_ctx->streams[videoStream]->duration << endl;
+					//	//cout << "fmt_ctx->streams[videoStream]->time_base " << fmt_ctx->streams[videoStream]->time_base << endl;
+					//	// Get a pointer to the codec context for the video stream
+					//	AVCodecContext *pCodecCtx=fmt_ctx->streams[videoStream]->codec;
+
+					//	// Find the decoder for the video stream
+					//	AVCodec *pCodec=avcodec_find_decoder(pCodecCtx->codec_id);
+					//	if(pCodec==NULL) 
+					//		cout << "Unsupported codec!" << endl;
+					//	else
+					//	{
+					//		// Open codec
+					//		if(avcodec_open(pCodecCtx, pCodec)<0)
+					//			cout << "Could not open codec!" << endl;
+					//		else
+					//			avcodec_close(pCodecCtx);
+					//	}
+					//}
+					// This next section looks at metadata
+					AVDictionaryEntry *tag = NULL;
+					while (tag = av_dict_get(fmt_ctx->metadata, "", tag, AV_DICT_IGNORE_SUFFIX))
+					{
+						#ifdef _DEBUG
+						cout << "[                   ] " << setw(20) << right << tag->key << " : " << tag->value << endl;
+						#endif
+						if (_stricmp("title", tag->key) == 0)
+							Title = CString(tag->value);
+						if (_stricmp("WM/SubTitle", tag->key) == 0)
+							EpisodeTitle = CString(tag->value);
+						if (_stricmp("WM/SubTitleDescription", tag->key) == 0)
+							Description = CString(tag->value);
+						//if (_stricmp("Duration", tag->key) == 0)
+						//{
+						//	std::stringstream ss(std::string(tag->value), std::stringstream::in | std::stringstream::out);
+						//	ss >> Duration;
+						//	// Duration should now be in 100-nanosecond units. The TiVo wants it in 1/1000 of a second units. http://msdn.microsoft.com/en-us/library/windows/desktop/ff384862(v=vs.85).aspx
+						//	Duration /= 1000;
+						//}
 					}
 				}
-				SourceFormat.Append(_T("video/"));
-				SourceFormat.Append(CString(CStringA(fmt_ctx->iformat->name)));
 				avformat_close_input(&fmt_ctx);
 			}
 
@@ -704,7 +755,12 @@ public:
 			_tmakepath_s(path_buffer, _MAX_PATH, drive, dir, fname, ext);
 			csURL.Append(path_buffer);
 			csURL.Replace(_T("\\"), _T("/"));
+			csURL.Remove(_T(':'));
 			// see WinHttpCreateUrl for useful info http://msdn.microsoft.com/en-us/library/windows/desktop/aa384093(v=vs.85).aspx
+			TCHAR lpszBuffer[_MAX_PATH];
+			DWORD dwBufferLength = sizeof(lpszBuffer) / sizeof(TCHAR);
+			InternetCanonicalizeUrl(csURL.GetString(), lpszBuffer, &dwBufferLength, ICU_BROWSER_MODE);
+			csURL = CString(lpszBuffer, dwBufferLength);
 			if (Title.IsEmpty())
 				Title = fname;
 		}
@@ -1986,23 +2042,144 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 								serverFile->QueryInfoStatusCode(dwRet);
 								if(dwRet == HTTP_STATUS_OK)
 								{
-									std::stringstream OutPutFileName;
-									//std::stringstream ReturnedData;
-									OutPutFileName << "WimTivoServer." << FileIndex++ << ".xml";
-									std::ofstream OutputFile(OutPutFileName.str());
-									std::cout << "[" << getTimeISO8601() << "] file contents: **--**" << endl;
-									char ittybittybuffer;
-									while (0 < serverFile->Read(&ittybittybuffer, sizeof(ittybittybuffer)))
+									CComPtr<IStream> spMemoryStreamOne(::SHCreateMemStream(NULL, 0));
+									CComPtr<IStream> spMemoryStreamTwo(::SHCreateMemStream(NULL, 0));
+									if ((spMemoryStreamOne != NULL) && (spMemoryStreamTwo != NULL))
 									{
-										//ReturnedData << ittybittybuffer;
-										//std::cout << ittybittybuffer;
-										if (OutputFile.is_open())
-											OutputFile << ittybittybuffer;
+										char ittybittybuffer;
+										ULONG cbWritten;
+										while (0 < serverFile->Read(&ittybittybuffer, sizeof(ittybittybuffer)))
+											spMemoryStreamOne->Write(&ittybittybuffer, 1, &cbWritten);
+
+										// reposition back to beginning of stream
+										LARGE_INTEGER position;
+										position.QuadPart = 0;
+										spMemoryStreamOne->Seek(position, STREAM_SEEK_SET, NULL);
+
+										HRESULT hr = S_OK;
+										CComPtr<IXmlReader> pReader; 
+										if (FAILED(hr = CreateXmlReader(__uuidof(IXmlReader), (void**) &pReader, NULL))) 
+											std::cout << "[" << getTimeISO8601() << "] Error creating xml reader, error is: " << hex << hr << endl;
+										else
+										{
+											if (FAILED(hr = pReader->SetProperty(XmlReaderProperty_DtdProcessing, DtdProcessing_Prohibit))) 
+												std::cout << "[" << getTimeISO8601() << "] Error setting XmlReaderProperty_DtdProcessing, error is: " << hex << showbase << setfill('0') << setw(8) << hr << endl;
+											else
+											{
+												if (FAILED(hr = pReader->SetInput(spMemoryStreamOne))) 
+													std::cout << "[" << getTimeISO8601() << "] Error setting input for reader, error is: " << hex << hr << endl;
+												else
+												{
+													CComPtr<IXmlWriter> pWriter;
+													if (FAILED(hr = CreateXmlWriter(__uuidof(IXmlWriter), (void**) &pWriter, NULL))) 
+														std::cout << "[" << getTimeISO8601() << "] Error creating xml writer, error is: " << hex << hr << endl;
+													else
+													{
+														pWriter->SetOutput(spMemoryStreamTwo);
+														pWriter->SetProperty(XmlWriterProperty_Indent, TRUE);
+
+														int indentlevel = 0;
+				 										XmlNodeType nodeType; 
+														const WCHAR* pwszPrefix; 
+														const WCHAR* pwszLocalName; 
+														const WCHAR* pwszValue; 
+														const WCHAR* pwszNamespaceURI; 
+														UINT cwchPrefix; 
+														//read until there are no more nodes 
+														while (S_OK == (hr = pReader->Read(&nodeType))) 
+														{ 
+															switch (nodeType) 
+															{ 
+															case XmlNodeType_XmlDeclaration: 
+																//std::cout << "[                   ] XmlDeclaration" << endl;
+																pWriter->WriteStartDocument(XmlStandalone_Omit);
+																break; 
+															case XmlNodeType_Element: 
+																if (FAILED(hr = pReader->GetPrefix(&pwszPrefix, &cwchPrefix))) 
+																	std::cout << "[                   ] Error getting prefix, error is " << hex << hr << endl;
+																if (FAILED(hr = pReader->GetLocalName(&pwszLocalName, NULL))) 
+																	std::cout << "[                   ] Error getting local name, error is" << hex << hr << endl;
+																//if (cwchPrefix > 0) 
+																//	std::wcout << L"[                   ] " << Indent(indentlevel) << L"Element: " << pwszPrefix << L":" << pwszLocalName << endl;
+																//else 
+																//	std::wcout << L"[                   ] " << Indent(indentlevel) << L"Element: " << pwszLocalName << endl;
+																//if (pReader->IsEmptyElement() ) 
+																//	std::cout << "[                   ] (empty)" << endl;
+																indentlevel++;
+																pReader->GetNamespaceUri(&pwszNamespaceURI, NULL);
+																pWriter->WriteStartElement(pwszPrefix, pwszLocalName, pwszNamespaceURI);
+																break; 
+															case XmlNodeType_EndElement: 
+																if (FAILED(hr = pReader->GetPrefix(&pwszPrefix, &cwchPrefix))) 
+																	std::cout << "[                   ] Error getting prefix, error is " << hex << hr << endl;
+																if (FAILED(hr = pReader->GetLocalName(&pwszLocalName, NULL))) 
+																	std::cout << "[                   ] Error getting local name, error is" << hex << hr << endl;
+																//if (cwchPrefix > 0) 
+																//	std::wcout << L"[                   ] " << Indent(indentlevel) << L"End Element: " << pwszPrefix << L":" << pwszLocalName << endl;
+																//else 
+																//	std::wcout << L"[                   ] " << Indent(indentlevel) << L"End Element: " << pwszLocalName << endl;
+																indentlevel--;
+																pWriter->WriteEndElement();
+																break; 
+															case XmlNodeType_Text: 
+															case XmlNodeType_Whitespace: 
+																if (FAILED(hr = pReader->GetValue(&pwszValue, NULL))) 
+																	std::cout << "[                   ] Error getting value, error is " << hex << hr << endl;
+																//std::wcout << L"[                   ] " << Indent(indentlevel) << L"Text: >" << pwszValue << L"<" << endl;
+																pWriter->WriteString(pwszValue);
+																break; 
+															case XmlNodeType_CDATA: 
+																//if (FAILED(hr = pReader->GetValue(&pwszValue, NULL))) 
+																//	wprintf(L"Error getting value, error is %08.8lx", hr); 
+																//wprintf(L"CDATA: %s\n", pwszValue); 
+																break; 
+															case XmlNodeType_ProcessingInstruction: 
+																//if (FAILED(hr = pReader->GetLocalName(&pwszLocalName, NULL))) 
+																//	wprintf(L"Error getting name, error is %08.8lx", hr); 
+																//if (FAILED(hr = pReader->GetValue(&pwszValue, NULL))) 
+																//	wprintf(L"Error getting value, error is %08.8lx", hr); 
+																//wprintf(L"Processing Instruction name:%s value:%s\n", pwszLocalName, pwszValue); 
+																break; 
+															case XmlNodeType_Comment: 
+																if (FAILED(hr = pReader->GetValue(&pwszValue, NULL))) 
+																	std::cout << "[                   ] Error getting value, error is " << hex << hr << endl;
+																//std::wcout << L"[                   ] " << Indent(indentlevel) << L"Comment: " << pwszValue << endl;
+																break; 
+															case XmlNodeType_DocumentType: 
+																//std::cout << "[                   ] DOCTYPE is not printed" << endl;
+																break; 
+															} 
+														} 
+														pWriter->WriteEndDocument();
+														pWriter->Flush();
+
+														// Allocates enough memeory for the xml content.
+														STATSTG ssStreamData = {0};
+														spMemoryStreamTwo->Stat(&ssStreamData, STATFLAG_NONAME);
+														SIZE_T cbSize = ssStreamData.cbSize.LowPart;
+														char *XMLDataBuff = new char[cbSize+1];
+
+														// Copies the content from the stream to the buffer.
+														LARGE_INTEGER position;
+														position.QuadPart = 0;
+														spMemoryStreamTwo->Seek(position, STREAM_SEEK_SET, NULL);
+
+														ULONG cbRead;
+														spMemoryStreamTwo->Read(XMLDataBuff, cbSize, &cbRead);
+														XMLDataBuff[cbSize] = '\0';
+														std::stringstream OutPutFileName;
+														//std::stringstream ReturnedData;
+														OutPutFileName << "WimTivoServer." << FileIndex++ << ".xml";
+														std::ofstream OutputFile(OutPutFileName.str(), ios_base::binary);
+														if (OutputFile.is_open())
+															OutputFile.write(XMLDataBuff,cbSize);
+														OutputFile.close();
+														delete[] XMLDataBuff;
+													}
+												}
+											}
+										}
 									}
-									std::cout << "**--**" << endl;
-									OutputFile.close();
-									XML_Test_Read_ElementsOnly(CString(OutPutFileName.str().c_str()));
-									//ReturnedData.str().c_str();
 								}
 								serverFile->Close();
 							}
@@ -2047,12 +2224,9 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 			terminateEvent = CreateEvent(0,TRUE,FALSE,0);
 			if (terminateEvent != NULL) 
 			{
-				threadHandle = AfxBeginThread(HTTPMain, NULL, THREAD_PRIORITY_NORMAL, 0, CREATE_SUSPENDED);
+				threadHandle = AfxBeginThread(HTTPMain, NULL);
 				if (threadHandle != NULL)
 				{
-					threadHandle->m_bAutoDelete = false;
-					threadHandle->ResumeThread();
-
 					DWORD dwVersion = GetVersion();
 					int dwMajorVersion = (int)(LOBYTE(LOWORD(dwVersion)));
 					int dwMinorVersion = (int)(HIBYTE(LOWORD(dwVersion)));
@@ -2108,11 +2282,6 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 
 					if (terminateEvent)
 						CloseHandle(terminateEvent);
-					if (threadHandle)
-					{
-						delete threadHandle;
-						threadHandle = NULL;
-					}
 				}
 			}
 		}
