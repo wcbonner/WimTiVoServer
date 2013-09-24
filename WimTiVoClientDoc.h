@@ -47,6 +47,7 @@ public:
 	unsigned long long m_CurrentFileSize;
 	unsigned long long m_CurrentFileSpeed;
 	CTimeSpan m_CurrentFileEstimatedTimeRemaining;
+	CCriticalSection m_ccTiVoFilesToConvert;
 	std::queue<cTiVoFile> m_TiVoFilesToConvert;
 	std::ofstream m_LogFile;
 

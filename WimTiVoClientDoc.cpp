@@ -228,6 +228,47 @@ CWimTiVoClientDoc::~CWimTiVoClientDoc()
 	{
 		std::stringstream ssKey;
 		ssKey << "Container-" << (Container - m_TiVoContainers.begin());
+		if (!Container->m_MAK.empty())
+		{
+			CString csURL(Container->m_url.c_str());
+			TCHAR szScheme[_MAX_PATH];
+			DWORD dwSchemeLength = sizeof(szScheme) / sizeof(TCHAR);
+			TCHAR szHostName[_MAX_PATH];
+			DWORD dwHostNameLength = sizeof(szHostName) / sizeof(TCHAR);
+			TCHAR szUserName[_MAX_PATH];
+			DWORD dwUserNameLength = sizeof(szUserName) / sizeof(TCHAR);
+			TCHAR szPassword[_MAX_PATH];
+			DWORD dwPasswordLength = sizeof(szPassword) / sizeof(TCHAR);
+			TCHAR szUrlPath[_MAX_PATH];
+			DWORD dwUrlPathLength = sizeof(szUrlPath) / sizeof(TCHAR);
+			TCHAR szExtraInfo[_MAX_PATH];
+			DWORD dwExtraInfoLength = sizeof(szExtraInfo) / sizeof(TCHAR);		
+			URL_COMPONENTS crackedURL;
+			crackedURL.dwStructSize = sizeof(URL_COMPONENTS);
+			crackedURL.lpszScheme = szScheme;					// pointer to scheme name
+			crackedURL.dwSchemeLength = dwSchemeLength;			// length of scheme name
+			crackedURL.nScheme;									// enumerated scheme type (if known)
+			crackedURL.lpszHostName = szHostName;				// pointer to host name
+			crackedURL.dwHostNameLength = dwHostNameLength;		// length of host name
+			crackedURL.nPort;									// converted port number
+			crackedURL.lpszUserName = szUserName;				// pointer to user name
+			crackedURL.dwUserNameLength = dwUserNameLength;		// length of user name
+			crackedURL.lpszPassword = szPassword;				// pointer to password
+			crackedURL.dwPasswordLength = dwPasswordLength;		// length of password
+			crackedURL.lpszUrlPath = szUrlPath;					// pointer to URL-path
+			crackedURL.dwUrlPathLength = dwUrlPathLength;		// length of URL-path
+			crackedURL.lpszExtraInfo = szExtraInfo;				// pointer to extra information (e.g. ?foo or #foo)
+			crackedURL.dwExtraInfoLength = dwExtraInfoLength;	// length of extra information
+			if (TRUE == InternetCrackUrl(csURL.GetString(), csURL.GetLength(), ICU_DECODE, &crackedURL))
+			{
+				std::stringstream ss;
+				ss << CStringA(crackedURL.lpszScheme).GetString() << "://";
+				ss << "tivo:" << Container->m_MAK << "@";
+				ss << CStringA(crackedURL.lpszHostName).GetString() << ":" << crackedURL.nPort;
+				ss << CStringA(crackedURL.lpszUrlPath).GetString() << CStringA(crackedURL.lpszExtraInfo).GetString(); // << "&Recurse=Yes" "&SortOrder=!CaptureDate";
+				Container->m_url = ss.str();
+			}
+		}
 		AfxGetApp()->WriteProfileString(_T("TiVo"), CString(ssKey.str().c_str()), CString(Container->WriteTXT().c_str()));
 	}
 	m_ccTiVoContainers.Unlock();
@@ -539,11 +580,15 @@ UINT CWimTiVoClientDoc::TiVoTransferFileThread(LPVOID lvp)
 			)
 		{
 			TRACE(_T("Transfer: %s\n"), pDoc->m_TiVoFilesToTransfer.front().GetPathName().GetString());
+			pDoc->m_ccTiVoFilesToConvert.Lock();
 			auto TiVoFile = pDoc->m_TiVoFilesToTransfer.front();
+			pDoc->m_ccTiVoFilesToConvert.Unlock();
 			if (pDoc->GetTiVoFile(TiVoFile))
 			{
 				RetryCount = 0;
+				pDoc->m_ccTiVoFilesToConvert.Lock();
 				pDoc->m_TiVoFilesToConvert.push(TiVoFile);
+				pDoc->m_ccTiVoFilesToConvert.Unlock();
 				pDoc->m_TiVoFilesToTransferTotalSize -= TiVoFile.GetSourceSize();
 				TRACE(_T("Pop: %s\n"), TiVoFile.GetPathName().GetString());
 				pDoc->m_ccTiVoFilesToTransfer.Lock();
@@ -688,6 +733,8 @@ bool CWimTiVoClientDoc::GetTiVoFile(const cTiVoFile & TiVoFile) //, CInternetSes
 								CFile::SetStatus(m_CurrentFileName, status);
 							}
 						}
+						else if (m_LogFile.is_open())
+							m_LogFile << "[" << getTimeISO8601() << "] Could not open file: " << CStringA(QuoteFileName(TiVoFile.GetPathName())).GetString() << std::endl;
 					}
 					else
 					{
@@ -759,8 +806,10 @@ UINT CWimTiVoClientDoc::TiVoConvertFileThread(LPVOID lvp)
 		{
 			if (!pDoc->m_TiVoFilesToConvert.empty())
 			{
+				pDoc->m_ccTiVoFilesToConvert.Lock();
 				cTiVoFile TiVoFile = pDoc->m_TiVoFilesToConvert.front();
 				pDoc->m_TiVoFilesToConvert.pop();
+				pDoc->m_ccTiVoFilesToConvert.Unlock();
 				CString csTiVoFileName(pDoc->m_csTiVoFileDestination);
 				csTiVoFileName.Append(TiVoFile.GetPathName());
 				CFileStatus status;
