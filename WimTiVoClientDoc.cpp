@@ -720,6 +720,11 @@ bool CWimTiVoClientDoc::GetTiVoFile(const cTiVoFile & TiVoFile) //, CInternetSes
 									m_CurrentFileEstimatedTimeRemaining = CTimeSpan((TiVoFile.GetSourceSize() - m_CurrentFileSize) / m_CurrentFileSpeed);
 									m_TotalFileEstimatedTimeRemaining = CTimeSpan((m_TiVoFilesToTransferTotalSize - m_CurrentFileSize) / m_CurrentFileSpeed);
 								}
+								if (m_CurrentFileSize > TiVoFile.GetSourceSize())
+								{
+									m_CurrentFileProgress = 100;
+									m_CurrentFileEstimatedTimeRemaining = 0;
+								}
 							}
 							OutputFile.close();
 							if (m_LogFile.is_open())

@@ -312,7 +312,7 @@ void CWimTiVoClientView::OnUpdateTiVoNowplaying(CCmdUI *pCmdUI)
 {
 	CWimTiVoClientDoc * pDoc = GetDocument();
 	if (pDoc)
-		pCmdUI->Enable(!(pDoc->m_TiVoTransferFileThreadRunning || pDoc->m_TiVoConvertFileThreadRunning));
+		pCmdUI->Enable(!(pDoc->m_TiVoTransferFileThreadRunning));
 }
 void CWimTiVoClientView::OnTivoBeacon()
 {
@@ -547,7 +547,7 @@ void CWimTiVoClientView::OnUpdateTivoGetFiles(CCmdUI *pCmdUI)
 {
 	CWimTiVoClientDoc * pDoc = GetDocument();
 	if (pDoc)
-		pCmdUI->Enable(!(pDoc->m_TiVoTransferFileThreadRunning || pDoc->m_TiVoConvertFileThreadRunning));
+		pCmdUI->Enable(!(pDoc->m_TiVoTransferFileThreadRunning));
 }
 void CWimTiVoClientView::OnTimer(UINT_PTR nIDEvent)
 {
