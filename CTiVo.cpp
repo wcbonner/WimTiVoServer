@@ -192,7 +192,10 @@ void cTiVoFile::SetFromTiVoItem(const CString &csTitle, const CString &csEpisode
 	ssFileName << csTitle.GetString();
 	if (!csEpisodeTitle.IsEmpty())
 		ssFileName << L" - ''" << csEpisodeTitle.GetString() << L"''";
-	ssFileName << L" (Recorded " << m_CaptureDate.Format(_T("%b %d, %Y, ")).GetString() << m_SourceStation.GetString() << L").TiVo";
+	ssFileName << L" (Recorded " << m_CaptureDate.Format(_T("%b %d, %Y")).GetString();
+	if (!m_SourceStation.IsEmpty())
+		ssFileName << ", " << m_SourceStation.GetString();
+	ssFileName << L").TiVo";
 	m_csPathName = ssFileName.str().c_str();
 	m_csPathName.Replace(_T(":"),_T("_")); // http://msdn.microsoft.com/en-us/library/system.io.path.getinvalidfilenamechars.aspx should be further examined
 }
