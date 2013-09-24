@@ -208,6 +208,7 @@ int GetTiVoConnect(SOCKET DataSocket)
 					pWriter->WriteFullEndElement();
 					pWriter->WriteStartElement(NULL,_T("Title"),NULL);
 						pWriter->WriteString(CString(MyHostName).GetString());
+						pWriter->WriteString(_T(" (WimTiVoServer)"));
 					pWriter->WriteFullEndElement();
 					pWriter->WriteStartElement(NULL,_T("TotalItems"),NULL);
 						pWriter->WriteString(_T("1"));
@@ -224,6 +225,7 @@ int GetTiVoConnect(SOCKET DataSocket)
 						pWriter->WriteFullEndElement();
 						pWriter->WriteStartElement(NULL,_T("Title"),NULL);
 							pWriter->WriteString(CString(MyHostName).GetString());
+							pWriter->WriteString(_T(" (WimTiVoServer)"));
 						pWriter->WriteFullEndElement();
 						pWriter->WriteStartElement(NULL,_T("UniqueId"),NULL);
 							pWriter->WriteString(_T("TivoHD"));
@@ -261,10 +263,6 @@ int GetTiVoConnect(SOCKET DataSocket)
 		if (cbSize >= sizeof(XMLDataBuff))
 			cbSize = sizeof(XMLDataBuff)-1;
 
-		LPWSTR pwszContent = (WCHAR*) new BYTE[cbSize + sizeof(WCHAR)];
-		if (pwszContent == NULL)
-			return E_OUTOFMEMORY;
-
 		// Copies the content from the stream to the buffer.
 		LARGE_INTEGER position;
 		position.QuadPart = 0;
@@ -279,7 +277,7 @@ int GetTiVoConnect(SOCKET DataSocket)
 		strcpy(XMLDataBuff,"<?xml version=\"1.0\" encoding=\"iso-8859-1\" ?>\n");
 		strcat(XMLDataBuff,"<TiVoContainer>\n");
 		strcat(XMLDataBuff,"  <Details>\n");
-		strcat(XMLDataBuff,"    <Title>"); strcat(XMLDataBuff, MyHostName); strcat(XMLDataBuff,"</Title>\n");
+		strcat(XMLDataBuff,"    <Title>"); strcat(XMLDataBuff, MyHostName); strcat(XMLDataBuff," (WimTiVoServer)</Title>\n");
 		strcat(XMLDataBuff,"    <ContentType>x-tivo-container/tivo-server</ContentType>\n");
 		strcat(XMLDataBuff,"    <SourceFormat>x-tivo-container/folder</SourceFormat>\n");
 		strcat(XMLDataBuff,"    <TotalItems>1</TotalItems>\n");
@@ -1391,723 +1389,688 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 	int nRetCode = 0;
 
 	HMODULE hModule = ::GetModuleHandle(NULL);
-
-	if (hModule != NULL)
+	if (hModule == NULL)
+		std::cout << "[" << getTimeISO8601() << "] Fatal Error: GetModuleHandle failed " << ++nRetCode << endl;
+	else if (!AfxWinInit(hModule, NULL, ::GetCommandLine(), 0)) // initialize MFC and print and error on failure
+		std::cout << "[" << getTimeISO8601() << "] Fatal Error: MFC initialization failed " << ++nRetCode << endl;
+	else if (!AfxSocketInit())
+		std::cout << "[" << getTimeISO8601() << "] Fatal Error: Sockets initialization failed " << ++nRetCode << endl;
+	else
 	{
-		// initialize MFC and print and error on failure
-		if (!AfxWinInit(hModule, NULL, ::GetCommandLine(), 0))
-		{
-			// TODO: change error code to suit your needs
-			_tprintf(_T("Fatal Error: MFC initialization failed\n"));
-			nRetCode = 1;
-		}
-		else
-		if (!AfxSocketInit())
-		{
-			_tprintf(_T("Fatal Error: Sockets initialization failed\n"));
-		}
-		else
-		{
-			//theApp.SetRegistryKey(_T("WimsWorld"));
-			CString Parameters(theApp.m_lpCmdLine);
-			if (argc > 1)
-				Parameters = argv[1];
-			TCHAR UserNameBuff[256];
-			DWORD UserNameSize = sizeof(UserNameBuff)/sizeof(TCHAR);
-			GetUserName(UserNameBuff,&UserNameSize); // this is "wim" when I run it.
-			CString UserName(UserNameBuff,UserNameSize);
+		//theApp.SetRegistryKey(_T("WimsWorld"));
+		CString Parameters(theApp.m_lpCmdLine);
+		if (argc > 1)
+			Parameters = argv[1];
+		TCHAR UserNameBuff[256];
+		DWORD UserNameSize = sizeof(UserNameBuff)/sizeof(TCHAR);
+		GetUserName(UserNameBuff,&UserNameSize); // this is "wim" when I run it.
+		CString UserName(UserNameBuff,UserNameSize);
 
-			CString csMyProgramGuid(theApp.GetProfileString(_T("Settings"), _T("GUID")));
-			if (csMyProgramGuid.IsEmpty())
+		CString csMyProgramGuid(theApp.GetProfileString(_T("Settings"), _T("GUID")));
+		if (csMyProgramGuid.IsEmpty())
+		{
+			GUID MyProgramGuid;
+			if (S_OK == CoCreateGuid(&MyProgramGuid))
 			{
-				GUID MyProgramGuid;
-				if (S_OK == CoCreateGuid(&MyProgramGuid))
-				{
-					OLECHAR MyProgramGuidString[40] = {0};
-					StringFromGUID2(MyProgramGuid, MyProgramGuidString, sizeof(MyProgramGuidString) / sizeof(OLECHAR));
-					csMyProgramGuid = CString(MyProgramGuidString);
-					theApp.WriteProfileString(_T("Settings"), _T("GUID"), csMyProgramGuid);
-				}
+				OLECHAR MyProgramGuidString[40] = {0};
+				StringFromGUID2(MyProgramGuid, MyProgramGuidString, sizeof(MyProgramGuidString) / sizeof(OLECHAR));
+				csMyProgramGuid = CString(MyProgramGuidString);
+				theApp.WriteProfileString(_T("Settings"), _T("GUID"), csMyProgramGuid);
 			}
+		}
 
-			CString csMyHostName;
-			if (csMyHostName.IsEmpty())
-			{
-				char MyHostName[255]; // winsock hostname used for data recordkeeping
-				gethostname(MyHostName,sizeof(MyHostName)); 
-				csMyHostName = MyHostName;
-			}
+		CString csMyHostName;
+		if (csMyHostName.IsEmpty())
+		{
+			char MyHostName[255]; // winsock hostname used for data recordkeeping
+			gethostname(MyHostName,sizeof(MyHostName)); 
+			csMyHostName = MyHostName;
+		}
 
-			const char * BuildDateTime = "<BuildDateTime>" __DATE__ " " __TIME__ "</BuildDateTime>";
-			char cmonth[4];
-			int year, day, hour, min, sec;
-			sscanf(&(BuildDateTime[15]),"%s %d %d %d:%d:%d",cmonth,&day,&year,&hour,&min,&sec);
-			const char * Months[] = { "Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec" };
-			int month = 0;
-			while (strcmp(cmonth,Months[month]) != 0)
-				month++;
+		const char * BuildDateTime = "<BuildDateTime>" __DATE__ " " __TIME__ "</BuildDateTime>";
+		char cmonth[4];
+		int year, day, hour, min, sec;
+		sscanf(&(BuildDateTime[15]),"%s %d %d %d:%d:%d",cmonth,&day,&year,&hour,&min,&sec);
+		const char * Months[] = { "Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec" };
+		int month = 0;
+		while (strcmp(cmonth,Months[month]) != 0)
 			month++;
-			CString csBuildDateTime;
-			csBuildDateTime.Format(_T("%04d%02d%02d%02d%02d%02d"),year,month,day,hour,min,sec);
+		month++;
+		CString csBuildDateTime;
+		csBuildDateTime.Format(_T("%04d%02d%02d%02d%02d%02d"),year,month,day,hour,min,sec);
 
-			if (Parameters.CompareNoCase( _T("-?") ) == 0)
+		if (Parameters.CompareNoCase( _T("-?") ) == 0)
+		{
+			CString csBox;
+			csBox += _T("Optional Parameters:\n");
+			csBox += _T("\t-install\n");
+			csBox += _T("\t-remove\n");
+			csBox += _T("\t-ClearRegistry\n");
+			_tprintf(csBox);
+		}
+		// install this program in the service control manager
+		else if (Parameters.CompareNoCase( _T("-install") ) == 0)
+		{
+			SC_HANDLE scm = OpenSCManager(0,0,SC_MANAGER_CREATE_SERVICE);
+			if (scm != NULL)
 			{
-				CString csBox;
-				csBox += _T("Optional Parameters:\n");
-				csBox += _T("\t-install\n");
-				csBox += _T("\t-remove\n");
-				csBox += _T("\t-ClearRegistry\n");
-				_tprintf(csBox);
-			}
-			// install this program in the service control manager
-			else if (Parameters.CompareNoCase( _T("-install") ) == 0)
-			{
-				SC_HANDLE scm = OpenSCManager(0,0,SC_MANAGER_CREATE_SERVICE);
-				if (scm != NULL)
+				// Get the file name that we are running from.
+				TCHAR tcModuleFileName[MAX_PATH];
+				unsigned long buffersize = sizeof(tcModuleFileName)/sizeof(TCHAR);
+				GetModuleFileName(AfxGetResourceHandle(), tcModuleFileName, buffersize );
+				DWORD ModuleFileNameBytes = (_tcslen(tcModuleFileName) + 1) * sizeof(TCHAR);
+				SC_HANDLE newService = CreateService(
+					scm,
+					theApp.m_pszAppName,
+					_T("WimTiVoServer"),
+					SERVICE_ALL_ACCESS,
+					SERVICE_WIN32_OWN_PROCESS,
+					SERVICE_AUTO_START,
+					SERVICE_ERROR_NORMAL,
+					tcModuleFileName,
+					0,0,0,0,0);
+				if (newService != NULL)
 				{
-					// Get the file name that we are running from.
-					TCHAR tcModuleFileName[MAX_PATH];
-					unsigned long buffersize = sizeof(tcModuleFileName)/sizeof(TCHAR);
-					GetModuleFileName(AfxGetResourceHandle(), tcModuleFileName, buffersize );
-					DWORD ModuleFileNameBytes = (_tcslen(tcModuleFileName) + 1) * sizeof(TCHAR);
-					SC_HANDLE newService = CreateService(
-						scm,
-						theApp.m_pszAppName,
-						_T("WimTiVoServer"),
-						SERVICE_ALL_ACCESS,
-						SERVICE_WIN32_OWN_PROCESS,
-						SERVICE_AUTO_START,
-						SERVICE_ERROR_NORMAL,
-						tcModuleFileName,
-						0,0,0,0,0);
-					if (newService != NULL)
-					{
-						// successfully installed the service
-						// Add a description to the entry.
-						SERVICE_DESCRIPTION servdesc;
-						servdesc.lpDescription = _TEXT("WimsWorld TiVo Server");
-						ChangeServiceConfig2(newService,SERVICE_CONFIG_DESCRIPTION,&servdesc);
+					// successfully installed the service
+					// Add a description to the entry.
+					SERVICE_DESCRIPTION servdesc;
+					servdesc.lpDescription = _TEXT("WimsWorld TiVo Server");
+					ChangeServiceConfig2(newService,SERVICE_CONFIG_DESCRIPTION,&servdesc);
 
-						// set up the event log stuff.
-						// Add your source name as a subkey under the Application 
-						// key in the EventLog registry key. 
-						HKEY hk; 
-						CString csRegKey("SYSTEM\\CurrentControlSet\\Services\\EventLog\\Application\\");
+					// set up the event log stuff.
+					// Add your source name as a subkey under the Application 
+					// key in the EventLog registry key. 
+					HKEY hk; 
+					CString csRegKey("SYSTEM\\CurrentControlSet\\Services\\EventLog\\Application\\");
+					csRegKey.Append(theApp.m_pszAppName);
+					if (ERROR_SUCCESS == RegCreateKey(HKEY_LOCAL_MACHINE,csRegKey, &hk))
+					{
+						// Add the name to the EventMessageFile subkey. 
+						RegSetValueEx(hk,		// subkey handle 
+							_T("EventMessageFile"),	// value name 
+							0,					// must be zero 
+							REG_EXPAND_SZ,		// value type 
+							(LPBYTE) tcModuleFileName,	// pointer to value data 
+							ModuleFileNameBytes);// length of value data 
+						// Set the supported event types in the TypesSupported subkey.
+						DWORD dwData = EVENTLOG_ERROR_TYPE | EVENTLOG_WARNING_TYPE | EVENTLOG_INFORMATION_TYPE;
+						RegSetValueEx(hk,		// subkey handle 
+							_T("TypesSupported"),	// value name 
+							0,					// must be zero 
+							REG_DWORD,			// value type 
+							(LPBYTE) &dwData,	// pointer to value data 
+							sizeof(DWORD));		// length of value data 
+						RegCloseKey(hk); 
+						// Here I atempt to write a message
+						_tprintf(_T("Sucessfully installed %s as a service\n"),tcModuleFileName);
+						HANDLE h = RegisterEventSource(NULL,  // uses local computer 
+									theApp.m_pszAppName);	// source name 
+						if (h != NULL) 
+						{
+							CString csSubstitutionText(tcModuleFileName);
+							LPCTSTR lpStrings[] = { LPCTSTR(csSubstitutionText), NULL };
+							ReportEvent(h,			// event log handle 
+								EVENTLOG_INFORMATION_TYPE,// event type 
+								0,					// category zero 
+								WIMSWORLD_EVENT_INSTALL,// event identifier 
+								NULL,				// no user security identifier 
+								1,					// one substitution string 
+								0,					// no data 
+								lpStrings,			// pointer to string array 
+								NULL);				// pointer to data 
+							DeregisterEventSource(h);
+						}
+					}
+					CloseServiceHandle(newService);
+				}
+				CloseServiceHandle(scm);
+			}
+		}
+		// remove this program from the service control manager
+		else if (Parameters.CompareNoCase( _T("-remove") ) == 0)
+		{
+			SC_HANDLE scm = OpenSCManager(0,0,SC_MANAGER_CREATE_SERVICE);
+			if (scm != NULL)
+			{
+				SC_HANDLE theService = OpenService(
+					scm,
+					theApp.m_pszAppName,
+					SERVICE_ALL_ACCESS | DELETE);
+				if (theService != NULL)
+				{
+					SERVICE_STATUS status;
+					if (QueryServiceStatus(theService,&status))
+					{
+						if (status.dwCurrentState != SERVICE_STOPPED)
+						{
+							ControlService(theService,SERVICE_CONTROL_STOP,&status);
+							Sleep(5000);
+						}
+						DeleteService(theService);
+						// Here I atempt to write a message
+						HANDLE h = RegisterEventSource(NULL,  // uses local computer 
+									theApp.m_pszAppName);	// source name 
+						if (h != NULL) 
+						{
+							CString csSubstitutionText(theApp.m_pszAppName);
+							LPCTSTR lpStrings[] = { csSubstitutionText.GetString(), NULL };
+							ReportEvent(h,			// event log handle 
+								EVENTLOG_INFORMATION_TYPE,// event type 
+								0,					// category zero 
+								WIMSWORLD_EVENT_REMOVE,	// event identifier 
+								NULL,				// no user security identifier 
+								1,					// one substitution string 
+								0,					// no data 
+								lpStrings,			// pointer to string array 
+								NULL);				// pointer to data 
+							DeregisterEventSource(h);
+						}
+						// remove the ability to write to the application log
+						CString csRegKey(_T("SYSTEM\\CurrentControlSet\\Services\\EventLog\\Application\\"));
 						csRegKey.Append(theApp.m_pszAppName);
-						if (ERROR_SUCCESS == RegCreateKey(HKEY_LOCAL_MACHINE,csRegKey, &hk))
-						{
-							// Add the name to the EventMessageFile subkey. 
-							RegSetValueEx(hk,		// subkey handle 
-								_T("EventMessageFile"),	// value name 
-								0,					// must be zero 
-								REG_EXPAND_SZ,		// value type 
-								(LPBYTE) tcModuleFileName,	// pointer to value data 
-								ModuleFileNameBytes);// length of value data 
-							// Set the supported event types in the TypesSupported subkey.
-							DWORD dwData = EVENTLOG_ERROR_TYPE | EVENTLOG_WARNING_TYPE | EVENTLOG_INFORMATION_TYPE;
-							RegSetValueEx(hk,		// subkey handle 
-								_T("TypesSupported"),	// value name 
-								0,					// must be zero 
-								REG_DWORD,			// value type 
-								(LPBYTE) &dwData,	// pointer to value data 
-								sizeof(DWORD));		// length of value data 
-							RegCloseKey(hk); 
-							// Here I atempt to write a message
-							_tprintf(_T("Sucessfully installed %s as a service\n"),tcModuleFileName);
-							HANDLE h = RegisterEventSource(NULL,  // uses local computer 
-										theApp.m_pszAppName);	// source name 
-							if (h != NULL) 
-							{
-								CString csSubstitutionText(tcModuleFileName);
-								LPCTSTR lpStrings[] = { LPCTSTR(csSubstitutionText), NULL };
-								ReportEvent(h,			// event log handle 
-									EVENTLOG_INFORMATION_TYPE,// event type 
-									0,					// category zero 
-									WIMSWORLD_EVENT_INSTALL,// event identifier 
-									NULL,				// no user security identifier 
-									1,					// one substitution string 
-									0,					// no data 
-									lpStrings,			// pointer to string array 
-									NULL);				// pointer to data 
-								DeregisterEventSource(h);
-							}
-						}
-						CloseServiceHandle(newService);
+						RegDeleteKey(HKEY_LOCAL_MACHINE,csRegKey);
+						_tprintf(_T("Sucessfully removed the service %s\n"),theApp.m_pszAppName);
 					}
-					CloseServiceHandle(scm);
+					CloseServiceHandle(theService);
 				}
+				CloseServiceHandle(scm);
 			}
-			// remove this program from the service control manager
-			else if (Parameters.CompareNoCase( _T("-remove") ) == 0)
+		}
+		else if (Parameters.CompareNoCase( _T("-ClearRegistry") ) == 0)
+		{
+			_tprintf(_T("Removing Registry Entries\n"));
+			CString csRegKey(_T("Software\\WimsWorld\\"));
+			csRegKey.Append(theApp.m_pszAppName);
+			theApp.DelRegTree(HKEY_CURRENT_USER, csRegKey);
+		}
+		// If I'm running as SYSTEM, I assume that I'm running as a service.
+		else if (UserName.CompareNoCase(_T("SYSTEM")) == 0)
+		{
+			ApplicationLogHandle = RegisterEventSource(NULL,theApp.m_pszAppName);
+			if (ApplicationLogHandle != NULL) 
 			{
-				SC_HANDLE scm = OpenSCManager(0,0,SC_MANAGER_CREATE_SERVICE);
-				if (scm != NULL)
-				{
-					SC_HANDLE theService = OpenService(
-						scm,
-						theApp.m_pszAppName,
-						SERVICE_ALL_ACCESS | DELETE);
-					if (theService != NULL)
-					{
-						SERVICE_STATUS status;
-						if (QueryServiceStatus(theService,&status))
-						{
-							if (status.dwCurrentState != SERVICE_STOPPED)
-							{
-								ControlService(theService,SERVICE_CONTROL_STOP,&status);
-								Sleep(5000);
-							}
-							DeleteService(theService);
-							// Here I atempt to write a message
-							HANDLE h = RegisterEventSource(NULL,  // uses local computer 
-										theApp.m_pszAppName);	// source name 
-							if (h != NULL) 
-							{
-								CString csSubstitutionText(theApp.m_pszAppName);
-								LPCTSTR lpStrings[] = { csSubstitutionText.GetString(), NULL };
-								ReportEvent(h,			// event log handle 
-									EVENTLOG_INFORMATION_TYPE,// event type 
-									0,					// category zero 
-									WIMSWORLD_EVENT_REMOVE,	// event identifier 
-									NULL,				// no user security identifier 
-									1,					// one substitution string 
-									0,					// no data 
-									lpStrings,			// pointer to string array 
-									NULL);				// pointer to data 
-								DeregisterEventSource(h);
-							}
-							// remove the ability to write to the application log
-							CString csRegKey(_T("SYSTEM\\CurrentControlSet\\Services\\EventLog\\Application\\"));
-							csRegKey.Append(theApp.m_pszAppName);
-							RegDeleteKey(HKEY_LOCAL_MACHINE,csRegKey);
-							_tprintf(_T("Sucessfully removed the service %s\n"),theApp.m_pszAppName);
-						}
-						CloseServiceHandle(theService);
-					}
-					CloseServiceHandle(scm);
-				}
+				CString csSubstitutionText;
+				csSubstitutionText.Format(_T("Service %s has been started by %s"), theApp.m_pszAppName, UserNameBuff);
+				LPCTSTR lpStrings[] = { csSubstitutionText.GetString(), NULL };
+				ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
 			}
-			else if (Parameters.CompareNoCase( _T("-ClearRegistry") ) == 0)
+			SERVICE_TABLE_ENTRY serviceTable[] =
 			{
-				_tprintf(_T("Removing Registry Entries\n"));
-				CString csRegKey(_T("Software\\WimsWorld\\"));
-				csRegKey.Append(theApp.m_pszAppName);
-				theApp.DelRegTree(HKEY_CURRENT_USER, csRegKey);
+				//{ m_pszAppName, (LPSERVICE_MAIN_FUNCTION) ServiceMain },
+				{ NULL, (LPSERVICE_MAIN_FUNCTION) ServiceMain },
+				{ NULL, NULL }
+			};
+			serviceTable[0].lpServiceName = (LPWSTR) theApp.m_pszAppName;
+			BOOL success = StartServiceCtrlDispatcher(serviceTable);
+			if (ApplicationLogHandle != NULL) 
+			{
+				CString csSubstitutionText;
+				csSubstitutionText.Format(_T("StartServiceCtrlDispatcher returned %d (TRUE = %d)"), success, TRUE);
+				LPCTSTR lpStrings[] = { LPCTSTR(csSubstitutionText), NULL };
+				ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
+				DeregisterEventSource(ApplicationLogHandle);
 			}
-			// If I'm running as SYSTEM, I assume that I'm running as a service.
-			else if (UserName.CompareNoCase(_T("SYSTEM")) == 0)
-			{
-				ApplicationLogHandle = RegisterEventSource(NULL,theApp.m_pszAppName);
-				if (ApplicationLogHandle != NULL) 
-				{
-					CString csSubstitutionText;
-					csSubstitutionText.Format(_T("Service %s has been started by %s"), theApp.m_pszAppName, UserNameBuff);
-					LPCTSTR lpStrings[] = { csSubstitutionText.GetString(), NULL };
-					ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
-				}
-				SERVICE_TABLE_ENTRY serviceTable[] =
-				{
-					//{ m_pszAppName, (LPSERVICE_MAIN_FUNCTION) ServiceMain },
-					{ NULL, (LPSERVICE_MAIN_FUNCTION) ServiceMain },
-					{ NULL, NULL }
-				};
-				serviceTable[0].lpServiceName = (LPWSTR) theApp.m_pszAppName;
-				BOOL success = StartServiceCtrlDispatcher(serviceTable);
-				if (ApplicationLogHandle != NULL) 
-				{
-					CString csSubstitutionText;
-					csSubstitutionText.Format(_T("StartServiceCtrlDispatcher returned %d (TRUE = %d)"), success, TRUE);
-					LPCTSTR lpStrings[] = { LPCTSTR(csSubstitutionText), NULL };
-					ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
-					DeregisterEventSource(ApplicationLogHandle);
-				}
-			}
-			// Otherwise I assume I've been run in a console window
-			else
-			{
-				bConsoleExists = true;
-				cout << "[" << getTimeISO8601() << "] Running Application from the command line." << endl;
-				cout << "[" << getTimeISO8601() << "] Built on " << __DATE__ << " at " <<  __TIME__ << endl;
-				cout << "[" << getTimeISO8601() << "] Use key combination Ctrl-C to end the program." << endl;
+		}
+		// Otherwise I assume I've been run in a console window
+		else
+		{
+			bConsoleExists = true;
+			std::cout << "[" << getTimeISO8601() << "] Running Application from the command line." << endl;
+			std::cout << "[" << getTimeISO8601() << "] Built on " << __DATE__ << " at " <<  __TIME__ << endl;
+			std::cout << "[" << getTimeISO8601() << "] Use key combination Ctrl-C to end the program." << endl;
 
-				char szDescription[8][32] = {
-					"NetBIOS", 
-					"DNS hostname", 
-					"DNS domain", 
-					"DNS fully-qualified", 
-					"Physical NetBIOS", 
-					"Physical DNS hostname", 
-					"Physical DNS domain", 
-					"Physical DNS fully-qualified"};
-				TCHAR buffer[256] = TEXT("");
-				DWORD dwSize = sizeof(buffer);
-				cout << "[" << getTimeISO8601() << "] Determining Machine name with various methods:" << endl;
-				for (int cnf = 0; cnf < ComputerNameMax; cnf++)
+			char szDescription[8][32] = {
+				"NetBIOS", 
+				"DNS hostname", 
+				"DNS domain", 
+				"DNS fully-qualified", 
+				"Physical NetBIOS", 
+				"Physical DNS hostname", 
+				"Physical DNS domain", 
+				"Physical DNS fully-qualified"};
+			TCHAR buffer[256] = TEXT("");
+			DWORD dwSize = sizeof(buffer);
+			std::cout << "[" << getTimeISO8601() << "] Determining Machine name with various methods:" << endl;
+			for (int cnf = 0; cnf < ComputerNameMax; cnf++)
+			{
+				if (!GetComputerNameEx((COMPUTER_NAME_FORMAT)cnf, buffer, &dwSize))
 				{
-					if (!GetComputerNameEx((COMPUTER_NAME_FORMAT)cnf, buffer, &dwSize))
+					std::cout << "[" << getTimeISO8601() << "] GetComputerNameEx failed (" << GetLastError() << ")" << endl;
+					break;
+				}
+				else
+					std::cout << "[" << getTimeISO8601() << "] " << setw(28) << right << szDescription[cnf] << " : " << left << CStringA(buffer).GetString() << endl;
+				dwSize = _countof(buffer);
+				ZeroMemory(buffer, dwSize);
+			}
+
+			if (S_OK == CoInitializeEx(0, COINIT_MULTITHREADED)) // COINIT_APARTMENTTHREADED
+			{
+				HRESULT hr = S_OK;
+				//CComPtr<IXmlReader> pReader; 
+				//if (FAILED(hr = CreateXmlReader(__uuidof(IXmlReader), (void**) &pReader, NULL))) 
+				//	std::cout << "[" << getTimeISO8601() << "] Error creating xml reader, error is: " << hex << hr << endl;
+				//else
+				//{
+				//	if (FAILED(hr = pReader->SetProperty(XmlReaderProperty_DtdProcessing, DtdProcessing_Prohibit))) 
+				//		std::cout << "[" << getTimeISO8601() << "] Error setting XmlReaderProperty_DtdProcessing, error is: " << hex << hr << endl;
+				//	else
+				//	{
+				//		//Open read-only input stream 
+				//		CComPtr<IStream> pFileStream;
+				//		if (FAILED(hr = SHCreateStreamOnFile(_T("WimTivoServer.0.xml"), STGM_READ, &pFileStream))) 
+				//			std::cout << "[" << getTimeISO8601() << "] Error creating file reader, error is: " << hex << hr << endl;
+				//		else
+				//		{
+				//			if (FAILED(hr = pReader->SetInput(pFileStream))) 
+				//				std::cout << "[" << getTimeISO8601() << "] Error setting input for reader, error is: " << hex << hr << endl;
+				//			else
+				//			{
+				// 				XmlNodeType nodeType; 
+				//				const WCHAR* pwszPrefix; 
+				//				const WCHAR* pwszLocalName; 
+				//				const WCHAR* pwszValue; 
+				//				UINT cwchPrefix; 
+				//				//read until there are no more nodes 
+				//				while (S_OK == (hr = pReader->Read(&nodeType))) 
+				//				{ 
+				//					switch (nodeType) 
+				//					{ 
+				//					case XmlNodeType_XmlDeclaration: 
+				//						wprintf(L"XmlDeclaration\n"); 
+				//						if (FAILED(hr = WriteAttributes(pReader))) 
+				//							wprintf(L"Error writing attributes, error is %08.8lx", hr); 
+				//						break; 
+				//					case XmlNodeType_Element: 
+				//						if (FAILED(hr = pReader->GetPrefix(&pwszPrefix, &cwchPrefix))) 
+				//							wprintf(L"Error getting prefix, error is %08.8lx", hr); 
+				//						if (FAILED(hr = pReader->GetLocalName(&pwszLocalName, NULL))) 
+				//							wprintf(L"Error getting local name, error is %08.8lx", hr); 
+				//						if (cwchPrefix > 0) 
+				//							wprintf(L"Element: %s:%s\n", pwszPrefix, pwszLocalName); 
+				//						else 
+				//							wprintf(L"Element: %s\n", pwszLocalName);  
+				//						if (FAILED(hr = WriteAttributes(pReader))) 
+				//							wprintf(L"Error writing attributes, error is %08.8lx", hr); 
+				//						if (pReader->IsEmptyElement() ) 
+				//							wprintf(L" (empty)"); 
+				//						break; 
+				//					case XmlNodeType_EndElement: 
+				//						if (FAILED(hr = pReader->GetPrefix(&pwszPrefix, &cwchPrefix))) 
+				//							wprintf(L"Error getting prefix, error is %08.8lx", hr); 
+				//						if (FAILED(hr = pReader->GetLocalName(&pwszLocalName, NULL))) 
+				//							wprintf(L"Error getting local name, error is %08.8lx", hr); 
+				//						if (cwchPrefix > 0) 
+				//							wprintf(L"End Element: %s:%s\n", pwszPrefix, pwszLocalName); 
+				//						else 
+				//							wprintf(L"End Element: %s\n", pwszLocalName); 
+				//						break; 
+				//					case XmlNodeType_Text: 
+				//					case XmlNodeType_Whitespace: 
+				//						if (FAILED(hr = pReader->GetValue(&pwszValue, NULL))) 
+				//							wprintf(L"Error getting value, error is %08.8lx", hr); 
+				//						wprintf(L"Text: >%s<\n", pwszValue); 
+				//						break; 
+				//					case XmlNodeType_CDATA: 
+				//						if (FAILED(hr = pReader->GetValue(&pwszValue, NULL))) 
+				//							wprintf(L"Error getting value, error is %08.8lx", hr); 
+				//						wprintf(L"CDATA: %s\n", pwszValue); 
+				//						break; 
+				//					case XmlNodeType_ProcessingInstruction: 
+				//						if (FAILED(hr = pReader->GetLocalName(&pwszLocalName, NULL))) 
+				//							wprintf(L"Error getting name, error is %08.8lx", hr); 
+				//						if (FAILED(hr = pReader->GetValue(&pwszValue, NULL))) 
+				//							wprintf(L"Error getting value, error is %08.8lx", hr); 
+				//						wprintf(L"Processing Instruction name:%s value:%s\n", pwszLocalName, pwszValue); 
+				//						break; 
+				//					case XmlNodeType_Comment: 
+				//						if (FAILED(hr = pReader->GetValue(&pwszValue, NULL))) 
+				//							wprintf(L"Error getting value, error is %08.8lx", hr); 
+				//						wprintf(L"Comment: %s\n", pwszValue); 
+				//						break; 
+				//					case XmlNodeType_DocumentType: 
+				//						wprintf(L"DOCTYPE is not printed\n"); 
+				//						break; 
+				//					} 
+				//				} 
+				//			}
+				//		}
+				//	}
+				//}
+
+				CComPtr<IXmlWriter> pWriter;
+				if (FAILED(hr = CreateXmlWriter(__uuidof(IXmlWriter), (void**) &pWriter, NULL))) 
+					std::cout << "[" << getTimeISO8601() << "] Error creating xml writer, error is: " << hex << hr << endl;
+				else
+				{
+					// from: http://stackoverflow.com/questions/3037946/how-can-i-store-xml-in-buffer-using-xmlite
+					CComPtr<IStream> spMemoryStream;
+					// Opens writeable output stream.
+					spMemoryStream.Attach(::SHCreateMemStream(NULL, 0));
+					if (spMemoryStream != NULL)
 					{
-						cout << "[" << getTimeISO8601() << "] GetComputerNameEx failed (" << GetLastError() << ")" << endl;
-						break;
+						CComPtr<IXmlWriterOutput> pWriterOutput;
+						CreateXmlWriterOutputWithEncodingName(spMemoryStream, NULL, L"utf-16", &pWriterOutput);
+						pWriter->SetOutput(pWriterOutput);
+						//pWriter->SetOutput(spMemoryStream);
+						pWriter->SetProperty(XmlWriterProperty_Indent, TRUE);
+						pWriter->WriteStartDocument(XmlStandalone_Omit);
+							pWriter->WriteStartElement(NULL,_T("TiVoContainer"),_T("http://www.tivo.com/developer/calypso-protocol-1.6/"));
+								pWriter->WriteStartElement(NULL,_T("Details"),NULL);
+									pWriter->WriteStartElement(NULL,_T("ContentType"),NULL);
+										pWriter->WriteString(_T("x-tivo-container/tivo-server"));
+									pWriter->WriteFullEndElement();
+									pWriter->WriteStartElement(NULL,_T("SourceFormat"),NULL);
+										pWriter->WriteString(_T("x-tivo-container/tivo-dvr"));
+									pWriter->WriteFullEndElement();
+									pWriter->WriteStartElement(NULL,_T("Title"),NULL);
+										pWriter->WriteString(_T("TivoHD"));
+									pWriter->WriteFullEndElement();
+									pWriter->WriteStartElement(NULL,_T("TotalItems"),NULL);
+										pWriter->WriteString(_T("1"));
+									pWriter->WriteFullEndElement();
+								pWriter->WriteFullEndElement();	// Details
+
+								pWriter->WriteStartElement(NULL,_T("ItemStart"),NULL);
+									pWriter->WriteString(_T("0"));
+								pWriter->WriteFullEndElement();
+								pWriter->WriteStartElement(NULL,_T("ItemCount"),NULL);
+									pWriter->WriteString(_T("1"));
+								pWriter->WriteFullEndElement();
+
+								pWriter->WriteStartElement(NULL,_T("Item"),NULL);
+									pWriter->WriteStartElement(NULL,_T("Details"),NULL);
+										pWriter->WriteStartElement(NULL,_T("ContentType"),NULL);
+											pWriter->WriteString(_T("x-tivo-container/tivo-videos"));
+										pWriter->WriteFullEndElement();
+										pWriter->WriteStartElement(NULL,_T("SourceFormat"),NULL);
+											pWriter->WriteString(_T("x-tivo-container/tivo-dvr"));
+										pWriter->WriteFullEndElement();
+										pWriter->WriteStartElement(NULL,_T("Title"),NULL);
+											pWriter->WriteString(_T("TivoHD"));
+										pWriter->WriteFullEndElement();
+										pWriter->WriteStartElement(NULL,_T("UniqueId"),NULL);
+											pWriter->WriteString(_T("TivoHD"));
+										pWriter->WriteFullEndElement();
+									pWriter->WriteFullEndElement();	// Details
+									pWriter->WriteStartElement(NULL,_T("Links"),NULL);
+										pWriter->WriteStartElement(NULL,_T("Content"),NULL);
+											pWriter->WriteStartElement(NULL,_T("Url"),NULL);
+												pWriter->WriteString(_T("https://192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=%2FNowPlaying"));
+											pWriter->WriteFullEndElement();
+											pWriter->WriteStartElement(NULL,_T("ContentType"),NULL);
+												pWriter->WriteString(_T("x-tivo-container/tivo-videos"));
+											pWriter->WriteFullEndElement();
+										pWriter->WriteFullEndElement();	// Content
+									pWriter->WriteFullEndElement();	// Links
+								pWriter->WriteFullEndElement();	// Item
+							pWriter->WriteFullEndElement();	// TiVoContainer
+						pWriter->WriteEndDocument();
+						pWriter->Flush();
+
+						// Allocates enough memeory for the xml content.
+						STATSTG ssStreamData = {0};
+						spMemoryStream->Stat(&ssStreamData, STATFLAG_NONAME);
+						SIZE_T cbSize = ssStreamData.cbSize.LowPart;
+						LPWSTR pwszContent = (WCHAR*) new BYTE[cbSize + sizeof(WCHAR)];
+						if (pwszContent == NULL)
+							return E_OUTOFMEMORY;
+
+						// Copies the content from the stream to the buffer.
+						LARGE_INTEGER position;
+						position.QuadPart = 0;
+						spMemoryStream->Seek(position, STREAM_SEEK_SET, NULL);
+						ULONG cbRead;
+						spMemoryStream->Read(pwszContent, cbSize, &cbRead);
+						pwszContent[cbSize / sizeof(WCHAR)] = L'\0';
+
+						wprintf(L"%s", pwszContent);
+						delete[] pwszContent;
+						// Next I'm going to follow http://stackoverflow.com/questions/8804687/unable-to-read-xml-string-with-xmllite-using-memory-buffer
+						// and figure out how to read the XML out of an internal memory buffer.
 					}
+
+					//Open writeable output stream 
+					CComPtr<IStream> pOutFileStream;
+					if (FAILED(hr = SHCreateStreamOnFile(_T("WimTivoServer.8.xml"), STGM_CREATE | STGM_WRITE, &pOutFileStream))) 
+						cout << "[" << getTimeISO8601() << "] Error creating file writer, error is: " << hex << hr << endl;
 					else
-						cout << "[" << getTimeISO8601() << "] " << setw(28) << right << szDescription[cnf] << " : " << left << CStringA(buffer).GetString() << endl;
-					dwSize = _countof(buffer);
-					ZeroMemory(buffer, dwSize);
-				}
-
-				if (S_OK == CoInitializeEx(0, COINIT_MULTITHREADED)) // COINIT_APARTMENTTHREADED
-				{
-					//#define SAFE_RELEASE(I)         do { if (I){ I->Release(); } I = NULL; } while(0) 
-					//HRESULT hr = S_OK;
-					//IXmlReader *pReader = NULL; 
-					//if (FAILED(hr = CreateXmlReader(__uuidof(IXmlReader), (void**) &pReader, NULL))) 
-					//	cout << "[" << getTimeISO8601() << "] Error creating xml reader, error is: " << hex << hr << endl;
-					//	//wprintf(L"Error creating xml reader, error is %08.8lx", hr); 
-					//else
-					//{
-					//	if (FAILED(hr = pReader->SetProperty(XmlReaderProperty_DtdProcessing, DtdProcessing_Prohibit))) 
-					//		cout << "[" << getTimeISO8601() << "] Error setting XmlReaderProperty_DtdProcessing, error is: " << hex << hr << endl;
-					//	else
-					//	{
-					//		//Open read-only input stream 
-					//		IStream *pFileStream = NULL; 
-					//		if (FAILED(hr = SHCreateStreamOnFile(_T("WimTivoServer.0.xml"), STGM_READ, &pFileStream))) 
-					//		//if (FAILED(hr = SHCreateStreamOnFile(_T("Stocks.xml"), STGM_READ, &pFileStream))) 
-					//			cout << "[" << getTimeISO8601() << "] Error creating file reader, error is: " << hex << hr << endl;
-					//		else
-					//		{
-					//			if (FAILED(hr = pReader->SetInput(pFileStream))) 
-					//				cout << "[" << getTimeISO8601() << "] Error setting input for reader, error is: " << hex << hr << endl;
-					//			else
-					//			{
-					// 				XmlNodeType nodeType; 
-					//				const WCHAR* pwszPrefix; 
-					//				const WCHAR* pwszLocalName; 
-					//				const WCHAR* pwszValue; 
-					//				UINT cwchPrefix; 
-					//				//read until there are no more nodes 
-					//				while (S_OK == (hr = pReader->Read(&nodeType))) 
-					//				{ 
-					//					switch (nodeType) 
-					//					{ 
-					//					case XmlNodeType_XmlDeclaration: 
-					//						wprintf(L"XmlDeclaration\n"); 
-					//						if (FAILED(hr = WriteAttributes(pReader))) 
-					//							wprintf(L"Error writing attributes, error is %08.8lx", hr); 
-					//						break; 
-					//					case XmlNodeType_Element: 
-					//						if (FAILED(hr = pReader->GetPrefix(&pwszPrefix, &cwchPrefix))) 
-					//							wprintf(L"Error getting prefix, error is %08.8lx", hr); 
-					//						if (FAILED(hr = pReader->GetLocalName(&pwszLocalName, NULL))) 
-					//							wprintf(L"Error getting local name, error is %08.8lx", hr); 
-					//						if (cwchPrefix > 0) 
-					//							wprintf(L"Element: %s:%s\n", pwszPrefix, pwszLocalName); 
-					//						else 
-					//							wprintf(L"Element: %s\n", pwszLocalName); 
- 
-					//						if (FAILED(hr = WriteAttributes(pReader))) 
-					//							wprintf(L"Error writing attributes, error is %08.8lx", hr); 
-	
-					//						if (pReader->IsEmptyElement() ) 
-					//							wprintf(L" (empty)"); 
-					//						break; 
-					//					case XmlNodeType_EndElement: 
-					//						if (FAILED(hr = pReader->GetPrefix(&pwszPrefix, &cwchPrefix))) 
-					//							wprintf(L"Error getting prefix, error is %08.8lx", hr); 
-					//						if (FAILED(hr = pReader->GetLocalName(&pwszLocalName, NULL))) 
-					//							wprintf(L"Error getting local name, error is %08.8lx", hr); 
-					//						if (cwchPrefix > 0) 
-					//							wprintf(L"End Element: %s:%s\n", pwszPrefix, pwszLocalName); 
-					//						else 
-					//							wprintf(L"End Element: %s\n", pwszLocalName); 
-					//						break; 
-					//					case XmlNodeType_Text: 
-					//					case XmlNodeType_Whitespace: 
-					//						if (FAILED(hr = pReader->GetValue(&pwszValue, NULL))) 
-					//							wprintf(L"Error getting value, error is %08.8lx", hr); 
-					//						wprintf(L"Text: >%s<\n", pwszValue); 
-					//						break; 
-					//					case XmlNodeType_CDATA: 
-					//						if (FAILED(hr = pReader->GetValue(&pwszValue, NULL))) 
-					//							wprintf(L"Error getting value, error is %08.8lx", hr); 
-					//						wprintf(L"CDATA: %s\n", pwszValue); 
-					//						break; 
-					//					case XmlNodeType_ProcessingInstruction: 
-					//						if (FAILED(hr = pReader->GetLocalName(&pwszLocalName, NULL))) 
-					//							wprintf(L"Error getting name, error is %08.8lx", hr); 
-					//						if (FAILED(hr = pReader->GetValue(&pwszValue, NULL))) 
-					//							wprintf(L"Error getting value, error is %08.8lx", hr); 
-					//						wprintf(L"Processing Instruction name:%s value:%s\n", pwszLocalName, pwszValue); 
-					//						break; 
-					//					case XmlNodeType_Comment: 
-					//						if (FAILED(hr = pReader->GetValue(&pwszValue, NULL))) 
-					//							wprintf(L"Error getting value, error is %08.8lx", hr); 
-					//						wprintf(L"Comment: %s\n", pwszValue); 
-					//						break; 
-					//					case XmlNodeType_DocumentType: 
-					//						wprintf(L"DOCTYPE is not printed\n"); 
-					//						break; 
-					//					} 
-					//				} 
-					//			}
-					//		}
-					//		SAFE_RELEASE(pFileStream); 
-					//	}
-					//}
-					//SAFE_RELEASE(pReader); 
-
-					//IXmlWriter *pWriter = NULL; 
-					//if (FAILED(hr = CreateXmlWriter(__uuidof(IXmlWriter), (void**) &pWriter, NULL))) 
-					//	cout << "[" << getTimeISO8601() << "] Error creating xml writer, error is: " << hex << hr << endl;
-					//else
-					//{
-					//	// from: http://stackoverflow.com/questions/3037946/how-can-i-store-xml-in-buffer-using-xmlite
-					//	CComPtr<IStream> spMemoryStream;
-					//	// Opens writeable output stream.
-					//	spMemoryStream.Attach(::SHCreateMemStream(NULL, 0));
-					//	if (spMemoryStream != NULL)
-					//	{
-					//		CComPtr<IXmlWriterOutput> pWriterOutput;
-					//		CreateXmlWriterOutputWithEncodingName(spMemoryStream, NULL, L"utf-16", &pWriterOutput);
-					//		pWriter->SetOutput(pWriterOutput);
-					//		pWriter->SetProperty(XmlWriterProperty_Indent, TRUE);
-					//		pWriter->WriteStartDocument(XmlStandalone_Omit);
-					//			pWriter->WriteStartElement(NULL,_T("TiVoContainer"),_T("http://www.tivo.com/developer/calypso-protocol-1.6/"));
-					//				pWriter->WriteStartElement(NULL,_T("Details"),NULL);
-					//					pWriter->WriteStartElement(NULL,_T("ContentType"),NULL);
-					//						pWriter->WriteString(_T("x-tivo-container/tivo-server"));
-					//					pWriter->WriteFullEndElement();
-					//					pWriter->WriteStartElement(NULL,_T("SourceFormat"),NULL);
-					//						pWriter->WriteString(_T("x-tivo-container/tivo-dvr"));
-					//					pWriter->WriteFullEndElement();
-					//					pWriter->WriteStartElement(NULL,_T("Title"),NULL);
-					//						pWriter->WriteString(_T("TivoHD"));
-					//					pWriter->WriteFullEndElement();
-					//					pWriter->WriteStartElement(NULL,_T("TotalItems"),NULL);
-					//						pWriter->WriteString(_T("1"));
-					//					pWriter->WriteFullEndElement();
-					//				pWriter->WriteFullEndElement();	// Details
-
-					//				pWriter->WriteStartElement(NULL,_T("ItemStart"),NULL);
-					//					pWriter->WriteString(_T("0"));
-					//				pWriter->WriteFullEndElement();
-					//				pWriter->WriteStartElement(NULL,_T("ItemCount"),NULL);
-					//					pWriter->WriteString(_T("1"));
-					//				pWriter->WriteFullEndElement();
-
-					//				pWriter->WriteStartElement(NULL,_T("Item"),NULL);
-					//					pWriter->WriteStartElement(NULL,_T("Details"),NULL);
-					//						pWriter->WriteStartElement(NULL,_T("ContentType"),NULL);
-					//							pWriter->WriteString(_T("x-tivo-container/tivo-videos"));
-					//						pWriter->WriteFullEndElement();
-					//						pWriter->WriteStartElement(NULL,_T("SourceFormat"),NULL);
-					//							pWriter->WriteString(_T("x-tivo-container/tivo-dvr"));
-					//						pWriter->WriteFullEndElement();
-					//						pWriter->WriteStartElement(NULL,_T("Title"),NULL);
-					//							pWriter->WriteString(_T("TivoHD"));
-					//						pWriter->WriteFullEndElement();
-					//						pWriter->WriteStartElement(NULL,_T("UniqueId"),NULL);
-					//							pWriter->WriteString(_T("TivoHD"));
-					//						pWriter->WriteFullEndElement();
-					//					pWriter->WriteFullEndElement();	// Details
-					//					pWriter->WriteStartElement(NULL,_T("Links"),NULL);
-					//						pWriter->WriteStartElement(NULL,_T("Content"),NULL);
-					//							pWriter->WriteStartElement(NULL,_T("Url"),NULL);
-					//								pWriter->WriteString(_T("https://192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=%2FNowPlaying"));
-					//							pWriter->WriteFullEndElement();
-					//							pWriter->WriteStartElement(NULL,_T("ContentType"),NULL);
-					//								pWriter->WriteString(_T("x-tivo-container/tivo-videos"));
-					//							pWriter->WriteFullEndElement();
-					//						pWriter->WriteFullEndElement();	// Content
-					//					pWriter->WriteFullEndElement();	// Links
-					//				pWriter->WriteFullEndElement();	// Item
-					//			pWriter->WriteFullEndElement();	// TiVoContainer
-					//		pWriter->WriteEndDocument();
-					//		pWriter->Flush();
-
-					//		// Allocates enough memeory for the xml content.
-					//		STATSTG ssStreamData = {0};
-					//		spMemoryStream->Stat(&ssStreamData, STATFLAG_NONAME);
-					//		SIZE_T cbSize = ssStreamData.cbSize.LowPart;
-					//		LPWSTR pwszContent = (WCHAR*) new BYTE[cbSize + sizeof(WCHAR)];
-					//		if (pwszContent == NULL)
-					//			return E_OUTOFMEMORY;
-
-					//		// Copies the content from the stream to the buffer.
-					//		LARGE_INTEGER position;
-					//		position.QuadPart = 0;
-					//		spMemoryStream->Seek(position, STREAM_SEEK_SET, NULL);
-					//		ULONG cbRead;
-					//		spMemoryStream->Read(pwszContent, cbSize, &cbRead);
-					//		pwszContent[cbSize / sizeof(WCHAR)] = L'\0';
-
-					//		wprintf(L"%s", pwszContent);
-					//		// Next I'm going to follow http://stackoverflow.com/questions/8804687/unable-to-read-xml-string-with-xmllite-using-memory-buffer
-					//		// and figure out how to read the XML out of an internal memory buffer.
-					//	}
-
- 				//		//Open writeable output stream 
-					//	IStream *pOutFileStream = NULL; 
-					//	if (FAILED(hr = SHCreateStreamOnFile(_T("WimTivoServer.8.xml"), STGM_CREATE | STGM_WRITE, &pOutFileStream))) 
-					//		cout << "[" << getTimeISO8601() << "] Error creating file writer, error is: " << hex << hr << endl;
-					//	else
-					//	{ 
-					//		if (FAILED(hr = pWriter->SetOutput(pOutFileStream))) 
-					//			wprintf(L"Error, Method: SetOutput, error is %08.8lx", hr); 
-					//		else
-					//		{
-					//			if (FAILED(hr = pWriter->SetProperty(XmlWriterProperty_Indent, TRUE))) 
-					//				wprintf(L"Error, Method: SetProperty XmlWriterProperty_Indent, error is %08.8lx", hr); 
-					//			else
-					//			{
-					//				if (FAILED(hr = pWriter->WriteStartDocument(XmlStandalone_Omit))) 
-					//					wprintf(L"Error, Method: WriteStartDocument, error is %08.8lx", hr); 
-					//				else
-					//				{
-					//					pWriter->WriteStartElement(NULL,_T("TiVoContainer"),_T("http://www.tivo.com/developer/calypso-protocol-1.6/"));
-					//						pWriter->WriteStartElement(NULL,_T("Details"),NULL);
-					//							pWriter->WriteStartElement(NULL,_T("ContentType"),NULL);
-					//								pWriter->WriteString(_T("x-tivo-container/tivo-server"));
-					//							pWriter->WriteFullEndElement();
-					//							pWriter->WriteStartElement(NULL,_T("SourceFormat"),NULL);
-					//								pWriter->WriteString(_T("x-tivo-container/tivo-dvr"));
-					//							pWriter->WriteFullEndElement();
-					//							pWriter->WriteStartElement(NULL,_T("Title"),NULL);
-					//								pWriter->WriteString(_T("TivoHD"));
-					//							pWriter->WriteFullEndElement();
-					//							pWriter->WriteStartElement(NULL,_T("TotalItems"),NULL);
-					//								pWriter->WriteString(_T("1"));
-					//							pWriter->WriteFullEndElement();
-					//						pWriter->WriteFullEndElement();	// Details
-
-					//						pWriter->WriteStartElement(NULL,_T("ItemStart"),NULL);
-					//							pWriter->WriteString(_T("0"));
-					//						pWriter->WriteFullEndElement();
-					//						pWriter->WriteStartElement(NULL,_T("ItemCount"),NULL);
-					//							pWriter->WriteString(_T("1"));
-					//						pWriter->WriteFullEndElement();
-
-					//						pWriter->WriteStartElement(NULL,_T("Item"),NULL);
-					//							pWriter->WriteStartElement(NULL,_T("Details"),NULL);
-					//								pWriter->WriteStartElement(NULL,_T("ContentType"),NULL);
-					//									pWriter->WriteString(_T("x-tivo-container/tivo-videos"));
-					//								pWriter->WriteFullEndElement();
-					//								pWriter->WriteStartElement(NULL,_T("SourceFormat"),NULL);
-					//									pWriter->WriteString(_T("x-tivo-container/tivo-dvr"));
-					//								pWriter->WriteFullEndElement();
-					//								pWriter->WriteStartElement(NULL,_T("Title"),NULL);
-					//									pWriter->WriteString(_T("TivoHD"));
-					//								pWriter->WriteFullEndElement();
-					//								pWriter->WriteStartElement(NULL,_T("UniqueId"),NULL);
-					//									pWriter->WriteString(_T("TivoHD"));
-					//								pWriter->WriteFullEndElement();
-					//							pWriter->WriteFullEndElement();	// Details
-					//							pWriter->WriteStartElement(NULL,_T("Links"),NULL);
-					//								pWriter->WriteStartElement(NULL,_T("Content"),NULL);
-					//									pWriter->WriteStartElement(NULL,_T("Url"),NULL);
-					//										pWriter->WriteString(_T("https://192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=%2FNowPlaying"));
-					//									pWriter->WriteFullEndElement();
-					//									pWriter->WriteStartElement(NULL,_T("ContentType"),NULL);
-					//										pWriter->WriteString(_T("x-tivo-container/tivo-videos"));
-					//									pWriter->WriteFullEndElement();
-					//								pWriter->WriteFullEndElement();	// Content
-					//							pWriter->WriteFullEndElement();	// Links
-					//						pWriter->WriteFullEndElement();	// Item
-					//					pWriter->WriteFullEndElement();	// TiVoContainer
-
-					//					// WriteEndDocument closes any open elements or attributes 
-					//					if (FAILED(hr = pWriter->WriteEndDocument())) 
-					//						wprintf(L"Error, Method: WriteEndDocument, error is %08.8lx", hr); 
-
-					//					if (FAILED(hr = pWriter->Flush())) 
-					//						wprintf(L"Error, Method: Flush, error is %08.8lx", hr); 
-
-					//					// if you want to use a DTD using either the SYSTEM or PUBLIC identifiers, 
-					//					// or if you want to use an internal DTD subset, you can modify the following 
-					//					// call to WriteDocType. 
-					//					//if (FAILED(hr = pWriter->WriteDocType(L"root", NULL, NULL, NULL))) 
-					//					//	wprintf(L"Error, Method: WriteDocType, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteProcessingInstruction(L"xml-stylesheet", 
-					//					//	L"href=\"mystyle.css\" title=\"Compact\" type=\"text/css\""))) 
-					//					//	wprintf(L"Error, Method: WriteProcessingInstruction, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteStartElement(NULL, L"root", NULL))) 
-					//					//	wprintf(L"Error, Method: WriteStartElement, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteStartElement(NULL, L"sub", NULL))) 
-					//					//	wprintf(L"Error, Method: WriteStartElement, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteAttributeString(NULL, L"myAttr", NULL, 
-					//					//												L"1234"))) 
-					//					//	wprintf(L"Error, Method: WriteAttributeString, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteString( 
-					//					//			L"Markup is <escaped> for this string"))) 
-					//					//	wprintf(L"Error, Method: WriteString, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteFullEndElement())) 
-					//					//	wprintf(L"Error, Method: WriteFullEndElement, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteStartElement(NULL, L"anotherChild", NULL))) 
-					//					//	wprintf(L"Error, Method: WriteStartElement, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteString(L"some text"))) 
-					//					//	wprintf(L"Error, Method: WriteString, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteFullEndElement())) 
-					//					//	wprintf(L"Error, Method: WriteFullEndElement, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
-					//					//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteCData(L"This is CDATA text."))) 
-					//					//	wprintf(L"Error, Method: WriteCData, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
-					//					//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteStartElement(NULL, L"containsCharacterEntity", NULL))) 
-					//					//	wprintf(L"Error, Method: WriteStartElement, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteCharEntity(L'a'))) 
-					//					//	wprintf(L"Error, Method: WriteCharEntity, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteFullEndElement())) 
-					//					//	wprintf(L"Error, Method: WriteFullEndElement, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
-					//					//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteStartElement(NULL, L"containsChars", NULL))) 
-					//					//	wprintf(L"Error, Method: WriteStartElement, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteChars(L"abcdefghijklm", 5))) 
-					//					//	wprintf(L"Error, Method: WriteChars, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteFullEndElement())) 
-					//					//	wprintf(L"Error, Method: WriteFullEndElement, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
-					//					//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteStartElement(NULL, L"containsEntity", NULL))) 
-					//					//	wprintf(L"Error, Method: WriteStartElement, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteEntityRef(L"myEntity"))) 
-					//					//	wprintf(L"Error, Method: WriteEntityRef, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteEndElement())) 
-					//					//	wprintf(L"Error, Method: WriteEndElement, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
-					//					//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteStartElement(NULL, L"containsName", NULL))) 
-					//					//	wprintf(L"Error, Method: WriteStartElement, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteName(L"myName"))) 
-					//					//	wprintf(L"Error, Method: WriteName, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteEndElement())) 
-					//					//	wprintf(L"Error, Method: WriteEndElement, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
-					//					//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteStartElement(NULL, L"containsNmToken", NULL))) 
-					//					//	wprintf(L"Error, Method: WriteStartElement, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteNmToken(L"myNmToken"))) 
-					//					//	wprintf(L"Error, Method: WriteNmToken, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteEndElement())) 
-					//					//	wprintf(L"Error, Method: WriteEndElement, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
-					//					//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteComment(L"This is a comment"))) 
-					//					//	wprintf(L"Error, Method: WriteComment, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
-					//					//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteRaw(L"<elementWrittenRaw/>"))) 
-					//					//	wprintf(L"Error, Method: WriteRaw, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
-					//					//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteRawChars(L"<rawCharacters/>", 16))) 
-					//					//	wprintf(L"Error, Method: WriteRawChars, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
-					//					//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteElementString(NULL, L"myElement", NULL, L"myValue"))) 
-					//					//	wprintf(L"Error, Method: WriteElementString, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteFullEndElement())) 
-					//					//	wprintf(L"Error, Method: WriteFullEndElement, error is %08.8lx", hr); 
-					//					//else 
-					//					//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
-					//					//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
-
-					//					//// WriteEndDocument closes any open elements or attributes 
-					//					//if (FAILED(hr = pWriter->WriteEndDocument())) 
-					//					//	wprintf(L"Error, Method: WriteEndDocument, error is %08.8lx", hr); 
-
-					//					//if (FAILED(hr = pWriter->Flush())) 
-					//					//	wprintf(L"Error, Method: Flush, error is %08.8lx", hr); 
-					//				}
-					//			}
-					//		}
-					//	} 
-					//	SAFE_RELEASE(pOutFileStream); 
-					//} 
-					//SAFE_RELEASE(pWriter); 
-
-					std::vector<CString> myURLS;
-					myURLS.push_back(CString(_T("http://192.168.0.5:8080/TiVoConnect?Command=QueryContainer&Container=/")));
-					myURLS.push_back(CString(_T("http://192.168.0.108/TiVoConnect?Command=QueryContainer&Container=/")));
-					myURLS.push_back(CString(_T("https://192.168.0.5:4430/TiVoConnect?Command=QueryContainer&Container=/TivoNowPlaying")));
-					myURLS.push_back(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying")));
-					int FileIndex = 0;
-					CInternetSession serverSession; //(NULL,1,PRE_CONFIG_INTERNET_ACCESS,NULL,NULL,INTERNET_FLAG_EXISTING_CONNECT);
-					for (auto csURL = myURLS.begin(); csURL != myURLS.end(); csURL++)
-					{
-						int BadCertErrorCount = 0;
-						AGAIN:
-						//DWORD dwOption = INTERNET_OPTION_SECURITY_FLAGS;
-						//DWORD dwValue;
-						//if (serverSession.QueryOption(dwOption, dwValue))
-						//{
-						//	dwValue |= SECURITY_FLAG_IGNORE_UNKNOWN_CA;
-						//	dwValue |= SECURITY_FLAG_IGNORE_CERT_CN_INVALID;
-						//	dwValue |= SECURITY_FLAG_IGNORE_CERT_DATE_INVALID;
-						//	serverSession.SetOption(dwOption, dwValue);
-						//}
-						//else
-						//{
-						//	DWORD dw = GetLastError(); 
-						//	LPVOID lpMsgBuf;
-						//	FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, dw, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR) &lpMsgBuf, 0, NULL );
-						//	cout << "[" << getTimeISO8601() << "] error(" << dw << ") " << CStringA((LPCTSTR)lpMsgBuf).GetString() << endl;							
-						//	LocalFree(lpMsgBuf);
-						//}
-						CHttpFile* serverFile = NULL;
-						try 
+					{ 
+						if (FAILED(hr = pWriter->SetOutput(pOutFileStream))) 
+							wprintf(L"Error, Method: SetOutput, error is %08.8lx", hr); 
+						else
 						{
-							cout << "[" << getTimeISO8601() << "] Attempting: " << CStringA(*csURL).GetString() << endl;
-							DWORD dwServiceType;
-							CString strServer;
-							CString strObject; 
-							INTERNET_PORT nPort; 
-							CString strUsername; 
-							CString strPassword; 
-							AfxParseURLEx(csURL->GetString(), dwServiceType, strServer, strObject, nPort, strUsername, strPassword);
-							serverFile = (CHttpFile*) serverSession.OpenURL(*csURL);
+							if (FAILED(hr = pWriter->SetProperty(XmlWriterProperty_Indent, TRUE))) 
+								wprintf(L"Error, Method: SetProperty XmlWriterProperty_Indent, error is %08.8lx", hr); 
+							else
+							{
+								if (FAILED(hr = pWriter->WriteStartDocument(XmlStandalone_Omit))) 
+									wprintf(L"Error, Method: WriteStartDocument, error is %08.8lx", hr); 
+								else
+								{
+									pWriter->WriteStartElement(NULL,_T("TiVoContainer"),_T("http://www.tivo.com/developer/calypso-protocol-1.6/"));
+										pWriter->WriteStartElement(NULL,_T("Details"),NULL);
+											pWriter->WriteStartElement(NULL,_T("ContentType"),NULL);
+												pWriter->WriteString(_T("x-tivo-container/tivo-server"));
+											pWriter->WriteFullEndElement();
+											pWriter->WriteStartElement(NULL,_T("SourceFormat"),NULL);
+												pWriter->WriteString(_T("x-tivo-container/tivo-dvr"));
+											pWriter->WriteFullEndElement();
+											pWriter->WriteStartElement(NULL,_T("Title"),NULL);
+												pWriter->WriteString(_T("TivoHD"));
+											pWriter->WriteFullEndElement();
+											pWriter->WriteStartElement(NULL,_T("TotalItems"),NULL);
+												pWriter->WriteString(_T("1"));
+											pWriter->WriteFullEndElement();
+										pWriter->WriteFullEndElement();	// Details
+										pWriter->WriteStartElement(NULL,_T("ItemStart"),NULL);
+											pWriter->WriteString(_T("0"));
+										pWriter->WriteFullEndElement();
+										pWriter->WriteStartElement(NULL,_T("ItemCount"),NULL);
+											pWriter->WriteString(_T("1"));
+										pWriter->WriteFullEndElement();
+										pWriter->WriteStartElement(NULL,_T("Item"),NULL);
+											pWriter->WriteStartElement(NULL,_T("Details"),NULL);
+												pWriter->WriteStartElement(NULL,_T("ContentType"),NULL);
+													pWriter->WriteString(_T("x-tivo-container/tivo-videos"));
+												pWriter->WriteFullEndElement();
+												pWriter->WriteStartElement(NULL,_T("SourceFormat"),NULL);
+													pWriter->WriteString(_T("x-tivo-container/tivo-dvr"));
+												pWriter->WriteFullEndElement();
+												pWriter->WriteStartElement(NULL,_T("Title"),NULL);
+													pWriter->WriteString(_T("TivoHD"));
+												pWriter->WriteFullEndElement();
+												pWriter->WriteStartElement(NULL,_T("UniqueId"),NULL);
+													pWriter->WriteString(_T("TivoHD"));
+												pWriter->WriteFullEndElement();
+											pWriter->WriteFullEndElement();	// Details
+											pWriter->WriteStartElement(NULL,_T("Links"),NULL);
+												pWriter->WriteStartElement(NULL,_T("Content"),NULL);
+													pWriter->WriteStartElement(NULL,_T("Url"),NULL);
+														pWriter->WriteString(_T("https://192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=%2FNowPlaying"));
+													pWriter->WriteFullEndElement();
+													pWriter->WriteStartElement(NULL,_T("ContentType"),NULL);
+														pWriter->WriteString(_T("x-tivo-container/tivo-videos"));
+													pWriter->WriteFullEndElement();
+												pWriter->WriteFullEndElement();	// Content
+											pWriter->WriteFullEndElement();	// Links
+										pWriter->WriteFullEndElement();	// Item
+									pWriter->WriteFullEndElement();	// TiVoContainer
+									// WriteEndDocument closes any open elements or attributes 
+									if (FAILED(hr = pWriter->WriteEndDocument())) 
+										wprintf(L"Error, Method: WriteEndDocument, error is %08.8lx", hr); 
+									if (FAILED(hr = pWriter->Flush())) 
+										wprintf(L"Error, Method: Flush, error is %08.8lx", hr); 
+									// if you want to use a DTD using either the SYSTEM or PUBLIC identifiers, 
+									// or if you want to use an internal DTD subset, you can modify the following 
+									// call to WriteDocType. 
+									//if (FAILED(hr = pWriter->WriteDocType(L"root", NULL, NULL, NULL))) 
+									//	wprintf(L"Error, Method: WriteDocType, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteProcessingInstruction(L"xml-stylesheet", 
+									//	L"href=\"mystyle.css\" title=\"Compact\" type=\"text/css\""))) 
+									//	wprintf(L"Error, Method: WriteProcessingInstruction, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteStartElement(NULL, L"root", NULL))) 
+									//	wprintf(L"Error, Method: WriteStartElement, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteStartElement(NULL, L"sub", NULL))) 
+									//	wprintf(L"Error, Method: WriteStartElement, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteAttributeString(NULL, L"myAttr", NULL, 
+									//												L"1234"))) 
+									//	wprintf(L"Error, Method: WriteAttributeString, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteString( 
+									//			L"Markup is <escaped> for this string"))) 
+									//	wprintf(L"Error, Method: WriteString, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteFullEndElement())) 
+									//	wprintf(L"Error, Method: WriteFullEndElement, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteStartElement(NULL, L"anotherChild", NULL))) 
+									//	wprintf(L"Error, Method: WriteStartElement, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteString(L"some text"))) 
+									//	wprintf(L"Error, Method: WriteString, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteFullEndElement())) 
+									//	wprintf(L"Error, Method: WriteFullEndElement, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
+									//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteCData(L"This is CDATA text."))) 
+									//	wprintf(L"Error, Method: WriteCData, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
+									//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteStartElement(NULL, L"containsCharacterEntity", NULL))) 
+									//	wprintf(L"Error, Method: WriteStartElement, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteCharEntity(L'a'))) 
+									//	wprintf(L"Error, Method: WriteCharEntity, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteFullEndElement())) 
+									//	wprintf(L"Error, Method: WriteFullEndElement, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
+									//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteStartElement(NULL, L"containsChars", NULL))) 
+									//	wprintf(L"Error, Method: WriteStartElement, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteChars(L"abcdefghijklm", 5))) 
+									//	wprintf(L"Error, Method: WriteChars, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteFullEndElement())) 
+									//	wprintf(L"Error, Method: WriteFullEndElement, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
+									//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteStartElement(NULL, L"containsEntity", NULL))) 
+									//	wprintf(L"Error, Method: WriteStartElement, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteEntityRef(L"myEntity"))) 
+									//	wprintf(L"Error, Method: WriteEntityRef, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteEndElement())) 
+									//	wprintf(L"Error, Method: WriteEndElement, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
+									//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteStartElement(NULL, L"containsName", NULL))) 
+									//	wprintf(L"Error, Method: WriteStartElement, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteName(L"myName"))) 
+									//	wprintf(L"Error, Method: WriteName, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteEndElement())) 
+									//	wprintf(L"Error, Method: WriteEndElement, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
+									//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteStartElement(NULL, L"containsNmToken", NULL))) 
+									//	wprintf(L"Error, Method: WriteStartElement, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteNmToken(L"myNmToken"))) 
+									//	wprintf(L"Error, Method: WriteNmToken, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteEndElement())) 
+									//	wprintf(L"Error, Method: WriteEndElement, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
+									//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteComment(L"This is a comment"))) 
+									//	wprintf(L"Error, Method: WriteComment, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
+									//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteRaw(L"<elementWrittenRaw/>"))) 
+									//	wprintf(L"Error, Method: WriteRaw, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
+									//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteRawChars(L"<rawCharacters/>", 16))) 
+									//	wprintf(L"Error, Method: WriteRawChars, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
+									//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteElementString(NULL, L"myElement", NULL, L"myValue"))) 
+									//	wprintf(L"Error, Method: WriteElementString, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteFullEndElement())) 
+									//	wprintf(L"Error, Method: WriteFullEndElement, error is %08.8lx", hr); 
+									//else 
+									//if (FAILED(hr = pWriter->WriteWhitespace(L"\n"))) 
+									//	wprintf(L"Error, Method: WriteWhitespace, error is %08.8lx", hr); 
+
+									//// WriteEndDocument closes any open elements or attributes 
+									//if (FAILED(hr = pWriter->WriteEndDocument())) 
+									//	wprintf(L"Error, Method: WriteEndDocument, error is %08.8lx", hr); 
+
+									//if (FAILED(hr = pWriter->Flush())) 
+									//	wprintf(L"Error, Method: Flush, error is %08.8lx", hr); 
+								}
+							}
+						}
+					} 
+				} 
+
+				std::vector<CString> myURLS;
+				myURLS.push_back(CString(_T("http://192.168.0.5:8080/TiVoConnect?Command=QueryContainer&Container=/")));
+				myURLS.push_back(CString(_T("http://192.168.0.108/TiVoConnect?Command=QueryContainer&Container=/")));
+				myURLS.push_back(CString(_T("https://192.168.0.5:4430/TiVoConnect?Command=QueryContainer&Container=/TivoNowPlaying")));
+				myURLS.push_back(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying")));
+				int FileIndex = 0;
+				CInternetSession serverSession;
+				for (auto csURL = myURLS.begin(); csURL != myURLS.end(); csURL++)
+				{
+					int BadCertErrorCount = 0;
+					AGAIN:
+					try 
+					{
+						std::cout << "[" << getTimeISO8601() << "] Attempting: " << CStringA(*csURL).GetString() << endl;
+						DWORD dwServiceType;
+						CString strServer;
+						CString strObject; 
+						INTERNET_PORT nPort; 
+						CString strUsername; 
+						CString strPassword; 
+						AfxParseURLEx(csURL->GetString(), dwServiceType, strServer, strObject, nPort, strUsername, strPassword);
+						//std::unique_ptr<CHttpConnection> serverConnection(serverSession.GetHttpConnection(strServer,nPort,strUsername,strPassword));
+						//if (NULL != serverConnection)
+						//{
+						//	std::unique_ptr<CHttpFile> serverFile(serverConnection->OpenRequest(1, strObject, NULL, 1, NULL, NULL, SECURITY_IGNORE_ERROR_MASK));
+							std::unique_ptr<CHttpFile> serverFile((CHttpFile*) serverSession.OpenURL(*csURL, 1, INTERNET_FLAG_TRANSFER_BINARY | SECURITY_IGNORE_ERROR_MASK));
 							if (serverFile != NULL)
 							{
 								serverFile->SendRequest();
@@ -2118,61 +2081,61 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 									std::stringstream OutPutFileName;
 									OutPutFileName << "WimTivoServer." << FileIndex++ << ".xml";
 									std::ofstream OutputFile(OutPutFileName.str());
-									cout << "[" << getTimeISO8601() << "] file contents: **--**" << endl;
+									std::cout << "[" << getTimeISO8601() << "] file contents: **--**" << endl;
 									char ittybittybuffer;
 									while (0 < serverFile->Read(&ittybittybuffer, sizeof(ittybittybuffer)))
 									{
-										cout << ittybittybuffer;
+										std::cout << ittybittybuffer;
 										if (OutputFile.is_open())
 											OutputFile << ittybittybuffer;
 									}
-									cout << "**--**" << endl;
+									std::cout << "**--**" << endl;
 									OutputFile.close();
 								}
 								serverFile->Close();
 							}
-						}
-						catch(CInternetException *e)
+						//}
+					}
+					catch(CInternetException *e)
+					{
+						TCHAR   szCause[255];
+						e->GetErrorMessage(szCause,sizeof(szCause)/sizeof(TCHAR));
+						CStringA csErrorMessage(szCause);
+						csErrorMessage.Trim();
+						cout << "[" << getTimeISO8601() << "] InternetException: " <<  csErrorMessage.GetString() << " (" << e->m_dwError << ") " << endl;
+						DWORD dw = GetLastError();
+						LPVOID lpMsgBuf;
+						int fmrval = FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, dw, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR) &lpMsgBuf, 0, NULL );
+						CStringA csgotLastErr((LPCTSTR)lpMsgBuf);
+						LocalFree(lpMsgBuf);
+						csgotLastErr.Trim();
+						cout << "[" << getTimeISO8601() << "] error(" << dw << ") " << csgotLastErr.GetString() << endl;							
+						if ((e->m_dwError == ERROR_INTERNET_INVALID_CA) || 
+							(e->m_dwError == ERROR_INTERNET_SEC_CERT_CN_INVALID) ||
+							(e->m_dwError == ERROR_INTERNET_SEC_CERT_DATE_INVALID) ||
+							(e->m_dwError == ERROR_INTERNET_SEC_INVALID_CERT) )
 						{
-							TCHAR   szCause[255];
-							e->GetErrorMessage(szCause,sizeof(szCause)/sizeof(TCHAR));
-							CStringA csErrorMessage(szCause);
-							csErrorMessage.Trim();
-							cout << "[" << getTimeISO8601() << "] InternetException: " <<  csErrorMessage.GetString() << " (" << e->m_dwError << ") " << endl;
-							DWORD dw = GetLastError();
-							LPVOID lpMsgBuf;
-							int fmrval = FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, dw, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR) &lpMsgBuf, 0, NULL );
-							CStringA csgotLastErr((LPCTSTR)lpMsgBuf);
-							LocalFree(lpMsgBuf);
-							csgotLastErr.Trim();
-							cout << "[" << getTimeISO8601() << "] error(" << dw << ") " << csgotLastErr.GetString() << endl;							
-							if ((e->m_dwError == ERROR_INTERNET_INVALID_CA) || 
-								(e->m_dwError == ERROR_INTERNET_SEC_CERT_CN_INVALID) ||
-								(e->m_dwError == ERROR_INTERNET_SEC_CERT_DATE_INVALID) ||
-								(e->m_dwError == ERROR_INTERNET_SEC_INVALID_CERT) )
+							DWORD dwOption = INTERNET_OPTION_SECURITY_FLAGS;
+							DWORD dwValue;
+							if (TRUE == serverSession.QueryOption(dwOption, dwValue))
 							{
-								DWORD dwOption = INTERNET_OPTION_SECURITY_FLAGS;
-								DWORD dwValue;
-								if (serverSession.QueryOption(dwOption, dwValue))
-								{
-									dwValue |= SECURITY_FLAG_IGNORE_UNKNOWN_CA;
-									dwValue |= SECURITY_FLAG_IGNORE_CERT_CN_INVALID;
-									dwValue |= SECURITY_FLAG_IGNORE_CERT_DATE_INVALID;
-									dwValue |= SECURITY_SET_MASK; // This is a catchall that I'm trying.
-									serverSession.SetOption(dwOption, dwValue);
-									if (BadCertErrorCount++ < 2)
-										goto AGAIN;
-								}
+								dwValue |= SECURITY_FLAG_IGNORE_UNKNOWN_CA;
+								dwValue |= SECURITY_FLAG_IGNORE_CERT_CN_INVALID;
+								dwValue |= SECURITY_FLAG_IGNORE_CERT_DATE_INVALID;
+								dwValue |= SECURITY_SET_MASK; // This is a catchall that I'm trying.
+								serverSession.SetOption(dwOption, dwValue);
+								if (BadCertErrorCount++ < 2)
+									goto AGAIN;
 							}
 						}
-						if (serverFile != NULL)
-							delete serverFile;
 					}
 				}
-				CoUninitialize();
+			}
+			CoUninitialize();
 
+			if (csMyHostName.CompareNoCase(_T("INSPIRON")))
+			{
 				cout << "[" << getTimeISO8601() << "] Listening for TiVo Broadcast packets on UDP port 2190" << endl;
-
 				// Set up CTR-C signal handler
 				typedef void (*SignalHandlerPointer)(int);
 				SignalHandlerPointer previousHandler = signal(SIGINT, SignalHandler);
@@ -2180,92 +2143,83 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 				bRun = true;
 				SOCKADDR_IN saServer;
 				while (bRun && (TiVoBeaconListen(saServer) == true))
-				{
 					cout << "[" << getTimeISO8601() << "] \r";
-				}
 				// remove our special Ctrl-C signal handler and restore previous one
 				signal(SIGINT, previousHandler);
 				cout << "\n[" << getTimeISO8601() << "] No longer listening for TiVo Broadcast packets on UDP port 2190" << endl;
-
-				terminateEvent = CreateEvent(0,TRUE,FALSE,0);
-				if (terminateEvent != NULL) 
+			}
+			terminateEvent = CreateEvent(0,TRUE,FALSE,0);
+			if (terminateEvent != NULL) 
+			{
+				threadHandle = AfxBeginThread(HTTPMain, NULL, THREAD_PRIORITY_NORMAL, 0, CREATE_SUSPENDED);
+				if (threadHandle != NULL)
 				{
-					threadHandle = AfxBeginThread(HTTPMain, NULL, THREAD_PRIORITY_NORMAL, 0, CREATE_SUSPENDED);
-					if (threadHandle != NULL)
+					threadHandle->m_bAutoDelete = false;
+					threadHandle->ResumeThread();
+
+					DWORD dwVersion = GetVersion();
+					int dwMajorVersion = (int)(LOBYTE(LOWORD(dwVersion)));
+					int dwMinorVersion = (int)(HIBYTE(LOWORD(dwVersion)));
+					int dwBuild = 0;
+					if (dwVersion < 0x80000000)              
+						dwBuild = (int)(HIWORD(dwVersion));
+
+					CStringA csTiVoPacket("tivoconnect=1\n");
+					csTiVoPacket.AppendFormat("method=%s\n",true?"broadcast":"connect");
+					csTiVoPacket.AppendFormat("platform=pc/WinNT:%d.%d.%d\n", dwMajorVersion, dwMinorVersion, dwBuild);
+					csTiVoPacket.Append("machine="); csTiVoPacket.Append(CStringA(csMyHostName).GetString());csTiVoPacket.Append("\n");
+					csTiVoPacket.Append("identity="); csTiVoPacket.Append(CStringA(csMyProgramGuid).GetString());csTiVoPacket.Append("\n");
+					struct sockaddr addr;
+					socklen_t addr_len = sizeof(addr);
+					getsockname(ControlSocket, &addr, &addr_len);
+					if (addr.sa_family == AF_INET)
 					{
-						threadHandle->m_bAutoDelete = false;
-						threadHandle->ResumeThread();
-
-						DWORD dwVersion = GetVersion();
-						int dwMajorVersion = (int)(LOBYTE(LOWORD(dwVersion)));
-						int dwMinorVersion = (int)(HIBYTE(LOWORD(dwVersion)));
-						int dwBuild = 0;
-						if (dwVersion < 0x80000000)              
-							dwBuild = (int)(HIWORD(dwVersion));
-
+						struct sockaddr_in * saServer = (sockaddr_in *)&addr;
+						csTiVoPacket.AppendFormat("services=TiVoMediaServer:%hu/http\n",ntohs(saServer->sin_port));
+					}
+					//csTiVoPacket.AppendFormat(_T("services=<name>[:<port>][/<protocol>], ...\r\n"));
+					csTiVoPacket.Append("swversion=");csTiVoPacket.Append(CStringA(csBuildDateTime));csTiVoPacket.Append("\n");
+					cout << csTiVoPacket.GetString();
+					for (auto index = 300; index > 0; --index)
+					{
 						CStringA csTiVoPacket("tivoconnect=1\n");
 						csTiVoPacket.AppendFormat("method=%s\n",true?"broadcast":"connect");
 						csTiVoPacket.AppendFormat("platform=pc/WinNT:%d.%d.%d\n", dwMajorVersion, dwMinorVersion, dwBuild);
 						csTiVoPacket.Append("machine="); csTiVoPacket.Append(CStringA(csMyHostName).GetString());csTiVoPacket.Append("\n");
 						csTiVoPacket.Append("identity="); csTiVoPacket.Append(CStringA(csMyProgramGuid).GetString());csTiVoPacket.Append("\n");
 						struct sockaddr addr;
+						addr.sa_family = AF_UNSPEC;
 						socklen_t addr_len = sizeof(addr);
-						getsockname(ControlSocket, &addr, &addr_len);
+						if (ControlSocket != INVALID_SOCKET)
+							getsockname(ControlSocket, &addr, &addr_len);
 						if (addr.sa_family == AF_INET)
 						{
 							struct sockaddr_in * saServer = (sockaddr_in *)&addr;
 							csTiVoPacket.AppendFormat("services=TiVoMediaServer:%hu/http\n",ntohs(saServer->sin_port));
 						}
 						//csTiVoPacket.AppendFormat(_T("services=<name>[:<port>][/<protocol>], ...\r\n"));
-						csTiVoPacket.Append("swversion=");csTiVoPacket.Append(CStringA(csBuildDateTime));csTiVoPacket.Append("\n");
-						cout << csTiVoPacket.GetString();
-						for (auto index = 300; index > 0; --index)
-						{
-							CStringA csTiVoPacket("tivoconnect=1\n");
-							csTiVoPacket.AppendFormat("method=%s\n",true?"broadcast":"connect");
-							csTiVoPacket.AppendFormat("platform=pc/WinNT:%d.%d.%d\n", dwMajorVersion, dwMinorVersion, dwBuild);
-							csTiVoPacket.Append("machine="); csTiVoPacket.Append(CStringA(csMyHostName).GetString());csTiVoPacket.Append("\n");
-							csTiVoPacket.Append("identity="); csTiVoPacket.Append(CStringA(csMyProgramGuid).GetString());csTiVoPacket.Append("\n");
-							struct sockaddr addr;
-							addr.sa_family = AF_UNSPEC;
-							socklen_t addr_len = sizeof(addr);
-							if (ControlSocket != INVALID_SOCKET)
-								getsockname(ControlSocket, &addr, &addr_len);
-							if (addr.sa_family == AF_INET)
-							{
-								struct sockaddr_in * saServer = (sockaddr_in *)&addr;
-								csTiVoPacket.AppendFormat("services=TiVoMediaServer:%hu/http\n",ntohs(saServer->sin_port));
-							}
-							//csTiVoPacket.AppendFormat(_T("services=<name>[:<port>][/<protocol>], ...\r\n"));
-							csTiVoPacket.Append("swversion="); csTiVoPacket.Append(CStringA(csBuildDateTime));csTiVoPacket.Append("\n");
-							TiVoBeaconSend(csTiVoPacket);
-							csTiVoPacket.Replace("\n", " ");
-							csTiVoPacket.Trim();
-							cout << "[" << getTimeISO8601() << "] (" << index << ") " << csTiVoPacket.GetString() << endl;
-							Sleep(1000);
-						}
-						closesocket(ControlSocket);
-						ControlSocket = INVALID_SOCKET;
+						csTiVoPacket.Append("swversion="); csTiVoPacket.Append(CStringA(csBuildDateTime));csTiVoPacket.Append("\n");
+						TiVoBeaconSend(csTiVoPacket);
+						csTiVoPacket.Replace("\n", " ");
+						csTiVoPacket.Trim();
+						cout << "[" << getTimeISO8601() << "] (" << index << ") " << csTiVoPacket.GetString() << endl;
+						Sleep(1000);
+					}
+					closesocket(ControlSocket);
+					ControlSocket = INVALID_SOCKET;
 
-						WaitForSingleObject(terminateEvent,INFINITE);
+					WaitForSingleObject(terminateEvent,INFINITE);
 
-						if (terminateEvent)
-							CloseHandle(terminateEvent);
-						if (threadHandle)
-						{
-							delete threadHandle;
-							threadHandle = NULL;
-						}
+					if (terminateEvent)
+						CloseHandle(terminateEvent);
+					if (threadHandle)
+					{
+						delete threadHandle;
+						threadHandle = NULL;
 					}
 				}
 			}
 		}
-	}
-	else
-	{
-		// TODO: change error code to suit your needs
-		_tprintf(_T("Fatal Error: GetModuleHandle failed\n"));
-		nRetCode = 1;
 	}
 	return nRetCode;
 }
