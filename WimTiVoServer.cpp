@@ -664,7 +664,6 @@ void XML_Test_FileReformat(const CString & Source = _T("D:\\Videos\\chunk-01-000
 		}
 	}
 }
-
 /////////////////////////////////////////////////////////////////////////////
 class cTiVoServer
 {
@@ -681,107 +680,124 @@ const CString csUrlPrefix(_T("/TiVoConnect/TivoNowPlaying/"));
 class cTiVoFile
 {
 private:
-	CString csPathName;
-	CString csURL;
-	CString Title;
-	CString EpisodeTitle;
-	CString Description;
-	CString ContentType;
-	CString SourceFormat;
-	unsigned long long SourceSize;
-    unsigned long long Duration;
-	CTime CaptureDate;
+	CString m_csPathName;
+	CString m_csURL;
+	CString m_Title;
+	CString m_EpisodeTitle;
+	CString m_Description;
+	CString m_ContentType;
+	CString m_SourceFormat;
+	unsigned long long m_SourceSize;
+    unsigned long long m_Duration;
+	CTime m_CaptureDate;
 public:
 	cTiVoFile() : 
-	SourceSize(0),
-    Duration(0)
+	m_SourceSize(0),
+    m_Duration(0)
 	{
 	}
 	friend bool cTiVoFileCompareDate(const cTiVoFile & a, const cTiVoFile & b);
+	friend bool cTiVoFileCompareDateReverse(const cTiVoFile & a, const cTiVoFile & b);
 	void SetPathName(const CString csNewPath)
 	{
-		csPathName = csNewPath;
+		m_csPathName = csNewPath;
 		std::string isotime(getTimeISO8601());
 		std::wstring wistotime(isotime.begin(),isotime.end());
-		std::wcout << L"[" << wistotime << L"] " << csPathName.GetString() << endl;
+		std::wcout << L"[" << wistotime << L"] " << m_csPathName.GetString() << endl;
 		struct _stat buf;
-		if (0 == _tstat( csPathName.GetString(), &buf ))
+		if (0 == _tstat( m_csPathName.GetString(), &buf ))
 		{
-			SourceSize = buf.st_size;
+			m_SourceSize = buf.st_size;
 			//char timebuf[26];
 			//ctime_s(timebuf, 26, &buf.st_mtime);
 			//timebuf[24] = 0; // Get rid of \n that ctime_s appends to end of string
-			//cout << "[                   ] " << setw(20) << right << "File size" << " : " << SourceSize << endl;
+			//cout << "[                   ] " << setw(20) << right << "File size" << " : " << m_SourceSize << endl;
 			//cout << "[                   ] " << setw(20) << right << "Drive" << " : " << char(buf.st_dev + 'A') << ":" << endl;
 			//cout << "[                   ] " << setw(20) << right << "Time modified" << " : " << timebuf << endl;
 
-			CaptureDate = CTime(buf.st_mtime);
+			m_CaptureDate = CTime(buf.st_mtime);
 			PopulateFromFFMPEG();
 			TCHAR path_buffer[_MAX_PATH];
 			TCHAR drive[_MAX_DRIVE];
 			TCHAR dir[_MAX_DIR];
 			TCHAR fname[_MAX_FNAME];
 			TCHAR ext[_MAX_EXT];
-			_tsplitpath_s(csPathName.GetString(), drive, _MAX_DRIVE, dir, _MAX_DIR, fname, _MAX_FNAME, ext, _MAX_EXT);
+			_tsplitpath_s(m_csPathName.GetString(), drive, _MAX_DRIVE, dir, _MAX_DIR, fname, _MAX_FNAME, ext, _MAX_EXT);
 			//wcout << L"[                   ] " << setw(20) << right << L"Drive" << L" : " << drive << endl;
 			//wcout << L"[                   ] " << setw(20) << right << L"dir" << L" : " << dir << endl;
 			//wcout << L"[                   ] " << setw(20) << right << L"fname" << L" : " << fname << endl;
 			//wcout << L"[                   ] " << setw(20) << right << L"ext" << L" : " << ext << endl;
-			csURL = csUrlPrefix;
+			m_csURL = csUrlPrefix;
 			_tmakepath_s(path_buffer, _MAX_PATH, drive, dir, fname, ext);
-			csURL.Append(path_buffer);
-			csURL.Replace(_T("\\"), _T("/"));
+			m_csURL.Append(path_buffer);
+			m_csURL.Replace(_T("\\"), _T("/"));
 			// see WinHttpCreateUrl for useful info http://msdn.microsoft.com/en-us/library/windows/desktop/aa384093(v=vs.85).aspx
 			TCHAR lpszBuffer[_MAX_PATH];
 			DWORD dwBufferLength = sizeof(lpszBuffer) / sizeof(TCHAR);
-			InternetCanonicalizeUrl(csURL.GetString(), lpszBuffer, &dwBufferLength, 0);
-			csURL = CString(lpszBuffer, dwBufferLength);
-			if (Title.IsEmpty())
-				Title = fname;
+			InternetCanonicalizeUrl(m_csURL.GetString(), lpszBuffer, &dwBufferLength, 0);
+			m_csURL = CString(lpszBuffer, dwBufferLength);
+			if (m_Title.IsEmpty())
+				m_Title = fname;
 		}
-		ContentType = _T("video/x-tivo-mpeg");
+		m_ContentType = _T("video/x-tivo-mpeg");
 		// Final Output of object values
-		wcout << L"[                   ] " << setw(20) << right << L"Title" << L" : " << Title.GetString() << endl;
-		wcout << L"[                   ] " << setw(20) << right << L"EpisodeTitle" << L" : " << EpisodeTitle.GetString() << endl;
-		wcout << L"[                   ] " << setw(20) << right << L"Description" << L" : " << Description.GetString() << endl;
-		wcout << L"[                   ] " << setw(20) << right << L"ContentType" << L" : " << ContentType.GetString() << endl;
-		wcout << L"[                   ] " << setw(20) << right << L"SourceFormat" << L" : " << SourceFormat.GetString() << endl;
+		wcout << L"[                   ] " << setw(20) << right << L"m_Title" << L" : " << m_Title.GetString() << endl;
+		wcout << L"[                   ] " << setw(20) << right << L"m_EpisodeTitle" << L" : " << m_EpisodeTitle.GetString() << endl;
+		wcout << L"[                   ] " << setw(20) << right << L"m_Description" << L" : " << m_Description.GetString() << endl;
+		wcout << L"[                   ] " << setw(20) << right << L"m_ContentType" << L" : " << m_ContentType.GetString() << endl;
+		wcout << L"[                   ] " << setw(20) << right << L"m_SourceFormat" << L" : " << m_SourceFormat.GetString() << endl;
 		//wcout << L"[                   ] " << setw(20) << right << L"LastChangeDate" << L" : " << LastChangeDate.GetString() << endl;
-		wcout << L"[                   ] " << setw(20) << right << L"SourceSize" << L" : " << SourceSize << endl;
-		wcout << L"[                   ] " << setw(20) << right << L"Duration" << L" : " << Duration << endl;
-		wcout << L"[                   ] " << setw(20) << right << L"CaptureDate" << L" : " << CaptureDate.Format(_T("%c")).GetString() << endl;
-		wcout << L"[                   ] " << setw(20) << right << L"URL" << L" : " << csURL.GetString() << endl;
+		wcout << L"[                   ] " << setw(20) << right << L"m_SourceSize" << L" : " << m_SourceSize << endl;
+		wcout << L"[                   ] " << setw(20) << right << L"m_Duration" << L" : " << m_Duration << endl;
+		wcout << L"[                   ] " << setw(20) << right << L"m_CaptureDate" << L" : " << m_CaptureDate.Format(_T("%c")).GetString() << endl;
+		wcout << L"[                   ] " << setw(20) << right << L"URL" << L" : " << m_csURL.GetString() << endl;
 	}	
 	void SetPathName(const CFileFind & csNewPath)
 	{
-		csPathName = csNewPath.GetFilePath();
-		SourceSize = csNewPath.GetLength();
-		Title = csNewPath.GetFileTitle();
-		ContentType = _T("video/x-tivo-mpeg");		
-		csNewPath.GetLastWriteTime(CaptureDate);
+		m_csPathName = csNewPath.GetFilePath();
+		m_SourceSize = csNewPath.GetLength();
+		m_Title = csNewPath.GetFileTitle();
+		m_ContentType = _T("video/x-tivo-mpeg");		
+		csNewPath.GetLastWriteTime(m_CaptureDate);
 
-
-		//csURL = csNewPath.GetFileURL();
-		csURL = csUrlPrefix;
-		csURL.Append(csPathName);
-		csURL.Replace(_T("\\"), _T("/"));
+		//m_csURL = csNewPath.GetFileURL();
+		m_csURL = csUrlPrefix;
+		m_csURL.Append(m_csPathName);
+		m_csURL.Replace(_T("\\"), _T("/"));
 		TCHAR lpszBuffer[_MAX_PATH];
 		DWORD dwBufferLength = sizeof(lpszBuffer) / sizeof(TCHAR);
-		InternetCanonicalizeUrl(csURL.GetString(), lpszBuffer, &dwBufferLength, 0);
-		csURL = CString(lpszBuffer, dwBufferLength);
+		InternetCanonicalizeUrl(m_csURL.GetString(), lpszBuffer, &dwBufferLength, 0);
+		m_csURL = CString(lpszBuffer, dwBufferLength);
 		PopulateFromFFMPEG();
 		// Final Output of object values
-		wcout << L"[                   ] " << setw(20) << right << L"csPathName" << L" : " << csPathName.GetString() << endl;
-		wcout << L"[                   ] " << setw(20) << right << L"Title" << L" : " << Title.GetString() << endl;
-		wcout << L"[                   ] " << setw(20) << right << L"EpisodeTitle" << L" : " << EpisodeTitle.GetString() << endl;
-		wcout << L"[                   ] " << setw(20) << right << L"Description" << L" : " << Description.GetString() << endl;
-		wcout << L"[                   ] " << setw(20) << right << L"ContentType" << L" : " << ContentType.GetString() << endl;
-		wcout << L"[                   ] " << setw(20) << right << L"SourceFormat" << L" : " << SourceFormat.GetString() << endl;
+		wcout << L"[                   ] " << setw(20) << right << L"m_csPathName" << L" : " << m_csPathName.GetString() << endl;
+		wcout << L"[                   ] " << setw(20) << right << L"m_Title" << L" : " << m_Title.GetString() << endl;
+		wcout << L"[                   ] " << setw(20) << right << L"m_EpisodeTitle" << L" : " << m_EpisodeTitle.GetString() << endl;
+		wcout << L"[                   ] " << setw(20) << right << L"m_Description" << L" : " << m_Description.GetString() << endl;
+		wcout << L"[                   ] " << setw(20) << right << L"m_ContentType" << L" : " << m_ContentType.GetString() << endl;
+		wcout << L"[                   ] " << setw(20) << right << L"m_SourceFormat" << L" : " << m_SourceFormat.GetString() << endl;
 		//wcout << L"[                   ] " << setw(20) << right << L"LastChangeDate" << L" : " << LastChangeDate.GetString() << endl;
-		wcout << L"[                   ] " << setw(20) << right << L"SourceSize" << L" : " << SourceSize << endl;
-		wcout << L"[                   ] " << setw(20) << right << L"Duration" << L" : " << Duration << endl;
-		wcout << L"[                   ] " << setw(20) << right << L"CaptureDate" << L" : " << CaptureDate.Format(_T("%c")).GetString() << endl;
-		wcout << L"[                   ] " << setw(20) << right << L"URL" << L" : " << csURL.GetString() << endl;
+		wcout << L"[                   ] " << setw(20) << right << L"m_SourceSize" << L" : " << m_SourceSize << endl;
+		wcout << L"[                   ] " << setw(20) << right << L"m_Duration" << L" : " << m_Duration << endl;
+		wcout << L"[                   ] " << setw(20) << right << L"m_CaptureDate" << L" : " << m_CaptureDate.Format(_T("%c")).GetString() << endl;
+		wcout << L"[                   ] " << setw(20) << right << L"URL" << L" : " << m_csURL.GetString() << endl;
+	}
+	const CString GetPathName(void) const { return(m_csPathName); }
+	void SetFromTiVoItem(const CString &csTitle, const CString &csEpisodeTitle, const CString &csDescription, const CString &csSourceStation, const CString &csContentURL, const CTime &ctCaptureDate, const CTimeSpan &ctsDuration)
+	{
+		m_Title = csTitle;
+		m_EpisodeTitle = csEpisodeTitle;
+		m_Description = csDescription;
+		m_csURL = csContentURL;
+		m_CaptureDate = ctCaptureDate;
+		m_Duration = 1000 * ctsDuration.GetTotalSeconds();
+		std::wstringstream ssFileName(std::stringstream::in | std::stringstream::out);
+		ssFileName << L"//Acid/TiVo/";
+		ssFileName << csTitle.GetString();
+		if (!csEpisodeTitle.IsEmpty())
+			ssFileName << L" - ''" << csEpisodeTitle.GetString() << L"''";
+		ssFileName << L" (Recorded " << ctCaptureDate.Format(_T("%b %d, %Y, ")).GetString() << csSourceStation.GetString() << L").TiVo";
+		m_csPathName = ssFileName.str().c_str();
 	}
 	void PopulateFromFFMPEG(void)
 	{
@@ -789,30 +805,30 @@ public:
 		int Oldavlog = av_log_get_level();
 		av_log_set_level(AV_LOG_FATAL);
 		AVFormatContext *fmt_ctx = NULL;
-		if (0 == avformat_open_input(&fmt_ctx, CStringA(csPathName).GetString(), NULL, NULL))
+		if (0 == avformat_open_input(&fmt_ctx, CStringA(m_csPathName).GetString(), NULL, NULL))
 		{
 			if(0 <= avformat_find_stream_info(fmt_ctx, NULL))					
 			{
 				if (fmt_ctx->duration != AV_NOPTS_VALUE) 
 				{
-					Duration = fmt_ctx->duration + 5000;
-					int secs = Duration / AV_TIME_BASE;
-					int us = Duration % AV_TIME_BASE;
+					m_Duration = fmt_ctx->duration + 5000;
+					int secs = m_Duration / AV_TIME_BASE;
+					int us = m_Duration % AV_TIME_BASE;
 					int mins = secs / 60;
 					secs %= 60;
 					int hours = mins / 60;
 					mins %= 60;
-					std::cout << "[                   ] " << setw(20) << right << "Duration" << " : ";
+					std::cout << "[                   ] " << setw(20) << right << "m_Duration" << " : ";
 					char oldfill = std::cout.fill('0');
 					streamsize oldwidth = std::cout.width(2);
 					std::cout << hours << ":" << mins << ":" << secs << "." << ((100 * us) / AV_TIME_BASE) << endl;
 					std::cout.width(oldwidth);
 					std::cout.fill(oldfill);
-					Duration /= 1000; // this makes at least my first example match the tivo desktop software
+					m_Duration /= 1000; // this makes at least my first example match the tivo desktop software
 				}
-				SourceFormat.Append(_T("video/"));
-				SourceFormat.Append(CString(CStringA(fmt_ctx->iformat->name)));
-				//av_dump_format(fmt_ctx, 0, CStringA(csPathName).GetString(), 0);
+				m_SourceFormat.Append(_T("video/"));
+				m_SourceFormat.Append(CString(CStringA(fmt_ctx->iformat->name)));
+				//av_dump_format(fmt_ctx, 0, CStringA(m_csPathName).GetString(), 0);
 
 				//// Find the first video stream
 				int videoStream=-1;
@@ -826,20 +842,20 @@ public:
 				{
 					const char *codec_type = av_get_media_type_string(fmt_ctx->streams[videoStream]->codec->codec_type);
 					const char *codec_name = avcodec_get_name(fmt_ctx->streams[videoStream]->codec->codec_id);
-					SourceFormat = CStringA(codec_type);
-					SourceFormat.Append(_T("/"));
-					SourceFormat.Append(CString(CStringA(codec_name)));
+					m_SourceFormat = CStringA(codec_type);
+					m_SourceFormat.Append(_T("/"));
+					m_SourceFormat.Append(CString(CStringA(codec_name)));
 					//if (fmt_ctx->streams[videoStream]->codec->codec_tag) 
 					//{
 					//	char tag_buf[32];
 					//	av_get_codec_tag_string(tag_buf, sizeof(tag_buf), fmt_ctx->streams[videoStream]->codec->codec_tag);
-					//	SourceFormat = CStringA(codec_type);
-					//	SourceFormat.Append(_T("/"));
-					//	SourceFormat.Append(CString(CStringA(tag_buf)));
+					//	m_SourceFormat = CStringA(codec_type);
+					//	m_SourceFormat.Append(_T("/"));
+					//	m_SourceFormat.Append(CString(CStringA(tag_buf)));
 					//}
 					//char buf[256];
 					//avcodec_string(buf, sizeof(buf), fmt_ctx->streams[videoStream]->codec, 1);
-					//Duration = fmt_ctx->streams[videoStream]->duration;
+					//m_Duration = fmt_ctx->streams[videoStream]->duration;
 					//cout << "fmt_ctx->streams[videoStream]->duration " << fmt_ctx->streams[videoStream]->duration << endl;
 					//cout << "fmt_ctx->streams[videoStream]->time_base " << fmt_ctx->streams[videoStream]->time_base << endl;
 					// Get a pointer to the codec context for the video stream
@@ -866,17 +882,17 @@ public:
 					//cout << "[                   ] " << setw(20) << right << tag->key << " : " << tag->value << endl;
 					//#endif
 					if (_stricmp("title", tag->key) == 0)
-						Title = CString(tag->value);
+						m_Title = CString(tag->value);
 					if (_stricmp("WM/SubTitle", tag->key) == 0)
-						EpisodeTitle = CString(tag->value);
+						m_EpisodeTitle = CString(tag->value);
 					if (_stricmp("WM/SubTitleDescription", tag->key) == 0)
-						Description = CString(tag->value);
-					//if (_stricmp("Duration", tag->key) == 0)
+						m_Description = CString(tag->value);
+					//if (_stricmp("m_Duration", tag->key) == 0)
 					//{
 					//	std::stringstream ss(std::string(tag->value), std::stringstream::in | std::stringstream::out);
-					//	ss >> Duration;
-					//	// Duration should now be in 100-nanosecond units. The TiVo wants it in 1/1000 of a second units. http://msdn.microsoft.com/en-us/library/windows/desktop/ff384862(v=vs.85).aspx
-					//	Duration /= 1000;
+					//	ss >> m_Duration;
+					//	// m_Duration should now be in 100-nanosecond units. The TiVo wants it in 1/1000 of a second units. http://msdn.microsoft.com/en-us/library/windows/desktop/ff384862(v=vs.85).aspx
+					//	m_Duration /= 1000;
 					//}
 				}
 			}
@@ -884,25 +900,25 @@ public:
 		}
 		av_log_set_level(Oldavlog);
 	}
-	const CString GetURL(void) const { return(csURL); }
+	const CString GetURL(void) const { return(m_csURL); }
 	void GetXML(CComPtr<IXmlWriter> & pWriter) const
 	{
 		pWriter->WriteStartElement(NULL, L"Item", NULL);
 			pWriter->WriteStartElement(NULL, L"Details", NULL);
-				pWriter->WriteElementString(NULL, L"Title", NULL, Title.GetString());
-				if (!EpisodeTitle.IsEmpty()) pWriter->WriteElementString(NULL, L"EpisodeTitle", NULL, EpisodeTitle.GetString());
-				if (!Description.IsEmpty()) pWriter->WriteElementString(NULL, L"Description", NULL, Description.GetString());
-				if (!ContentType.IsEmpty()) pWriter->WriteElementString(NULL, L"ContentType", NULL, ContentType.GetString());
-				if (!SourceFormat.IsEmpty()) pWriter->WriteElementString(NULL, L"SourceFormat", NULL, SourceFormat.GetString());
-				if (Duration > 0)
+				pWriter->WriteElementString(NULL, L"Title", NULL, m_Title.GetString());
+				if (!m_EpisodeTitle.IsEmpty()) pWriter->WriteElementString(NULL, L"EpisodeTitle", NULL, m_EpisodeTitle.GetString());
+				if (!m_Description.IsEmpty()) pWriter->WriteElementString(NULL, L"Description", NULL, m_Description.GetString());
+				if (!m_ContentType.IsEmpty()) pWriter->WriteElementString(NULL, L"ContentType", NULL, m_ContentType.GetString());
+				if (!m_SourceFormat.IsEmpty()) pWriter->WriteElementString(NULL, L"SourceFormat", NULL, m_SourceFormat.GetString());
+				if (m_Duration > 0)
 				{
 					std::wstringstream ss(std::stringstream::in | std::stringstream::out);
-					ss << Duration;
+					ss << m_Duration;
 					pWriter->WriteElementString(NULL, L"Duration", NULL, ss.str().c_str());
 				}
-				//if (CaptureDate.IsValidFILETIME())
+				//if (m_CaptureDate.IsValidFILETIME())
 				{
-					CTime tempTime(CaptureDate);
+					CTime tempTime(m_CaptureDate);
 					const CTime UnixEpochTime(1970,1,1,0,0,0);
 					_tzset();
 					tempTime += CTimeSpan(_timezone);	// the time difference was ~8 hours, which makes sense as the diff between UTC and local time.
@@ -912,12 +928,12 @@ public:
 					pWriter->WriteElementString(NULL, L"CaptureDate", NULL, ss.str().c_str());
 				}
 			pWriter->WriteEndElement();	// Details
-			if (!ContentType.IsEmpty() && !csURL.IsEmpty())
+			if (!m_ContentType.IsEmpty() && !m_csURL.IsEmpty())
 			{
 				pWriter->WriteStartElement(NULL, L"Links", NULL);
 					pWriter->WriteStartElement(NULL, L"Content", NULL);
-						pWriter->WriteElementString(NULL, L"ContentType", NULL, ContentType.GetString());
-						pWriter->WriteElementString(NULL, L"Url", NULL, csURL.GetString());
+						pWriter->WriteElementString(NULL, L"ContentType", NULL, m_ContentType.GetString());
+						pWriter->WriteElementString(NULL, L"Url", NULL, m_csURL.GetString());
 					pWriter->WriteEndElement();
 					pWriter->WriteStartElement(NULL, L"CustomIcon", NULL);
 						pWriter->WriteElementString(NULL, L"ContentType", NULL, L"image/*");
@@ -928,7 +944,7 @@ public:
 						pWriter->WriteElementString(NULL, L"ContentType", NULL, L"text/xml");
 						pWriter->WriteElementString(NULL, L"AcceptsParams", NULL, L"No");
 						CString DetailsURL(_T("/TiVoConnect?Command=TVBusQuery&Url="));
-						DetailsURL.Append(csURL);
+						DetailsURL.Append(m_csURL);
 						pWriter->WriteElementString(NULL, L"Url", NULL, DetailsURL.GetString());
 					pWriter->WriteEndElement();
 				pWriter->WriteEndElement();
@@ -953,10 +969,10 @@ public:
 				pWriter->WriteStartElement(NULL, L"vChoreographer", NULL);
 				pWriter->WriteEndElement();
 				pWriter->WriteStartElement(NULL, L"colorCode", NULL);pWriter->WriteAttributeString(NULL,L"value",NULL,L"4");pWriter->WriteEndElement();
-				pWriter->WriteElementString(NULL, L"description", NULL, Description.GetString());
+				pWriter->WriteElementString(NULL, L"description", NULL, m_Description.GetString());
 				pWriter->WriteStartElement(NULL, L"vDirector", NULL);
 				pWriter->WriteEndElement();
-				if (!EpisodeTitle.IsEmpty()) pWriter->WriteElementString(NULL, L"episodeTitle", NULL, EpisodeTitle.GetString());
+				if (!m_EpisodeTitle.IsEmpty()) pWriter->WriteElementString(NULL, L"episodeTitle", NULL, m_EpisodeTitle.GetString());
 				pWriter->WriteStartElement(NULL, L"vExecProducer", NULL);
 				pWriter->WriteEndElement();
 				pWriter->WriteStartElement(NULL, L"vProgramGenre", NULL);
@@ -977,10 +993,10 @@ public:
 						pWriter->WriteElementString(NULL, L"element", NULL, L"News and Business");
 						pWriter->WriteElementString(NULL, L"element", NULL, L"Talk Shows");
 					pWriter->WriteEndElement();
-					pWriter->WriteElementString(NULL, L"seriesTitle", NULL, Title.GetString());
+					pWriter->WriteElementString(NULL, L"seriesTitle", NULL, m_Title.GetString());
 				pWriter->WriteEndElement();
 				pWriter->WriteStartElement(NULL, L"showType", NULL);pWriter->WriteAttributeString(NULL,L"value",NULL,L"5");pWriter->WriteString(L"SERIES");pWriter->WriteEndElement();
-				pWriter->WriteElementString(NULL, L"title", NULL, Title.GetString());
+				pWriter->WriteElementString(NULL, L"title", NULL, m_Title.GetString());
 				pWriter->WriteStartElement(NULL, L"vWriter", NULL);
 				pWriter->WriteEndElement();
 			pWriter->WriteEndElement();
@@ -994,10 +1010,8 @@ public:
 		pWriter->WriteElementString(NULL, L"stopTime", NULL, L"2010-03-27T02:30:00Z");
 	}
 };
-bool cTiVoFileCompareDate(const cTiVoFile & a, const cTiVoFile & b)
-{
-	return(a.CaptureDate > b.CaptureDate);
-}
+bool cTiVoFileCompareDate(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_CaptureDate > b.m_CaptureDate); }
+bool cTiVoFileCompareDateReverse(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_CaptureDate < b.m_CaptureDate); }
 void PopulateTiVoFileList(std::vector<cTiVoFile> & TiVoFileList, std::string FileSpec)
 {
 	TRACE(__FUNCTION__ "\n");
@@ -1017,6 +1031,475 @@ void PopulateTiVoFileList(std::vector<cTiVoFile> & TiVoFileList, std::string Fil
 		}
 	}
 	finder.Close();
+}
+/////////////////////////////////////////////////////////////////////////////
+void XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, std::vector<cTiVoFile> & TiVoFileList)
+{
+	HRESULT hr = S_OK;
+	CComPtr<IXmlReader> pReader; 
+	if (SUCCEEDED(hr = CreateXmlReader(__uuidof(IXmlReader), (void**) &pReader, NULL))) 
+	{
+		if (SUCCEEDED(hr = pReader->SetProperty(XmlReaderProperty_DtdProcessing, DtdProcessing_Prohibit))) 
+		{
+			if (SUCCEEDED(hr = pReader->SetInput(spStream))) 
+			{
+				int indentlevel = 0;
+				XmlNodeType nodeType; 
+				const WCHAR* pwszPrefix; 
+				const WCHAR* pwszLocalName; 
+				const WCHAR* pwszValue; 
+				//const WCHAR* pwsznsURI;
+				UINT cwchPrefix;
+				bool bIsItem = false;
+				bool bIsItemDetails = false;
+				bool bIsItemLinks = false;
+				bool bIsItemLinksContent = false;
+				bool bIsItemVideo = false;
+				bool bCopyProtected = false;
+				const CString ccsItem(_T("Item"));
+				const CString ccsTitle(_T("Title"));
+				const CString ccsDuration(_T("Duration"));
+				const CString ccsCaptureDate(_T("CaptureDate"));
+				const CString ccsEpisodeTitle(_T("EpisodeTitle"));
+				const CString ccsDescription(_T("Description"));
+				const CString ccsSourceStation(_T("SourceStation"));
+				const CString ccsCopyProtected(_T("CopyProtected"));
+				const CString ccsUrl(_T("Url"));
+				const CString ccsContentType(_T("ContentType"));
+				const CString ccsContentTypeValue(_T("video/x-tivo-raw-tts"));
+				const CString ccsDetails(_T("Details"));
+				const CString ccsLinks(_T("Links"));
+				const CString ccsContent(_T("Content"));
+				CString csTitle;
+				CString csEpisodeTitle;
+				CString csDescription;
+				CString csSourceStation;
+				CString csContentURL;
+				CTime ctCaptureDate;
+				CTimeSpan ctsDuration;
+				//read until there are no more nodes 
+				while (S_OK == (hr = pReader->Read(&nodeType))) 
+				{ 
+					if (nodeType == XmlNodeType_Element)
+					{
+						if (SUCCEEDED(hr = pReader->GetLocalName(&pwszLocalName, NULL)))
+						{
+							if (!ccsItem.Compare(pwszLocalName))
+							{
+								// re-initialize stuff when starting the Item
+								bIsItem = true;
+								bIsItemDetails = false;
+								bIsItemLinks = false;
+								bIsItemLinksContent = false;
+								bIsItemVideo = false;
+								bCopyProtected = false;
+								csTitle.Empty();
+								csEpisodeTitle.Empty();
+								csDescription.Empty();
+								csSourceStation.Empty();
+								csContentURL.Empty();
+							}
+							else if (bIsItem && !ccsDetails.Compare(pwszLocalName))
+								bIsItemDetails = true;
+							else if (bIsItem && !ccsLinks.Compare(pwszLocalName))
+								bIsItemLinks = true;
+							else if (bIsItem && bIsItemLinks && !ccsContent.Compare(pwszLocalName))
+								bIsItemLinksContent = true;
+							// Here's where I need to dig deeper.
+							else if (bIsItemDetails)
+							{
+								if (SUCCEEDED(hr = pReader->Read(&nodeType)))
+								{
+									if (nodeType == XmlNodeType_Text)
+									{
+										if (SUCCEEDED(hr = pReader->GetValue(&pwszValue, NULL)))
+										{
+											if (!ccsContentType.Compare(pwszLocalName))
+											{
+												if (!ccsContentTypeValue.CompareNoCase(pwszValue))
+													bIsItemVideo = true;
+												else
+													bIsItemVideo = false;
+											}
+											else if (!ccsTitle.Compare(pwszLocalName))
+												csTitle = pwszValue;
+											else if (!ccsEpisodeTitle.Compare(pwszLocalName))
+												csEpisodeTitle = pwszValue;
+											else if (!ccsDescription.Compare(pwszLocalName))
+												csDescription = pwszValue;
+											else if (!ccsSourceStation.Compare(pwszLocalName))
+												csSourceStation = pwszValue;
+											else if (!ccsCopyProtected.Compare(pwszLocalName))
+												bCopyProtected = CString(pwszValue).CompareNoCase(_T("yes")) == 0;
+											else if (!ccsDuration.Compare(pwszLocalName))
+											{
+												auto tempDuration = _wtoi(pwszValue);
+												ctsDuration = CTimeSpan(0,0,0,tempDuration/1000);
+											}
+											else if (!ccsCaptureDate.Compare(pwszLocalName))
+											{
+												std::wstringstream ss(std::stringstream::in | std::stringstream::out);
+												ss << pwszValue;
+												ss << showbase << hex;
+												long long SecondsSinceEpoch = 0;
+												ss >> SecondsSinceEpoch;
+												ctCaptureDate = CTime(1970,1,1,0,0,0) + CTimeSpan(0,0,0,SecondsSinceEpoch) - CTimeSpan(_timezone);
+											}
+										}
+									}
+								}
+							}
+							else if (bIsItemLinksContent)
+							{
+								if (SUCCEEDED(hr = pReader->Read(&nodeType)))
+									if (nodeType == XmlNodeType_Text)
+										if (SUCCEEDED(hr = pReader->GetValue(&pwszValue, NULL)))
+											if (!ccsUrl.Compare(pwszLocalName))
+												csContentURL = pwszValue;
+							}
+						}
+					}
+					else if (nodeType == XmlNodeType_EndElement)
+					{
+						if (SUCCEEDED(hr = pReader->GetLocalName(&pwszLocalName, NULL)))
+						{
+							if (!ccsItem.Compare(pwszLocalName))
+							{
+								bIsItem = false;
+								if (bIsItemVideo && !bCopyProtected)
+								{
+									#ifdef _DEBUG
+									// Output stuff when ending the item
+									std::wcout << L"[                   ]";
+									std::wcout << L" " << csTitle.GetString();
+									std::wcout << L" " << csEpisodeTitle.GetString();
+									std::wcout << L" " << csDescription.GetString();
+									std::wcout << L" " << csSourceStation.GetString();
+									std::wcout << L" " << csContentURL.GetString();
+									std::wcout << L" " << ctCaptureDate.Format(_T("%c")).GetString();
+									std::wcout << L" " << ctsDuration.Format(_T("%H:%M:%S")).GetString();
+									std::wcout << endl;
+									#endif
+									std::wstringstream ssFileName(std::stringstream::in | std::stringstream::out);
+									ssFileName << csTitle.GetString();
+									if (!csEpisodeTitle.IsEmpty())
+										ssFileName << L" - ''" << csEpisodeTitle.GetString() << L"''";
+									ssFileName << L" (Recorded " << ctCaptureDate.Format(_T("%b %d, %Y, ")).GetString() << csSourceStation.GetString() << L").TiVo";
+									#ifdef _DEBUG
+									std::wcout << L"[                   ] FileName: " << ssFileName.str().c_str() << endl;
+									#endif
+									cTiVoFile MyFile;
+									MyFile.SetFromTiVoItem(csTitle, csEpisodeTitle, csDescription, csSourceStation, csContentURL, ctCaptureDate, ctsDuration);
+									TiVoFileList.push_back(MyFile);
+								}
+							}
+							else if (bIsItemDetails && !ccsDetails.Compare(pwszLocalName))
+								bIsItemDetails = false;
+							else if (bIsItemLinks && !ccsLinks.Compare(pwszLocalName))
+								bIsItemLinks = false;
+							else if (bIsItemLinksContent && !ccsContent.Compare(pwszLocalName))
+								bIsItemLinksContent = false;
+						}
+					}
+				}
+			} 
+		}
+	}
+}
+void XML_Parse_TiVoNowPlaying(const CString & Source, std::vector<cTiVoFile> & TiVoFileList)
+{
+	CComPtr<IStream> spFileStream;
+	if (SUCCEEDED(SHCreateStreamOnFile(Source.GetString(), STGM_READ, &spFileStream)))
+		XML_Parse_TiVoNowPlaying(spFileStream, TiVoFileList);
+}
+bool XML_Parse_TiVoNowPlaying(const CString & Source, std::vector<cTiVoFile> & TiVoFileList, CInternetSession & serverSession)
+{
+	bool rval = true;
+	std::cout << "[" << getTimeISO8601() << "] Attempting: " << CStringA(*Source).GetString() << endl;
+	DWORD dwServiceType;
+	CString strServer;
+	CString strObject; 
+	INTERNET_PORT nPort; 
+	CString strUsername; 
+	CString strPassword; 
+	AfxParseURLEx(Source.GetString(), dwServiceType, strServer, strObject, nPort, strUsername, strPassword);
+	std::unique_ptr<CHttpConnection> serverConnection(serverSession.GetHttpConnection(strServer,nPort,strUsername,strPassword));
+	if (NULL != serverConnection)
+	{
+		DWORD dwFlags = INTERNET_FLAG_TRANSFER_BINARY | SECURITY_IGNORE_ERROR_MASK;
+		if (dwServiceType == AFX_INET_SERVICE_HTTPS)
+			dwFlags |= INTERNET_FLAG_SECURE;
+		std::unique_ptr<CHttpFile> serverFile(serverConnection->OpenRequest(1, strObject, NULL, 1, NULL, NULL, dwFlags));
+		if (serverFile != NULL)
+		{
+			int BadCertErrorCount = 0;
+			TiVoNowPlayingAGAIN:
+			try 
+			{
+				//std::unique_ptr<CHttpFile> serverFile((CHttpFile*) serverSession.OpenURL(*Source, 1, INTERNET_FLAG_TRANSFER_BINARY));
+				serverFile->SendRequest();
+				DWORD dwRet;
+				serverFile->QueryInfoStatusCode(dwRet);
+				#ifdef _DEBUG
+				//std::wcout << L"[                   ] Server Status Code: " << dwRet << endl;
+				CString headers;
+				serverFile->QueryInfo(HTTP_QUERY_RAW_HEADERS_CRLF,headers);
+				headers.Trim();
+				headers.Replace(_T("\r\n"),_T("\r\n[                   ] HTTP_QUERY_RAW_HEADERS_CRLF: "));
+				std::wcout << L"[                   ] HTTP_QUERY_RAW_HEADERS_CRLF: " << headers.GetString() << endl;
+				#endif
+				if(dwRet == HTTP_STATUS_OK)
+				{
+					CString csCookie;
+					serverFile->QueryInfo(HTTP_QUERY_SET_COOKIE, csCookie);
+					if (!csCookie.IsEmpty())
+					{
+						std::wcout << L"[                   ] HTTP_QUERY_SET_COOKIE: " << csCookie.GetString() << endl;
+						// sid=1BFA53E13BDF178B; path=/; expires="Saturday, 16-Feb-2013 00:00:00 GMT";
+						CString csCookieName(csCookie.Left(csCookie.Find(_T("="))));
+						CString csCookieData(csCookie.Left(csCookie.Find(_T(";"))));;
+						csCookieData.Delete(0,csCookieData.Find(_T("="))+1);
+						CString csCookiePath(csCookie);
+						csCookiePath.Delete(0,csCookiePath.Find(_T("path="))+5);
+						csCookiePath.Delete(csCookiePath.Find(_T(";")),csCookiePath.GetLength());
+						CString csCookieURL;
+						if (dwServiceType == AFX_INET_SERVICE_HTTPS)
+							csCookieURL = _T("https://");
+						else
+							csCookieURL = _T("https://");
+						csCookieURL.Append(strServer);
+						csCookieURL.AppendFormat(_T(":%d"), nPort);
+						csCookieURL.Append(csCookiePath);
+						std::wcout << L"[                   ] csCookieURL: " << csCookieURL.GetString() << endl;
+						std::wcout << L"[                   ] csCookieName: " << csCookieName.GetString() << endl;
+						std::wcout << L"[                   ] csCookieData: " << csCookieData.GetString() << endl;
+						serverSession.SetCookie(csCookieURL,csCookieName,csCookieData);
+					}									
+					CString csContentType;
+					serverFile->QueryInfo(HTTP_QUERY_CONTENT_TYPE, csContentType);
+					if (0 < csContentType.Find(_T(";"))) // Fix issue of text/xml; charset=UTF-8
+						csContentType.Delete(csContentType.Find(_T(";")),csContentType.GetLength());									
+					if (!csContentType.CompareNoCase(_T("text/xml")))
+					{								
+						CComPtr<IStream> spMemoryStreamOne(::SHCreateMemStream(NULL, 0));
+						if (spMemoryStreamOne != NULL)
+						{
+							char ittybittybuffer;
+							ULONG cbWritten;
+							while (0 < serverFile->Read(&ittybittybuffer, sizeof(ittybittybuffer)))
+								spMemoryStreamOne->Write(&ittybittybuffer, 1, &cbWritten);
+
+							// reposition back to beginning of stream
+							LARGE_INTEGER position;
+							position.QuadPart = 0;
+							spMemoryStreamOne->Seek(position, STREAM_SEEK_SET, NULL);
+							XML_Parse_TiVoNowPlaying(spMemoryStreamOne, TiVoFileList);
+						}
+					}
+					else
+					{
+						std::cout << "[                   ] not text/xml" << endl;
+						char ittybittybuffer;
+						while (0 < serverFile->Read(&ittybittybuffer, sizeof(ittybittybuffer)))
+							std::cout << ittybittybuffer;
+						std::cout << endl;
+					}
+				}
+				else if (dwRet == HTTP_STATUS_SERVICE_UNAVAIL)
+				{
+					CString csRetry;
+					if (0 < serverFile->QueryInfo(HTTP_QUERY_RETRY_AFTER, csRetry))
+					{
+						int iRetry = _ttoi(csRetry.GetString());
+						std::cout << "[" << getTimeISO8601() << "] Sleeping for " << iRetry << " Seconds" << endl;
+						Sleep(iRetry * 1000);
+						rval = false;
+					}
+				}
+				else if (serverFile->GetLength() > 0)
+				{
+					char ittybittybuffer;
+					std::string ss;
+					while (0 < serverFile->Read(&ittybittybuffer, sizeof(ittybittybuffer)))
+						ss += ittybittybuffer;
+					std::cout << "[                   ] Returned File: " << ss << endl;
+				}
+				serverFile->Close();
+			}
+			catch(CInternetException *e)
+			{
+				TCHAR   szCause[255];
+				e->GetErrorMessage(szCause,sizeof(szCause)/sizeof(TCHAR));
+				CStringA csErrorMessage(szCause);
+				csErrorMessage.Trim();
+				std::cout << "[                   ] InternetException: " <<  csErrorMessage.GetString() << " (" << e->m_dwError << ") " << endl;
+				if ((e->m_dwError == ERROR_INTERNET_INVALID_CA) || 
+					(e->m_dwError == ERROR_INTERNET_SEC_CERT_CN_INVALID) ||
+					(e->m_dwError == ERROR_INTERNET_SEC_CERT_DATE_INVALID) ||
+					(e->m_dwError == ERROR_INTERNET_SEC_INVALID_CERT) )
+				{
+					serverFile->SetOption(INTERNET_OPTION_SECURITY_FLAGS, SECURITY_SET_MASK);
+					if (BadCertErrorCount++ < 2)
+						goto TiVoNowPlayingAGAIN;
+				}
+			}
+		}
+	}
+	return(rval);
+}
+bool GetTiVoFile(const cTiVoFile & TiVoFile, CInternetSession & serverSession, const CString & csTiVoMAK)
+{
+	bool rval = true;
+	std::cout << "[" << getTimeISO8601() << "] Attempting: " << CStringA(TiVoFile.GetURL()).GetString() << endl;
+	DWORD dwServiceType;
+	CString strServer;
+	CString strObject; 
+	INTERNET_PORT nPort; 
+	CString strUsername; 
+	CString strPassword; 
+	AfxParseURLEx(TiVoFile.GetURL().GetString(), dwServiceType, strServer, strObject, nPort, strUsername, strPassword);
+	strUsername = _T("tivo");
+	strPassword = csTiVoMAK;
+	std::unique_ptr<CHttpConnection> serverConnection(serverSession.GetHttpConnection(strServer,nPort,strUsername,strPassword));
+	if (NULL != serverConnection)
+	{
+		DWORD dwFlags = INTERNET_FLAG_TRANSFER_BINARY | SECURITY_IGNORE_ERROR_MASK;
+		if (dwServiceType == AFX_INET_SERVICE_HTTPS)
+			dwFlags |= INTERNET_FLAG_SECURE;
+		std::unique_ptr<CHttpFile> serverFile(serverConnection->OpenRequest(1, strObject, NULL, 1, NULL, NULL, dwFlags));
+		if (serverFile != NULL)
+		{
+			int BadCertErrorCount = 0;
+			AGAIN:
+			try 
+			{
+				//std::unique_ptr<CHttpFile> serverFile((CHttpFile*) serverSession.OpenURL(*csURL, 1, INTERNET_FLAG_TRANSFER_BINARY));
+				serverFile->SendRequest();
+				DWORD dwRet;
+				serverFile->QueryInfoStatusCode(dwRet);
+				#ifdef _DEBUG
+				//std::wcout << L"[                   ] Server Status Code: " << dwRet << endl;
+				CString headers;
+				serverFile->QueryInfo(HTTP_QUERY_RAW_HEADERS_CRLF,headers);
+				headers.Trim();
+				headers.Replace(_T("\r\n"),_T("\r\n[                   ] HTTP_QUERY_RAW_HEADERS_CRLF: "));
+				std::wcout << L"[                   ] HTTP_QUERY_RAW_HEADERS_CRLF: " << headers.GetString() << endl;
+				#endif
+				if(dwRet == HTTP_STATUS_OK)
+				{
+					CString csCookie;
+					serverFile->QueryInfo(HTTP_QUERY_SET_COOKIE, csCookie);
+					if (!csCookie.IsEmpty())
+					{
+						std::wcout << L"[                   ] HTTP_QUERY_SET_COOKIE: " << csCookie.GetString() << endl;
+						// sid=1BFA53E13BDF178B; path=/; expires="Saturday, 16-Feb-2013 00:00:00 GMT";
+						CString csCookieName(csCookie.Left(csCookie.Find(_T("="))));
+						CString csCookieData(csCookie.Left(csCookie.Find(_T(";"))));;
+						csCookieData.Delete(0,csCookieData.Find(_T("="))+1);
+						CString csCookiePath(csCookie);
+						csCookiePath.Delete(0,csCookiePath.Find(_T("path="))+5);
+						csCookiePath.Delete(csCookiePath.Find(_T(";")),csCookiePath.GetLength());
+						CString csCookieURL;
+						if (dwServiceType == AFX_INET_SERVICE_HTTPS)
+							csCookieURL = _T("https://");
+						else
+							csCookieURL = _T("https://");
+						csCookieURL.Append(strServer);
+						csCookieURL.AppendFormat(_T(":%d"), nPort);
+						csCookieURL.Append(csCookiePath);
+						std::wcout << L"[                   ] csCookieURL: " << csCookieURL.GetString() << endl;
+						std::wcout << L"[                   ] csCookieName: " << csCookieName.GetString() << endl;
+						std::wcout << L"[                   ] csCookieData: " << csCookieData.GetString() << endl;
+						serverSession.SetCookie(csCookieURL,csCookieName,csCookieData);
+					}									
+					CString csContentType;
+					serverFile->QueryInfo(HTTP_QUERY_CONTENT_TYPE, csContentType);
+					if (0 < csContentType.Find(_T(";"))) // Fix issue of text/xml; charset=UTF-8
+						csContentType.Delete(csContentType.Find(_T(";")),csContentType.GetLength());									
+					if (!csContentType.CompareNoCase(_T("video/x-tivo-mpeg")))
+					{
+						std::cout << "[                   ] Writing File: " << TiVoFile.GetPathName() << endl;
+						std::ofstream OutputFile(TiVoFile.GetPathName(), ios_base::binary);
+						if (OutputFile.is_open())
+						{
+							const size_t ReadWriteBufferSize = 1024*10;
+							char ReadWriteBuffer[ReadWriteBufferSize];
+							long long TotalRead = 0;
+							UINT uiRead;
+							CTime ctCurrent(CTime::GetCurrentTime());
+							CTime ctStart(ctCurrent);
+							CTime ctLastOutput(ctStart);
+							CTimeSpan ctsTotal = ctCurrent - ctStart;
+							std::locale mylocale("");   // get global locale
+							std::locale OriginalLocale(std::cout.imbue(mylocale));  // imbue global locale
+							while (0 < (uiRead = serverFile->Read(ReadWriteBuffer, ReadWriteBufferSize)))
+							{
+								OutputFile.write(ReadWriteBuffer,uiRead);
+								TotalRead += uiRead;
+								ctCurrent = CTime::GetCurrentTime();
+								ctsTotal = ctCurrent - ctStart;
+								if ((ctCurrent - ctLastOutput) > CTimeSpan(0,0,0,1))
+								{
+									std::cout << "[" << getTimeISO8601() << "] Elapsed: " << CStringA(ctsTotal.Format(_T("%H:%M:%S"))).GetString() << " Bytes: " << TotalRead << " bytes/second: " <<  (TotalRead / ctsTotal.GetTotalSeconds()) << "\r";
+									ctLastOutput = ctCurrent;
+								}
+							}
+							OutputFile.close();
+							std::cout << "[" << getTimeISO8601() << "] Elapsed: " << CStringA(ctsTotal.Format(_T("%H:%M:%S"))).GetString() << " Bytes: " << TotalRead << " bytes/second: " <<  (TotalRead / ctsTotal.GetTotalSeconds()) << " ReadWriteBufferSize: " << ReadWriteBufferSize << endl;
+							std::cout.imbue(OriginalLocale);
+						}
+					}
+					else
+					{
+						std::cout << "[                   ] not text/xml or video/x-tivo-mpeg" << endl;
+						char ittybittybuffer;
+						while (0 < serverFile->Read(&ittybittybuffer, sizeof(ittybittybuffer)))
+							std::cout << ittybittybuffer;
+						std::cout << endl;
+					}
+				}
+				else if (dwRet == HTTP_STATUS_SERVICE_UNAVAIL)
+				{
+					CString csRetry;
+					if (0 < serverFile->QueryInfo(HTTP_QUERY_RETRY_AFTER, csRetry))
+					{
+						int iRetry = _ttoi(csRetry.GetString());
+						std::cout << "[" << getTimeISO8601() << "] Sleeping for " << iRetry << " Seconds" << endl;
+						Sleep(iRetry * 1000);
+						rval = false;
+					}
+				}
+				else if (serverFile->GetLength() > 0)
+				{
+					char ittybittybuffer;
+					std::string ss;
+					while (0 < serverFile->Read(&ittybittybuffer, sizeof(ittybittybuffer)))
+						ss += ittybittybuffer;
+					std::cout << "[                   ] Returned File: " << ss << endl;
+				}
+				serverFile->Close();
+			}
+			catch(CInternetException *e)
+			{
+				TCHAR   szCause[255];
+				e->GetErrorMessage(szCause,sizeof(szCause)/sizeof(TCHAR));
+				CStringA csErrorMessage(szCause);
+				csErrorMessage.Trim();
+				std::cout << "[                   ] InternetException: " <<  csErrorMessage.GetString() << " (" << e->m_dwError << ") " << endl;
+				if ((e->m_dwError == ERROR_INTERNET_INVALID_CA) || 
+					(e->m_dwError == ERROR_INTERNET_SEC_CERT_CN_INVALID) ||
+					(e->m_dwError == ERROR_INTERNET_SEC_CERT_DATE_INVALID) ||
+					(e->m_dwError == ERROR_INTERNET_SEC_INVALID_CERT) )
+				{
+					serverFile->SetOption(INTERNET_OPTION_SECURITY_FLAGS, SECURITY_SET_MASK);
+					if (BadCertErrorCount++ < 2)
+						goto AGAIN;
+					rval = false;
+				}
+			}
+		}
+	}
+	return(rval);
 }
 /////////////////////////////////////////////////////////////////////////////
 void printerr(TCHAR * errormsg)
@@ -2372,10 +2855,21 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 
 			if (SUCCEEDED(CoInitializeEx(0, COINIT_MULTITHREADED))) // COINIT_APARTMENTTHREADED
 			{
+				//XML_Test_FileReformat(_T("D:\\Videos\\chunk-01-0001.xml"), _T("D:/Videos/Evening Magazine (Recorded Mar 26, 2010, KINGDT).1.xml"));
+				//XML_Test_FileReformat(_T("D:\\Videos\\chunk-02-0002.xml"), _T("D:/Videos/Evening Magazine (Recorded Mar 26, 2010, KINGDT).2.xml"));
 				//XML_Test_Read_ElementsOnly();
 				//XML_Test_Read();
 				//XML_Test_Write();
 				//XML_Test_Write_InMemory();
+				std::vector<cTiVoFile> FilesToGetFromTiVo;
+				XML_Parse_TiVoNowPlaying(_T("WimTivoServer.3.xml"), FilesToGetFromTiVo);
+				std::sort(FilesToGetFromTiVo.begin(),FilesToGetFromTiVo.end(),cTiVoFileCompareDateReverse);
+				FilesToGetFromTiVo.clear();
+				CInternetSession serverSession0;
+				XML_Parse_TiVoNowPlaying(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying&Recurse=Yes&SortOrder=!CaptureDate")), FilesToGetFromTiVo, serverSession0);
+				std::sort(FilesToGetFromTiVo.begin(),FilesToGetFromTiVo.end(),cTiVoFileCompareDateReverse);
+				for (auto TiVoFileToGet = FilesToGetFromTiVo.begin(); TiVoFileToGet != FilesToGetFromTiVo.end(); TiVoFileToGet++)
+					while (false == GetTiVoFile(*TiVoFileToGet, serverSession0, _T("1760168186")));
 
 				if (!csMyHostName.CompareNoCase(_T("INSPIRON")))
 				{
@@ -2388,27 +2882,31 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 				}
 				else
 				{
-					PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/Evening Magazine (Recorded Mar 26, 2010, KINGDT).TiVo");
+					PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/Evening*.TiVo");
 					PopulateTiVoFileList(TiVoFileList, "C:/Users/Wim/Videos/*.mp4");
 				}
 				std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate);
 
 				std::vector<CString> myURLS;
-				myURLS.push_back(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=ResetServer")));
+				myURLS.push_back(CString(_T("http://192.168.0.108/TiVoConnect?Command=ResetServer")));
 				myURLS.push_back(CString(_T("http://192.168.0.108/TiVoConnect?Command=QueryContainer&Container=/")));
 				myURLS.push_back(CString(_T("http://192.168.0.108/TiVoConnect?Command=QueryFormats&SourceFormat=video%2Fx-tivo-mpeg")));
 				myURLS.push_back(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying")));
-				myURLS.push_back(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying?Recurse=Yes")));
+				myURLS.push_back(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying&Recurse=Yes&SortOrder=!CaptureDate")));
 				myURLS.push_back(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying/9948")));
-				myURLS.push_back(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoVideoDetails?id=984268")));
+				myURLS.push_back(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoVideoDetails?id=984268")));	// It appears that after a "Details" call it uses a "Connection: keep-alive" call, so I should probably make another call to the now playing list to see if that makes the tivo more stable.
+				myURLS.push_back(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying/9948")));
 				//myURLS.push_back(CString(_T("http://192.168.1.11/TiVoConnect?Command=QueryContainer&Container=/")));
 				//myURLS.push_back(CString(_T("https://tivo:9371539867@192.168.1.11:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying")));
 				//myURLS.push_back(CString(_T("http://192.168.0.5:8080/TiVoConnect?Command=QueryContainer&Container=/")));
 				//myURLS.push_back(CString(_T("http://192.168.0.5:8080/TiVoConnect?Command=QueryFormats&SourceFormat=video%2Fx-tivo-mpeg")));
 				//myURLS.push_back(CString(_T("https://tivo:1760168186@192.168.0.5:4430/TiVoConnect?Command=QueryContainer&Container=/TivoNowPlaying")));
-				myURLS.push_back(CString(_T("http://tivo:1760168186@192.168.0.108:80/download/Evening Magazine.TiVo?Container=/NowPlaying&id=984268")));
-				myURLS.push_back(CString(_T("http://tivo:1760168186@192.168.0.108:80/download/Evening Magazine.TiVo?Container=/NowPlaying&id=879493")));
-				myURLS.push_back(CString(_T("http://tivo:1760168186@192.168.0.108:80/download/Community.TiVo?Container=/NowPlaying&id=3002485")));
+
+				//myURLS.push_back(CString(_T("http://tivo:1760168186@192.168.0.108/download/Evening Magazine.TiVo?Container=/NowPlaying&id=984268")));
+				//myURLS.push_back(CString(_T("http://tivo:1760168186@192.168.0.108/download/Evening Magazine.TiVo?Container=/NowPlaying&id=879493")));
+				//myURLS.push_back(CString(_T("http://tivo:1760168186@192.168.0.108/download/Community.TiVo?Container=/NowPlaying&id=3002485")));
+				myURLS.push_back(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=ResetServer")));
+				myURLS.push_back(CString(_T("http://tivo:1760168186@192.168.0.108/TiVoConnect?Command=ResetServer")));
 				int FileIndex = 0;
 				CInternetSession serverSession;
 				for (auto csURL = myURLS.begin(); csURL != myURLS.end(); csURL++)
@@ -2480,6 +2978,8 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 									}									
 									CString csContentType;
 									serverFile->QueryInfo(HTTP_QUERY_CONTENT_TYPE, csContentType);
+									if (0 < csContentType.Find(_T(";"))) // Fix issue of text/xml; charset=UTF-8
+										csContentType.Delete(csContentType.Find(_T(";")),csContentType.GetLength());									
 									if (!csContentType.CompareNoCase(_T("text/xml")))
 									{								
 										CComPtr<IStream> spMemoryStreamOne(::SHCreateMemStream(NULL, 0));
@@ -2530,6 +3030,7 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 															std::stringstream OutPutFileName;
 															//std::stringstream ReturnedData;
 															OutPutFileName << "WimTivoServer." << FileIndex++ << ".xml";
+															std::cout << "[                   ] Writing File: " << OutPutFileName.str() << endl;
 															std::ofstream OutputFile(OutPutFileName.str(), ios_base::binary);
 															if (OutputFile.is_open())
 																OutputFile.write(XMLDataBuff,cbSize);
@@ -2545,6 +3046,7 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 									{
 										std::stringstream OutPutFileName;
 										OutPutFileName << "WimTivoServer." << FileIndex++ << ".TiVo";
+										std::cout << "[                   ] Writing File: " << OutPutFileName.str() << endl;
 										std::ofstream OutputFile(OutPutFileName.str(), ios_base::binary);
 										if (OutputFile.is_open())
 										{
@@ -2565,7 +3067,7 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 												TotalRead += uiRead;
 												ctCurrent = CTime::GetCurrentTime();
 												ctsTotal = ctCurrent - ctStart;
-												if ((ctCurrent - ctLastOutput) > CTimeSpan(0,0,0,10))
+												if ((ctCurrent - ctLastOutput) > CTimeSpan(0,0,0,1))
 												{
 													std::cout << "[" << getTimeISO8601() << "] Elapsed: " << CStringA(ctsTotal.Format(_T("%H:%M:%S"))).GetString() << " Bytes: " << TotalRead << " bytes/second: " <<  (TotalRead / ctsTotal.GetTotalSeconds()) << "\r";
 													ctLastOutput = ctCurrent;
@@ -2595,6 +3097,7 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 										int iRetry = _ttoi(csRetry.GetString());
 										std::cout << "[" << getTimeISO8601() << "] Sleeping for " << iRetry << " Seconds" << endl;
 										Sleep(iRetry * 1000);
+										csURL--;
 									}
 								}
 								else if (serverFile->GetLength() > 0)
@@ -2613,7 +3116,7 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 								e->GetErrorMessage(szCause,sizeof(szCause)/sizeof(TCHAR));
 								CStringA csErrorMessage(szCause);
 								csErrorMessage.Trim();
-								std::cout << "[" << getTimeISO8601() << "] InternetException: " <<  csErrorMessage.GetString() << " (" << e->m_dwError << ") " << endl;
+								std::cout << "[                   ] InternetException: " <<  csErrorMessage.GetString() << " (" << e->m_dwError << ") " << endl;
 								if ((e->m_dwError == ERROR_INTERNET_INVALID_CA) || 
 									(e->m_dwError == ERROR_INTERNET_SEC_CERT_CN_INVALID) ||
 									(e->m_dwError == ERROR_INTERNET_SEC_CERT_DATE_INVALID) ||
