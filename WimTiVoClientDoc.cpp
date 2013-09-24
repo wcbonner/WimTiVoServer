@@ -121,7 +121,7 @@ CWimTiVoClientDoc::CWimTiVoClientDoc()
 	m_CurrentFileSize = 0;
 	m_CurrentFileSpeed = 0;
 
-	m_TiVoServerName = AfxGetApp()->GetProfileString(_T("TiVo"),_T("TiVoServerName"),_T(""));
+	//m_TiVoServerName = AfxGetApp()->GetProfileString(_T("TiVo"),_T("TiVoServerName"),_T(""));
 	m_TiVoTotalSize = 0;
 	m_csFFMPEGPath = FindEXEFromPath(_T("ffmpeg.exe"));
 	if (m_csFFMPEGPath.IsEmpty())
@@ -144,35 +144,22 @@ CWimTiVoClientDoc::CWimTiVoClientDoc()
 		if (!regTiVo.IsEmpty())
 		{
 			cTiVoServer myServer;
-			int SectPos = 0;
-			CString csSect(regTiVo.Tokenize(_T("\t"), SectPos));
-			while (csSect != _T(""))
-			{
-				int KeyPos = 0;
-				CString csKey(csSect.Tokenize(_T("="),KeyPos));
-				CString csValue(csSect.Tokenize(_T("="),KeyPos));
-				if (!csKey.CompareNoCase(_T("address")))
-					myServer.m_address = CStringA(csValue);
-				else if (!csKey.CompareNoCase(_T("identity")))
-					myServer.m_identity = CStringA(csValue);
-				else if (!csKey.CompareNoCase(_T("machine")))
-					myServer.m_machine = CStringA(csValue);
-				else if (!csKey.CompareNoCase(_T("method")))
-					myServer.m_method = CStringA(csValue);
-				else if (!csKey.CompareNoCase(_T("platform")))
-					myServer.m_platform = CStringA(csValue);
-				else if (!csKey.CompareNoCase(_T("services")))
-					myServer.m_services = CStringA(csValue);
-				else if (!csKey.CompareNoCase(_T("swversion")))
-					myServer.m_swversion = CStringA(csValue);
-				else if (!csKey.CompareNoCase(_T("MAK")))
-					myServer.m_MAK = CStringA(csValue);
-				csSect = regTiVo.Tokenize(_T("\t"), SectPos);
-			}
+			myServer.ReadTXT(CStringA(regTiVo).GetString());
 			m_ccTiVoServers.Lock();
 			m_TiVoServers.push_back(myServer);
 			m_ccTiVoServers.Unlock();
 		}
+	}
+	CString TiVoServer(AfxGetApp()->GetProfileString(_T("TiVo"), _T("TiVoServerName")));
+	if (!TiVoServer.IsEmpty())
+	{
+		m_TiVoServer.m_machine = CStringA(TiVoServer).GetString();
+		// This next bit makes sure that the MAK and any other attributes came from the list, and not the actual TiVoServer entry. Only the MachineName is important in the TiVoServer entry for consistency
+		m_ccTiVoServers.Lock();
+		auto pServer = std::find(m_TiVoServers.begin(), m_TiVoServers.end(), m_TiVoServer);
+		if (pServer != m_TiVoServers.end())
+			m_TiVoServer = *pServer;
+		m_ccTiVoServers.Unlock();
 	}
 
 	//PWSTR pszPath[MAX_PATH];
@@ -234,7 +221,6 @@ CWimTiVoClientDoc::~CWimTiVoClientDoc()
 		}
 		Sleep(500);
 	}
-	AfxGetApp()->WriteProfileString(_T("TiVo"), _T("TiVoServerName"), m_TiVoServerName);
 	AfxGetApp()->WriteProfileInt(_T("TiVo"), _T("FFMPEG"), m_bFFMPEG);
 	AfxGetApp()->WriteProfileInt(_T("TiVo"), _T("TiVoDecode"), m_bTiVoDecode);
 	m_ccTiVoServers.Lock();
@@ -242,19 +228,10 @@ CWimTiVoClientDoc::~CWimTiVoClientDoc()
 	{
 		std::stringstream ssKey;
 		ssKey << "TiVo-" << (TiVo - m_TiVoServers.begin());
-		std::stringstream ssValue;
-		ssValue << "machine=" << TiVo->m_machine;
-		ssValue << "\taddress=" << TiVo->m_address;
-		if (!TiVo->m_identity.empty()) ssValue << "\tidentity=" << TiVo->m_identity;
-		if (!TiVo->m_method.empty()) ssValue << "\tmethod=" << TiVo->m_method;
-		if (!TiVo->m_platform.empty()) ssValue << "\tplatform=" << TiVo->m_platform;
-		if (!TiVo->m_services.empty()) ssValue << "\tservices=" << TiVo->m_services;
-		if (!TiVo->m_swversion.empty()) ssValue << "\tswversion=" << TiVo->m_swversion;
-		ssValue << "\ttivoconnect=1";
-		if (!TiVo->m_MAK.empty()) ssValue << "\tMAK=" << TiVo->m_MAK;
-		AfxGetApp()->WriteProfileString(_T("TiVo"), CString(ssKey.str().c_str()), CString(ssValue.str().c_str()));
+		AfxGetApp()->WriteProfileString(_T("TiVo"), CString(ssKey.str().c_str()), CString(TiVo->WriteTXT().c_str()));
 	}
 	m_ccTiVoServers.Unlock();
+	AfxGetApp()->WriteProfileString(_T("TiVo"), _T("TiVoServerName"), CString(m_TiVoServer.m_machine.c_str()));
 	AfxGetApp()->WriteProfileString(_T("TiVo"),_T("TiVoFileDestination"),m_csTiVoFileDestination);
 	if (m_LogFile.is_open())
 	{
@@ -364,39 +341,32 @@ bool CWimTiVoClientDoc::GetNowPlaying(void)
 	crackedURL.dwUrlPathLength = dwUrlPathLength;		// length of URL-path
 	crackedURL.lpszExtraInfo = szExtraInfo;				// pointer to extra information (e.g. ?foo or #foo)
 	crackedURL.dwExtraInfoLength = dwExtraInfoLength;	// length of extra information
-	CString csURL(_T("https://tivo:@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying&Recurse=Yes&SortOrder=!CaptureDate"));
+	CString csURL(_T("https://192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying&Recurse=Yes&SortOrder=!CaptureDate"));
 	InternetCrackUrl(csURL.GetString(), csURL.GetLength(), ICU_DECODE, &crackedURL);
 
-	cTiVoServer myServer;
-	myServer.m_machine = CStringA(m_TiVoServerName);
-	auto pServer = std::find(m_TiVoServers.begin(), m_TiVoServers.end(), myServer);
-	if (pServer != m_TiVoServers.end())
+	std::stringstream ss;
+	ss << CStringA(crackedURL.lpszScheme).GetString() << "://";
+	ss << "tivo:" << m_TiVoServer.m_MAK << "@";
+	ss << m_TiVoServer.m_address << ":" << crackedURL.nPort;
+	ss << CStringA(crackedURL.lpszUrlPath).GetString() << CStringA(crackedURL.lpszExtraInfo).GetString();
+	csURL = CString(ss.str().c_str());
+
+	if (m_LogFile.is_open())
+		m_LogFile << "[" << getTimeISO8601() << "] XML_Parse_TiVoNowPlaying: " << CStringA(csURL).GetString() << std::endl;
+
+	m_TiVoFiles.clear();
+	XML_Parse_TiVoNowPlaying(csURL, CString(m_TiVoServer.m_MAK.c_str()), m_TiVoFiles, m_TiVoTiVoContainers, m_InternetSession);
+
+	m_TiVoTotalTime = CTimeSpan::CTimeSpan();
+	m_TiVoTotalSize = 0;
+	for (auto TiVoFile = m_TiVoFiles.begin(); TiVoFile != m_TiVoFiles.end(); TiVoFile++)
 	{
-		myServer = *pServer;
-		std::stringstream ss;
-		ss << CStringA(crackedURL.lpszScheme).GetString() << "://";
-		ss << "tivo:" << myServer.m_MAK << "@";
-		ss << myServer.m_address << ":" << crackedURL.nPort;
-		ss << CStringA(crackedURL.lpszUrlPath).GetString() << CStringA(crackedURL.lpszExtraInfo).GetString();
-		csURL = CString(ss.str().c_str());
-
-		if (m_LogFile.is_open())
-			m_LogFile << "[" << getTimeISO8601() << "] XML_Parse_TiVoNowPlaying: " << CStringA(csURL).GetString() << std::endl;
-
-		m_TiVoFiles.clear();
-		XML_Parse_TiVoNowPlaying(csURL, CString(myServer.m_MAK.c_str()), m_TiVoFiles, m_InternetSession);
-
-		m_TiVoTotalTime = CTimeSpan::CTimeSpan();
-		m_TiVoTotalSize = 0;
-		for (auto TiVoFile = m_TiVoFiles.begin(); TiVoFile != m_TiVoFiles.end(); TiVoFile++)
-		{
-			m_TiVoTotalTime += CTimeSpan(TiVoFile->GetDuration()/1000);
-			m_TiVoTotalSize += TiVoFile->GetSourceSize();
-		}
-
-		if (m_LogFile.is_open())
-			m_LogFile << "[" << getTimeISO8601() << "] TiVoNowPlaying Details: Total Time: " << CStringA(m_TiVoTotalTime.Format(_T("%D Days, %H:%M:%S"))).GetString() << " Total Size: " << m_TiVoTotalSize << std::endl;
+		m_TiVoTotalTime += CTimeSpan(TiVoFile->GetDuration()/1000);
+		m_TiVoTotalSize += TiVoFile->GetSourceSize();
 	}
+
+	if (m_LogFile.is_open())
+		m_LogFile << "[" << getTimeISO8601() << "] TiVoNowPlaying Details: Total Time: " << CStringA(m_TiVoTotalTime.Format(_T("%D Days, %H:%M:%S"))).GetString() << " Total Size: " << m_TiVoTotalSize << std::endl;
 	TRACE(__FUNCTION__ " Exiting\n");
 	return false;
 }
@@ -462,14 +432,34 @@ UINT CWimTiVoClientDoc::TiVoBeaconListenThread(LPVOID lvp)
 						TRACE(ss.str().c_str());
 						if (myServer.m_services.find("TiVoMediaServer") == 0)
 						{
+							bool bNewServer = false;
 							pDoc->m_ccTiVoServers.Lock();
 							if (pDoc->m_TiVoServers.end() == std::find(pDoc->m_TiVoServers.begin(), pDoc->m_TiVoServers.end(), myServer))
 							{
+								bNewServer = true;
 								if (pDoc->m_LogFile.is_open())
 									pDoc->m_LogFile << "[                   ] " << inet_ntoa(saServer.sin_addr) << " " << csServerBroadcast.GetString() << std::endl;
 								pDoc->m_TiVoServers.push_back(myServer);
 							}
 							pDoc->m_ccTiVoServers.Unlock();
+							if (bNewServer)
+							{
+								// This is where I should get and parse the top level document from the server, populating the containers.
+								int curPos = 0;
+								CString csServices(myServer.m_services.c_str());
+								CString csMediaServer(csServices.Tokenize(_T(":"),curPos));
+								CString csMediaServerValue(csServices.Tokenize(_T(":"),curPos));
+								curPos = 0;
+								CString csMediaServerPort(csMediaServerValue.Tokenize(_T("/"),curPos));
+								CString csMediaServerProtocol(csMediaServerValue.Tokenize(_T("/"),curPos));
+								CString csURL(csMediaServerProtocol);
+								csURL.Append(_T("://"));
+								csURL.Append(CString(myServer.m_address.c_str()));
+								csURL.Append(_T(":"));
+								csURL.Append(csMediaServerPort);
+								csURL.Append(_T("/TiVoConnect?Command=QueryContainer%2F"));
+								XML_Parse_TiVoNowPlaying(csURL, CString(myServer.m_MAK.c_str()), pDoc->m_TiVoFiles, pDoc->m_TiVoTiVoContainers, pDoc->m_InternetSession);
+							}
 						}
 					}
 				}

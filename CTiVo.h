@@ -13,6 +13,16 @@ public:
 	std::string m_services;
 	std::string m_MAK;
 	bool operator==(const cTiVoServer & other) const;
+	std::string WriteTXT(const char seperator = '\t') const;
+	bool ReadTXT(const std::string & text, const char seperator = '\t');
+};
+class CTiVoContainer
+{
+public:
+	std::string m_title;
+	std::string m_url;
+	std::string m_ContentType;
+	std::string m_SourceFormat;
 };
 class cTiVoFile
 {
@@ -66,8 +76,8 @@ bool cTiVoFileCompareDate(const cTiVoFile & a, const cTiVoFile & b);
 bool cTiVoFileCompareDateReverse(const cTiVoFile & a, const cTiVoFile & b);
 extern const CString csUrlPrefix;
 /////////////////////////////////////////////////////////////////////////////
-void XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, const CString & csMAK, std::vector<cTiVoFile> & TiVoFileList);
-void XML_Parse_TiVoNowPlaying(const CString & Source, const CString & csMAK, std::vector<cTiVoFile> & TiVoFileList);
-bool XML_Parse_TiVoNowPlaying(const CString & Source, const CString & csMAK, std::vector<cTiVoFile> & TiVoFileList, CInternetSession & serverSession);
+void XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, const CString & csMAK, std::vector<cTiVoFile> & TiVoFileList, std::vector<CTiVoContainer> & TiVoTiVoContainers);
+void XML_Parse_TiVoNowPlaying(const CString & Source, const CString & csMAK, std::vector<cTiVoFile> & TiVoFileList, std::vector<CTiVoContainer> & TiVoTiVoContainers);
+bool XML_Parse_TiVoNowPlaying(const CString & Source, const CString & csMAK, std::vector<cTiVoFile> & TiVoFileList, std::vector<CTiVoContainer> & TiVoTiVoContainers, CInternetSession & serverSession);
 bool GetTiVoFile(const cTiVoFile & TiVoFile, CInternetSession & serverSession, const CString & csTiVoMAK, const CString & csFileLocation = _T("//Acid/TiVo/"));
 /////////////////////////////////////////////////////////////////////////////

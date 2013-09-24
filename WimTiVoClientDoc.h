@@ -22,10 +22,12 @@ protected: // create from serialization only
 
 // Attributes
 public:
+	std::vector<CTiVoContainer> m_TiVoTiVoContainers;
 	std::vector<cTiVoFile> m_TiVoFiles;
 	CCriticalSection m_ccTiVoServers;
 	std::vector<cTiVoServer> m_TiVoServers;	// List of servers, populated either from the registry or listening for TiVo UDP Beacons
-	CString m_TiVoServerName;	// Selected TiVo name
+	cTiVoServer m_TiVoServer; // The Selected TiVo Server
+	//CString m_TiVoServerName;	// Selected TiVo name
 	//CString m_csTiVoMAK;	// Media Access Key to log into TiVo and also to decode TiVo transferred files
 	CInternetSession m_InternetSession;
 	CTimeSpan m_TiVoTotalTime;			// Total Time of files reported by TiVo

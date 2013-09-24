@@ -77,29 +77,34 @@ void CWimTiVoClientView::OnInitialUpdate()
 	// TODO: You may populate your ListView with items by directly accessing
 
 	CWimTiVoClientDoc * pDoc = GetDocument();
-	CMFCRibbonBar* pRibbon = ((CFrameWndEx*) GetTopLevelFrame())->GetRibbonBar();
-	if ((pRibbon) && (pDoc))
-	{
-		CMFCRibbonComboBox * TiVoList = DYNAMIC_DOWNCAST(CMFCRibbonComboBox, pRibbon->FindByID(ID_TIVO_LIST));
-		if (TiVoList)
-		{
-			for (auto TiVo = pDoc->m_TiVoServers.begin(); TiVo != pDoc->m_TiVoServers.end(); TiVo++)
-				TiVoList->AddItem(CString(TiVo->m_machine.c_str()));
-			TiVoList->SelectItem(pDoc->m_TiVoServerName);
-			// Make sure that something is selected, in case that m_PortName didn't match anything in the list.
-			if (TiVoList->GetCurSel() == LB_ERR)
-				if (TiVoList->GetCount() > 0)
-					TiVoList->SelectItem(0);
-			pDoc->m_TiVoServerName = TiVoList->GetItem(TiVoList->GetCurSel());
-		}
-		// I really want to right align most of the numbers in the edit bozes, but when I use the following code it causes the desriptive label to disapear.
-		//CMFCRibbonEdit* pEditTotalSize = DYNAMIC_DOWNCAST(CMFCRibbonEdit, pRibbon->FindByID(ID_TIVO_TOTAL_SIZE));
-		//if (pEditTotalSize)
-		//{
-		//	int TextAlignment = pEditTotalSize->GetTextAlign();
-		//	pEditTotalSize->SetTextAlign(ES_RIGHT);
-		//}
-	}
+	//CMFCRibbonBar* pRibbon = ((CFrameWndEx*) GetTopLevelFrame())->GetRibbonBar();
+	//if ((pRibbon) && (pDoc))
+	//{
+	//	CMFCRibbonComboBox * TiVoList = DYNAMIC_DOWNCAST(CMFCRibbonComboBox, pRibbon->FindByID(ID_TIVO_LIST));
+	//	if (TiVoList)
+	//	{
+	//		for (auto TiVo = pDoc->m_TiVoServers.begin(); TiVo != pDoc->m_TiVoServers.end(); TiVo++)
+	//			TiVoList->AddItem(CString(TiVo->m_machine.c_str()));
+	//		TiVoList->SelectItem(CString(pDoc->m_TiVoServer.m_machine.c_str()));
+	//		// Make sure that something is selected, in case that m_PortName didn't match anything in the list.
+	//		if (TiVoList->GetCurSel() == LB_ERR)
+	//			if (TiVoList->GetCount() > 0)
+	//				TiVoList->SelectItem(0);
+	//		pDoc->m_TiVoServer.m_machine = CStringA(TiVoList->GetItem(TiVoList->GetCurSel())).GetString();
+	//		pDoc->m_ccTiVoServers.Lock();
+	//		auto pServer = std::find(pDoc->m_TiVoServers.begin(), pDoc->m_TiVoServers.end(), pDoc->m_TiVoServer);
+	//		if (pServer != pDoc->m_TiVoServers.end())
+	//			pDoc->m_TiVoServer = *pServer;
+	//		pDoc->m_ccTiVoServers.Unlock();
+	//	}
+	//	// I really want to right align most of the numbers in the edit bozes, but when I use the following code it causes the desriptive label to disapear.
+	//	//CMFCRibbonEdit* pEditTotalSize = DYNAMIC_DOWNCAST(CMFCRibbonEdit, pRibbon->FindByID(ID_TIVO_TOTAL_SIZE));
+	//	//if (pEditTotalSize)
+	//	//{
+	//	//	int TextAlignment = pEditTotalSize->GetTextAlign();
+	//	//	pEditTotalSize->SetTextAlign(ES_RIGHT);
+	//	//}
+	//}
 
 	//  its list control through a call to GetListCtrl().
 	CListCtrl& ListCtrl = GetListCtrl();
@@ -203,16 +208,19 @@ void CWimTiVoClientView::OnUpdate(CView* pSender, LPARAM lHint, CObject* pHint)
 			CMFCRibbonComboBox * TiVoList = DYNAMIC_DOWNCAST(CMFCRibbonComboBox, pRibbon->FindByID(ID_TIVO_LIST));
 			if (TiVoList)
 			{
-				pDoc->m_ccTiVoServers.Lock();
 				for (auto TiVo = pDoc->m_TiVoServers.begin(); TiVo != pDoc->m_TiVoServers.end(); TiVo++)
 					TiVoList->AddItem(CString(TiVo->m_machine.c_str()));
-				pDoc->m_ccTiVoServers.Unlock();
-				TiVoList->SelectItem(pDoc->m_TiVoServerName);
+				TiVoList->SelectItem(CString(pDoc->m_TiVoServer.m_machine.c_str()));
 				// Make sure that something is selected, in case that m_PortName didn't match anything in the list.
 				if (TiVoList->GetCurSel() == LB_ERR)
 					if (TiVoList->GetCount() > 0)
 						TiVoList->SelectItem(0);
-				pDoc->m_TiVoServerName = TiVoList->GetItem(TiVoList->GetCurSel());
+				pDoc->m_TiVoServer.m_machine = CStringA(TiVoList->GetItem(TiVoList->GetCurSel())).GetString();
+				pDoc->m_ccTiVoServers.Lock();
+				auto pServer = std::find(pDoc->m_TiVoServers.begin(), pDoc->m_TiVoServers.end(), pDoc->m_TiVoServer);
+				if (pServer != pDoc->m_TiVoServers.end())
+					pDoc->m_TiVoServer = *pServer;
+				pDoc->m_ccTiVoServers.Unlock();
 			}
 			CMFCRibbonEdit* pEditTotalTime = DYNAMIC_DOWNCAST(CMFCRibbonEdit, pRibbon->FindByID(ID_TIVO_TOTAL_TIME));
 			if (pEditTotalTime)
@@ -242,24 +250,26 @@ void CWimTiVoClientView::OnTiviNowplaying()
 	CWimTiVoClientDoc * pDoc = GetDocument();
 	if (pDoc)
 	{
-		cTiVoServer SearchServer;
-		SearchServer.m_machine = CStringA(pDoc->m_TiVoServerName);
-		auto pServer = std::find(pDoc->m_TiVoServers.begin(), pDoc->m_TiVoServers.end(), SearchServer);
-		if (pServer != pDoc->m_TiVoServers.end())
+		if (pDoc->m_TiVoServer.m_MAK.empty())
 		{
-			if (pServer->m_MAK.empty())
+			CTiVoMAKDlg myDlg;
+			if (IDOK == myDlg.DoModal())
 			{
-				CTiVoMAKDlg myDlg;
-				if (IDOK == myDlg.DoModal())
-				{
-					myDlg.m_csMediaAccessKey.Trim();
-					pServer->m_MAK = CStringA(myDlg.m_csMediaAccessKey).GetString();
-				}
+				myDlg.m_csMediaAccessKey.Trim();
+				pDoc->m_TiVoServer.m_MAK = CStringA(myDlg.m_csMediaAccessKey).GetString();
+				pDoc->m_ccTiVoServers.Lock();
+				auto pServer = std::find(pDoc->m_TiVoServers.begin(), pDoc->m_TiVoServers.end(), pDoc->m_TiVoServer);
+				if (pServer != pDoc->m_TiVoServers.end())
+					*pServer = pDoc->m_TiVoServer;
+				pDoc->m_ccTiVoServers.Unlock();
 			}
+		}
+		if (!pDoc->m_TiVoServer.m_MAK.empty())
+		{
 			CWaitCursor wait;
 			pDoc->GetNowPlaying();
+			pDoc->UpdateAllViews(NULL);
 		}
-		pDoc->UpdateAllViews(NULL);
 	}
 	TRACE(__FUNCTION__ " Exiting\n");
 }
@@ -320,8 +330,15 @@ void CWimTiVoClientView::OnTivoList()
 			if (PortList)
 			{
 				CString csNewItem(PortList->GetItem(PortList->GetCurSel()));
-				if (pDoc->m_TiVoServerName.Compare(csNewItem) != 0)
-					pDoc->m_TiVoServerName = csNewItem;
+				if (pDoc->m_TiVoServer.m_machine != CStringA(csNewItem).GetString())
+				{
+					pDoc->m_TiVoServer.m_machine = CStringA(csNewItem).GetString();
+					pDoc->m_ccTiVoServers.Lock();
+					auto pServer = std::find(pDoc->m_TiVoServers.begin(), pDoc->m_TiVoServers.end(), pDoc->m_TiVoServer);
+					if (pServer != pDoc->m_TiVoServers.end())
+						pDoc->m_TiVoServer = *pServer;
+					pDoc->m_ccTiVoServers.Unlock();
+				}
 			}
 		}
 	}
