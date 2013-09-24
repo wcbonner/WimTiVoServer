@@ -39,12 +39,18 @@
     <ClInclude Include="inttypes.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="CTiVo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="WimTiVoServer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="CTiVo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
