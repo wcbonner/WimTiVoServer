@@ -43,4 +43,19 @@
 #include <xmllite.h>
 #pragma comment(lib, "xmllite")
 
+// FFMPEG Libraries
+extern "C" {
+#include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
+#include <libavutil/dict.h>
+}
+#pragma comment(lib, "avformat")
+#pragma comment(lib, "avcodec")
+#pragma comment(lib, "avutil")
+//#pragma comment(lib, "avdevice")
+//#pragma comment(lib, "avfilter")
+//#pragma comment(lib, "postproc")
+//#pragma comment(lib, "swresample")
+//#pragma comment(lib, "swscale")
+
 #include "WimTiVoServerEventLog.h"
