@@ -1386,6 +1386,7 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 		HttpResponse << "Server: Wims_TiVo_Server/1.0.0.1\r\n";
 		HttpResponse << "Date: " << getTimeRFC1123() << "\r\n";
 		HttpResponse << "Transfer-Encoding: chunked\r\n";
+		if (TiVoFileToSend.GetDuration() > 0) HttpResponse << "TiVo-Estimated-Length: " << max(TiVoFileToSend.GetSourceSize(), (TiVoFileToSend.GetDuration() * 1024)) << "\r\n"; // Since the Duration is 1/1000 of a second, and at least one example I transferred came in at roughly this multiple, 700bytes for every millisecond, worth a try.
 		HttpResponse << "Content-Type: video/x-tivo-mpeg\r\n";
 		HttpResponse << "Connection: close\r\n";
 		HttpResponse << "\r\n";

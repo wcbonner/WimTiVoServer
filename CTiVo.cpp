@@ -435,7 +435,7 @@ void cTiVoFile::GetXML(CComPtr<IXmlWriter> & pWriter) const
 			if (m_SourceSize > 0)
 			{
 				std::wstringstream ss;
-				ss << m_SourceSize;
+				ss << max(m_SourceSize, m_Duration * 1024);
 				pWriter->WriteElementString(NULL, L"SourceSize", NULL, ss.str().c_str());
 			}
 			if (m_Duration > 0)
