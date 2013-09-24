@@ -878,6 +878,8 @@ UINT PopulateTiVoFileList(LPVOID lvp)
 	ccTiVoFileList.Lock(); std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate); ccTiVoFileList.Unlock();
 	PopulateTiVoFileList(TiVoFileList, ccTiVoFileList, "D:/Recorded TV/*");
 	ccTiVoFileList.Lock(); std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate); ccTiVoFileList.Unlock();
+	PopulateTiVoFileList(TiVoFileList, ccTiVoFileList, "//Acid/Recorded TV/*");
+	ccTiVoFileList.Lock(); std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate); ccTiVoFileList.Unlock();
 	PopulateTiVoFileList(TiVoFileList, ccTiVoFileList, "//Acid/TiVo/*");
 	ccTiVoFileList.Lock(); std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate); ccTiVoFileList.Unlock();
 	PopulateTiVoFileList(TiVoFileList, ccTiVoFileList, "//Acid/Videos/*");
@@ -1310,7 +1312,7 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 		std::stringstream HttpResponse;
 		//HttpResponse << "HTTP/1.1 200 OK\r\n";
 		HttpResponse << "HTTP/1.1 206 Partial Content\r\n";
-		HttpResponse << "Server: Wims TiVo Server/1.0.0.1\r\n";
+		HttpResponse << "Server: Wims_TiVo_Server/1.0.0.1\r\n";
 		HttpResponse << "Date: " << getTimeRFC1123() << "\r\n";
 		HttpResponse << "Transfer-Encoding: chunked\r\n";
 		HttpResponse << "Content-Type: video/x-tivo-mpeg\r\n";
@@ -1733,10 +1735,10 @@ UINT HTTPMain(LPVOID lvp)
 						if (remoteSocket != INVALID_SOCKET)
 						{
 							setsockopt(remoteSocket, SOL_SOCKET, SO_KEEPALIVE, (char *)&on, sizeof(on));	// Attempt to see if this is related to why many of my transfers are failing.
-							#ifdef _WIM_THREADED_
-							AfxBeginThread(HTTPChild, (LPVOID)remoteSocket);
-							#else
+							#ifdef _DEBUG
 							HTTPChild((LPVOID)remoteSocket);
+							#else
+							AfxBeginThread(HTTPChild, (LPVOID)remoteSocket);
 							#endif
 						}
 					}
@@ -2567,6 +2569,56 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 			TiVoFileList.reserve(1000);
 			if (!csMyHostName.CompareNoCase(_T("INSPIRON")))
 			{
+				#ifdef _DE_CHUNK_FILE_
+				std::ifstream FileToDeChunk;
+				FileToDeChunk.open("C:\\Users\\Wim\\Videos\\The.Daily.Show.2013.05.02.Eric.Greitens.HDTV.x264-EVOLVE (Recorded May 02, 2013).pytivo.TiVo", ios_base::in | ios_base::binary);
+				std::ofstream OutFile("C:\\Users\\Wim\\Videos\\The.Daily.Show.2013.05.02.Eric.Greitens.HDTV.x264-EVOLVE (Recorded May 02, 2013).pytivo.dechunked.TiVo", ios_base::out | ios_base::binary);
+				long long chunksize = 0;
+				char ChunkHeader[64];
+				if (FileToDeChunk.is_open() && OutFile.is_open())
+				{
+					do {
+						FileToDeChunk.getline(ChunkHeader, sizeof(ChunkHeader));
+						stringstream ss(ChunkHeader);
+						ss << hex;
+						ss >> chunksize;
+						char * ChunkData = new char[chunksize];
+						FileToDeChunk.read(ChunkData, chunksize);
+						OutFile.write(ChunkData, chunksize);
+						delete[] ChunkData;
+						FileToDeChunk.getline(ChunkHeader, sizeof(ChunkHeader)); // gets the chunk footer
+					}
+					while (chunksize > 0);
+					FileToDeChunk.close();
+					OutFile.close();
+				}
+				#endif
+				#ifdef _COMPARE_PYTIVO_FILE
+				std::ifstream FileOne, FileTwo;
+				FileOne.open("C:\\Users\\Wim\\Videos\\The.Daily.Show.2013.05.02.Eric.Greitens.HDTV.x264-EVOLVE (Recorded May 02, 2013).pytivo.dechunked.TiVo", ios_base::in | ios_base::binary);
+				FileTwo.open("C:\\Users\\Wim\\Videos\\The.Daily.Show.2013.05.02.Eric.Greitens.HDTV.x264-EVOLVE (Recorded May 02, 2013).wim.1.1.TiVo", ios_base::in | ios_base::binary);
+				if (FileOne.is_open() && FileTwo.is_open())
+				{
+					FileOne.seekg(0x3000);	// Beginning of MPEG
+					FileTwo.seekg(0x1c00);	// Beginning of MPEG
+					char ByteOne, ByteTwo;
+					unsigned long long Position = 0;
+					while (!FileOne.eof() && !FileTwo.eof())
+					{
+						FileOne.read(&ByteOne, 1);
+						FileTwo.read(&ByteTwo, 1);
+						if (ByteOne != ByteTwo)
+						{
+							std::cout << "Bytes Don't Match at MPEG Offset " << Position << std::endl;
+							break;
+						}
+						Position++;
+					}
+					FileOne.close();
+					FileTwo.close();
+					std::cout << "Finished Comparing " << Position << " bytes" << std::endl;
+				}
+				#endif
 				#ifdef _WIM_TIVO_CONVERT_
 				CFileFind finder;
 				BOOL bWorking = finder.FindFile(_T("//Acid/TiVo/*.tivo"));
