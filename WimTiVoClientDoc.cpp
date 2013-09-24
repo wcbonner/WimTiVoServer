@@ -163,12 +163,7 @@ UINT CWimTiVoClientDoc::TiVoBeaconListenThread(LPVOID lvp)
 				saClient.sin_addr.s_addr = INADDR_ANY;
 				saClient.sin_port = htons(2190);
 				int nRet = bind(theSocket, (LPSOCKADDR)&saClient, sizeof(SOCKADDR_IN));
-				if (nRet == SOCKET_ERROR)
-				{
-					TRACE("%s: %d\n","bind()",WSAGetLastError());
-					closesocket(theSocket);
-				}
-				else
+				if (nRet != SOCKET_ERROR)
 				{
 					char szBuf[2048];
 					SOCKADDR_IN saServer;
@@ -178,13 +173,37 @@ UINT CWimTiVoClientDoc::TiVoBeaconListenThread(LPVOID lvp)
 					{
 						// here's where I should look at what I recieve.
 						CStringA csServerBroadcast(szBuf, nRet);
+						cTiVoServer myServer;
+						myServer.m_address = inet_ntoa(saServer.sin_addr);
+						int curLine = 0;
+						CStringA csLine(csServerBroadcast.Tokenize("\n",curLine));
+						while (csLine != "")
+						{
+							int curPos = 0;
+							CStringA Key(csLine.Tokenize("=",curPos));
+							CStringA Value(csLine.Tokenize("=",curPos));
+							if (!Key.CompareNoCase("identity"))
+								myServer.m_identity = Value.GetString();
+							else if (!Key.CompareNoCase("swversion"))
+								myServer.m_swversion = Value.GetString();
+							else if (!Key.CompareNoCase("method"))
+								myServer.m_method = Value.GetString();
+							else if (!Key.CompareNoCase("machine"))
+								myServer.m_machine = Value.GetString();
+							else if (!Key.CompareNoCase("platform"))
+								myServer.m_platform = Value.GetString();
+							else if (!Key.CompareNoCase("services"))
+								myServer.m_services = Value.GetString();
+							csLine = csServerBroadcast.Tokenize("\n",curLine);
+						}
 						csServerBroadcast.Replace("\n", " ");
 						csServerBroadcast.Trim();
-						std::cout << "[                   ] " << inet_ntoa(saServer.sin_addr) << " " << csServerBroadcast.GetString() << std::endl;
-						std::cerr << "[                   ] " << inet_ntoa(saServer.sin_addr) << " " << csServerBroadcast.GetString() << std::endl;
+						std::stringstream ss;
+						ss << "[                   ] " << inet_ntoa(saServer.sin_addr) << " " << csServerBroadcast.GetString() << std::endl;
+						TRACE(ss.str().c_str());
 					}
-					closesocket(theSocket);
 				}
+				closesocket(theSocket);
 			}
 		} while (pDoc->m_TiVoBeaconListenThreadStopRequested == false);
 		pDoc->m_TiVoBeaconListenThreadRunning = false;
