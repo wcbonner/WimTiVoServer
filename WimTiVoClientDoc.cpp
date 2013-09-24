@@ -64,6 +64,7 @@ static std::string getTimeISO8601(void)
 CString FindEXEFromPath(const CString & csEXE)
 {
 	CString csFullPath;
+	//PathFindOnPath();
 	CFileFind finder;
 	if (finder.FindFile(csEXE))
 	{
@@ -73,23 +74,38 @@ CString FindEXEFromPath(const CString & csEXE)
 	}
 	else
 	{
-		CString csPATH;
-		csPATH.GetEnvironmentVariable(_T("PATH"));
-		int iStart = 0;
-		CString csToken(csPATH.Tokenize(_T(";"), iStart));
-		while (csToken != _T(""))
+		TCHAR filename[MAX_PATH];
+		unsigned long buffersize = sizeof(filename) / sizeof(TCHAR);
+		// Get the file name that we are running from.
+		GetModuleFileName(AfxGetResourceHandle(), filename, buffersize );
+		PathRemoveFileSpec(filename);
+		PathAppend(filename, csEXE);
+		if (finder.FindFile(filename))
 		{
-			if (csToken.Right(1) != _T("\\"))
-				csToken.AppendChar(_T('\\'));
-			csToken.Append(csEXE);
-			if (finder.FindFile(csToken))
+			finder.FindNextFile();
+			csFullPath = finder.GetFilePath();
+			finder.Close();
+		}
+		else
+		{
+			CString csPATH;
+			csPATH.GetEnvironmentVariable(_T("PATH"));
+			int iStart = 0;
+			CString csToken(csPATH.Tokenize(_T(";"), iStart));
+			while (csToken != _T(""))
 			{
-				finder.FindNextFile();
-				csFullPath = finder.GetFilePath();
-				finder.Close();
-				break;
+				if (csToken.Right(1) != _T("\\"))
+					csToken.AppendChar(_T('\\'));
+				csToken.Append(csEXE);
+				if (finder.FindFile(csToken))
+				{
+					finder.FindNextFile();
+					csFullPath = finder.GetFilePath();
+					finder.Close();
+					break;
+				}
+				csToken = csPATH.Tokenize(_T(";"), iStart);
 			}
-			csToken = csPATH.Tokenize(_T(";"), iStart);
 		}
 	}
 	return(csFullPath);

@@ -49,6 +49,7 @@ BEGIN_MESSAGE_MAP(CWimTiVoClientView, CListView)
 	ON_COMMAND(ID_TRANSFER_LOG, &CWimTiVoClientView::OnTransferLog)
 	ON_UPDATE_COMMAND_UI(ID_TRANSFER_LOG, &CWimTiVoClientView::OnUpdateTransferLog)
 	ON_WM_TIMER()
+	ON_COMMAND(ID_TIVO_FILE_LOCATION, &CWimTiVoClientView::OnTivoFileLocation)
 END_MESSAGE_MAP()
 
 // CWimTiVoClientView construction/destruction
@@ -146,7 +147,7 @@ void CWimTiVoClientView::OnUpdate(CView* pSender, LPARAM lHint, CObject* pHint)
 	if (pDoc)
 	{
 		CListCtrl& ListCtrl = GetListCtrl();
-		if (!(pDoc->m_TiVoTransferFileThreadRunning || pDoc->m_TiVoConvertFileThreadRunning))
+		if (!pDoc->m_TiVoTransferFileThreadRunning)
 		{
 			if (0 != ListCtrl.DeleteAllItems())
 			{
@@ -502,6 +503,7 @@ void CWimTiVoClientView::OnTimer(UINT_PTR nIDEvent)
 				CFrameWndEx* mainFrm = dynamic_cast<CFrameWndEx*>(GetTopLevelFrame());
 				if (mainFrm)
 					mainFrm->SetProgressBarState(TBPF_NOPROGRESS);
+				pDoc->UpdateAllViews(NULL);
 			}
 			else
 			{
@@ -622,5 +624,15 @@ void CWimTiVoClientView::OnUpdateTransferLog(CCmdUI *pCmdUI)
 {
 	CWimTiVoClientDoc * pDoc = GetDocument();
 	if (pDoc)
-		pCmdUI->Enable(pDoc->m_LogFile.is_open());
+		pCmdUI->SetCheck(pDoc->m_LogFile.is_open());
+}
+
+
+void CWimTiVoClientView::OnTivoFileLocation()
+{
+	//CFolderPickerDlg 
+	//CFileDialog myDlg(TRUE,0,0,FOS_PICKFOLDERS);
+	//myDlg.
+	//myDlg.DoModal();
+	// TODO: Add your command handler code here
 }
