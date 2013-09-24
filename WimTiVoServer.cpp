@@ -782,16 +782,11 @@ void PopulateTiVoFileList(std::vector<cTiVoFile> & TiVoFileList, CCriticalSectio
 void printerr(TCHAR * errormsg)
 {
 	if (bConsoleExists)
-	{
 		_ftprintf(stderr, _T("%s\n"), errormsg);
-	}
-	else
+	else if (ApplicationLogHandle != NULL) 
 	{
-		if (ApplicationLogHandle != NULL) 
-		{
-			LPCTSTR lpStrings[] = { errormsg, NULL };
-			ReportEvent(ApplicationLogHandle, EVENTLOG_INFORMATION_TYPE, 0, WIMSWORLD_EVENT_GENERIC, NULL, 1, 0, lpStrings, NULL);
-		}
+		LPCTSTR lpStrings[] = { errormsg, NULL };
+		ReportEvent(ApplicationLogHandle, EVENTLOG_INFORMATION_TYPE, 0, WIMSWORLD_EVENT_GENERIC, NULL, 1, 0, lpStrings, NULL);
 	}
 }
 int GetTiVoQueryFormats(SOCKET DataSocket, const char * InBuffer)
@@ -866,7 +861,8 @@ int GetTiVoQueryFormats(SOCKET DataSocket, const char * InBuffer)
 	send(DataSocket, XMLDataBuff, strlen(XMLDataBuff),0);
 	return(0);
 }
-CCriticalSection ccTiVoFileList;
+cTiVoServer myServer;
+CCriticalSection ccTiVoFileListCritSec;
 std::vector<cTiVoFile> TiVoFileList;
 std::queue<cTiVoFile> TiVoFilesToConvert;
 UINT PopulateTiVoFileList(LPVOID lvp)
@@ -874,20 +870,95 @@ UINT PopulateTiVoFileList(LPVOID lvp)
 	//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/*.TiVo");
 	//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/Evening*.TiVo");
 	//PopulateTiVoFileList(TiVoFileList, "D:/Videos/Evening Magazine (Recorded Mar 26, 2010, KINGDT).TiVo");
-	PopulateTiVoFileList(TiVoFileList, ccTiVoFileList, "D:/Videos/*");
-	ccTiVoFileList.Lock(); std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate); ccTiVoFileList.Unlock();
-	PopulateTiVoFileList(TiVoFileList, ccTiVoFileList, "D:/Recorded TV/*");
-	ccTiVoFileList.Lock(); std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate); ccTiVoFileList.Unlock();
-	PopulateTiVoFileList(TiVoFileList, ccTiVoFileList, "//Acid/Recorded TV/*");
-	ccTiVoFileList.Lock(); std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate); ccTiVoFileList.Unlock();
-	PopulateTiVoFileList(TiVoFileList, ccTiVoFileList, "//Acid/TiVo/*");
-	ccTiVoFileList.Lock(); std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate); ccTiVoFileList.Unlock();
-	PopulateTiVoFileList(TiVoFileList, ccTiVoFileList, "//Acid/Videos/*");
+	PopulateTiVoFileList(TiVoFileList, ccTiVoFileListCritSec, "D:/Videos/*");
+	ccTiVoFileListCritSec.Lock(); std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate); ccTiVoFileListCritSec.Unlock();
+	PopulateTiVoFileList(TiVoFileList, ccTiVoFileListCritSec, "D:/Recorded TV/*");
+	ccTiVoFileListCritSec.Lock(); std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate); ccTiVoFileListCritSec.Unlock();
+	PopulateTiVoFileList(TiVoFileList, ccTiVoFileListCritSec, "//Acid/Recorded TV/*");
+	ccTiVoFileListCritSec.Lock(); std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate); ccTiVoFileListCritSec.Unlock();
+	PopulateTiVoFileList(TiVoFileList, ccTiVoFileListCritSec, "//Acid/TiVo/*");
+	//ccTiVoFileListCritSec.Lock(); std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate); ccTiVoFileListCritSec.Unlock();
+	//PopulateTiVoFileList(TiVoFileList, ccTiVoFileListCritSec, "//Acid/Videos/*");
 	//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/*.TiVo");
 	//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/the.daily*");
 	//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/Archer.*");
-	ccTiVoFileList.Lock(); std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate); ccTiVoFileList.Unlock();
+	ccTiVoFileListCritSec.Lock(); 
+	std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate); 
+	std::cout << "[" << getTimeISO8601() << "] TiVoFileList Size: " << TiVoFileList.size() << endl;
+	ccTiVoFileListCritSec.Unlock();
 	return(0);
+}
+UINT WatchTiVoDirectories(LPVOID lvp)
+{
+	UINT rval = 0;
+	// Obtaining Directory Change Notifications
+	// http://msdn.microsoft.com/en-us/library/windows/desktop/aa365261(v=vs.85).aspx
+	HANDLE dwChangeHandles[2];
+	TCHAR * lpDir = _T("//Acid/TiVo/");
+	dwChangeHandles[0] = FindFirstChangeNotification( 
+		lpDir,                         // directory to watch 
+		FALSE,                         // do not watch subtree 
+		FILE_NOTIFY_CHANGE_FILE_NAME); // watch file name changes 
+	if (dwChangeHandles[0] == INVALID_HANDLE_VALUE) 
+	{
+		std::cout << "ERROR: FindFirstChangeNotification function failed." << std::endl;
+		rval = GetLastError();
+	}
+	else if (dwChangeHandles[0] == NULL)
+	{
+		std::cout << "ERROR: Unexpected NULL from FindFirstChangeNotification." << std::endl;
+		rval = GetLastError();
+	}
+	else
+	{
+		while (TRUE) 
+		{ 
+			// Wait for notification.
+ 			std::cout << "Waiting for notification..." << std::endl;
+			DWORD dwWaitStatus = WaitForMultipleObjects(1, dwChangeHandles, FALSE, INFINITE); 
+			switch (dwWaitStatus) 
+			{ 
+			case WAIT_OBJECT_0: 
+				// A file was created, renamed, or deleted in the directory.
+				// Refresh this directory and restart the notification.
+				std::cout << "Directory (" << CStringA(lpDir).GetString() << ") changed." << std::endl;
+				if ( FindNextChangeNotification(dwChangeHandles[0]) == FALSE )
+				{
+					std::cout << "ERROR: FindNextChangeNotification function failed." << std::endl;
+					rval = GetLastError();
+					return(rval);
+				}
+				break; 
+ 
+			//case WAIT_OBJECT_0 + 1: 
+			//	// A directory was created, renamed, or deleted.
+			//	// Refresh the tree and restart the notification.
+			//	RefreshTree(lpDrive); 
+			//	if (FindNextChangeNotification(dwChangeHandles[1]) == FALSE )
+			//	{
+			//		std::cout << "ERROR: FindNextChangeNotification function failed." << std::endl;
+			//		rval = GetLastError();
+			//		return(rval);
+			//	}
+			//	break; 
+ 
+			case WAIT_TIMEOUT:
+				// A timeout occurred, this would happen if some value other 
+				// than INFINITE is used in the Wait call and no changes occur.
+				// In a single-threaded environment you might not want an
+				// INFINITE wait. 
+				std::cout << "No changes in the timeout period." << std::endl;
+				break;
+
+			default: 
+				std::cout << "ERROR: Unhandled dwWaitStatus." << std::endl;
+				rval = GetLastError();
+				return(rval);
+				break;
+			}
+		}
+	}
+	return(rval);
 }
 int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 {
@@ -902,7 +973,7 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 	getpeername(DataSocket, (struct sockaddr *)&adr_inet, &sa_len);
 	std::cout << "[" << getTimeISO8601() << "] "  << __FUNCTION__ << "\t" << inet_ntoa(adr_inet.sin_addr) << " " << csInBuffer.GetString() << endl;
 	#endif
-	ccTiVoFileList.Lock();
+	ccTiVoFileListCritSec.Lock();
 	int rval = 0;
 	const int XMLDataBuffSize = 1024;
 	char* XMLDataBuff = new char[XMLDataBuffSize];
@@ -918,11 +989,11 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 		CString csContainer;
 		int iAnchorOffset = 0;
 		CString csAnchorItem;
-		ccTiVoFileList.Lock();
+		ccTiVoFileListCritSec.Lock();
 		if (!TiVoFileList.empty())
 			csAnchorItem = TiVoFileList.begin()->GetURL();
 		int iItemCount = TiVoFileList.size();
-		ccTiVoFileList.Unlock();
+		ccTiVoFileListCritSec.Unlock();
 		CString csCommand(InBuffer);
 		int curPos = 0;
 		CString csToken(csCommand.Tokenize(_T("& ?"),curPos));
@@ -1026,7 +1097,7 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 			}
 			else
 			{
-				ccTiVoFileList.Lock();
+				ccTiVoFileListCritSec.Lock();
 				// If Anchoritem not empty 
 				//		set pointer to anchor item in list
 				//		move pointer to anchoroffset
@@ -1077,7 +1148,7 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 					pItem++;
 					iItemCount--;
 				}
-				ccTiVoFileList.Unlock();
+				ccTiVoFileListCritSec.Unlock();
 			}
 			pWriter->WriteEndElement();	// TiVoContainer
 		pWriter->WriteComment(L" Copyright © 2013 William C Bonner ");
@@ -1113,7 +1184,7 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 	send(DataSocket, XMLDataBuff, strlen(XMLDataBuff), 0);
 	delete[] XMLDataBuff;
 
-	ccTiVoFileList.Unlock();
+	ccTiVoFileListCritSec.Unlock();
 #ifdef _DEBUG
 	std::cout << "[" << getTimeISO8601() << "] "  << __FUNCTION__ << "\texiting" << endl;
 #endif
@@ -1220,14 +1291,14 @@ int GetTiVoTVBusQuery(SOCKET DataSocket, const char * InBuffer)
 				//pWriter->WriteAttributeString(L"xmlns", L"TvDbBitstreamFormat", NULL, L"http://tivo.com/developer/xml/idl/TvDbBitstreamFormat");
 				//pWriter->WriteAttributeString(L"xmlns", L"schemaLocation", NULL, L"http://tivo.com/developer/xml/idl/TvBusMarshalledStruct TvBusMarshalledStruct.xsd http://tivo.com/developer/xml/idl/TvPgdRecording TvPgdRecording.xsd http://tivo.com/developer/xml/idl/TvBusDuration TvBusDuration.xsd http://tivo.com/developer/xml/idl/TvPgdShowing TvPgdShowing.xsd http://tivo.com/developer/xml/idl/TvDbShowingBit TvDbShowingBit.xsd http://tivo.com/developer/xml/idl/TvBusDateTime TvBusDateTime.xsd http://tivo.com/developer/xml/idl/TvPgdProgram TvPgdProgram.xsd http://tivo.com/developer/xml/idl/TvDbColorCode TvDbColorCode.xsd http://tivo.com/developer/xml/idl/TvPgdSeries TvPgdSeries.xsd http://tivo.com/developer/xml/idl/TvDbShowType TvDbShowType.xsd http://tivo.com/developer/xml/idl/TvPgdChannel TvPgdChannel.xsd http://tivo.com/developer/xml/idl/TvDbTvRating TvDbTvRating.xsd http://tivo.com/developer/xml/idl/TvDbRecordQuality TvDbRecordQuality.xsd http://tivo.com/developer/xml/idl/TvDbBitstreamFormat TvDbBitstreamFormat.xsd");
 				//pWriter->WriteAttributeString(L"xmlns", L"type", NULL, L"TvPgdRecording:TvPgdRecording");
-				ccTiVoFileList.Lock();
+				ccTiVoFileListCritSec.Lock();
 				for (auto MyFile = TiVoFileList.begin(); MyFile != TiVoFileList.end(); MyFile++)
 					if (!MyFile->GetURL().CompareNoCase(csUrl))
 					{
 						MyFile->GetTvBusEnvelope(pWriter);
 						break;
 					}
-				ccTiVoFileList.Unlock();
+				ccTiVoFileListCritSec.Unlock();
 				//pWriter->WriteFullEndElement();
 			//pWriter->WriteComment(L" Copyright © 2013 William C Bonner ");
 			//pWriter->WriteEndDocument();
@@ -1290,7 +1361,7 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 	{
 		if (!csUrlPrefix.Compare(csToken.Left(csUrlPrefix.GetLength())))
 		{
-			ccTiVoFileList.Lock();
+			ccTiVoFileListCritSec.Lock();
 			for (auto MyFile = TiVoFileList.begin(); MyFile != TiVoFileList.end(); MyFile++)
 				if (!MyFile->GetURL().CompareNoCase(csToken))
 				{
@@ -1298,7 +1369,7 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 					TiVoFileToSend = *MyFile;
 					break;
 				}
-			ccTiVoFileList.Unlock();			
+			ccTiVoFileListCritSec.Unlock();			
 			if (TiVoFileToSend.GetSourceSize() == 0)
 				std::wcout << L"[                   ] Not Found File: " << csToken.GetString() << std::endl;
 		}
@@ -1682,6 +1753,8 @@ UINT HTTPChild(LPVOID lvp)
 		}
 		CoUninitialize();
 	}
+	if (shutdown(remoteSocket, SD_SEND) == SOCKET_ERROR)
+		TRACE("shutdown(remoteSocket, SD_SEND) == SOCKET_ERROR\n");
 	closesocket(remoteSocket);
 	return(0);
 }
@@ -1690,17 +1763,32 @@ UINT HTTPMain(LPVOID lvp)
 	if (AfxSocketInit())
 	{
 		/* Open a listening socket */
+		//SOCKET ControlSocket = INVALID_SOCKET;
 		ControlSocket = socket(AF_INET,	/* Address family */
 							SOCK_STREAM,	/* Socket type */
 							IPPROTO_TCP);	/* Protocol */
+		// If I created this as an attempt to create non-overlapped sockets to see if that would fix my problem. 
+		//ControlSocket = WSASocket(AF_INET,	/* Address family */
+		//					SOCK_STREAM,	/* Socket type */
+		//					IPPROTO_TCP,	/* Protocol */
+		//					NULL,
+		//					0,
+		//					0); // This is creating a non-overlapped socket.
 		if (ControlSocket == INVALID_SOCKET)
 			printerr(_T("Fatal Error: Socket could not be created"));
 		else
 		{
-			int on = 1;
-			SOCKADDR_IN saServer;
-			int nRet;
+			DWORD on = TRUE;
+			DWORD off = FALSE;
+			DWORD BigBuffSize = 0x8000;
 			setsockopt(ControlSocket, SOL_SOCKET, SO_REUSEADDR, (char *)&on, sizeof(on));
+			setsockopt(ControlSocket, SOL_SOCKET, SO_KEEPALIVE, (char *)&off, sizeof(off));	// Attempt to see if this is related to why many of my transfers are failing.
+			setsockopt(ControlSocket, SOL_SOCKET, SO_SNDBUF, (char *)&BigBuffSize, sizeof(BigBuffSize));	// Attempt to see if this is related to why many of my transfers are failing.
+			setsockopt(ControlSocket, SOL_SOCKET, SO_RCVBUF, (char *)&BigBuffSize, sizeof(BigBuffSize));	// Attempt to see if this is related to why many of my transfers are failing.
+			//setsockopt(ControlSocket, IPPROTO_TCP, TCP_EXPEDITED_1122, (char *)&on, sizeof(on));	// Attempt to see if this is related to why many of my transfers are failing.
+			//setsockopt(ControlSocket, IPPROTO_TCP, TCP_BSDURGENT, (char *)&on, sizeof(on));	// Attempt to see if this is related to why many of my transfers are failing.
+			//setsockopt(ControlSocket, IPPROTO_TCP, TCP_NODELAY, (char *)&off, sizeof(off));	// Attempt to see if this is related to why many of my transfers are failing.
+			SOCKADDR_IN saServer;
 			saServer.sin_family = AF_INET;
 			saServer.sin_addr.s_addr = INADDR_ANY;	/* Let WinSock supply address */
 			#ifdef _DEBUG
@@ -1708,7 +1796,7 @@ UINT HTTPMain(LPVOID lvp)
 			#else
 			saServer.sin_port = htons(0);			/* Use unique port */
 			#endif
-			nRet = bind(ControlSocket,				/* Socket */
+			int nRet = bind(ControlSocket,			/* Socket */
 						(LPSOCKADDR)&saServer,		/* Our address */
 						sizeof(struct sockaddr));	/* Size of address structure */
 			if (nRet == SOCKET_ERROR)
@@ -1719,6 +1807,18 @@ UINT HTTPMain(LPVOID lvp)
 			}
 			else
 			{
+				struct sockaddr addr;
+				addr.sa_family = AF_UNSPEC;
+				socklen_t addr_len = sizeof(addr);
+				if (ControlSocket != INVALID_SOCKET)
+					getsockname(ControlSocket, &addr, &addr_len);
+				if (addr.sa_family == AF_INET)
+				{
+					struct sockaddr_in * saServer = (sockaddr_in *)&addr;
+					std::stringstream ss;
+					ss << "TiVoMediaServer:" << ntohs(saServer->sin_port) << "/http";
+					myServer.m_services = ss.str();
+				}
 				/* Set the socket to listen */
 				nRet = listen(ControlSocket, SOMAXCONN);
 				if (nRet == SOCKET_ERROR)
@@ -1734,8 +1834,30 @@ UINT HTTPMain(LPVOID lvp)
 						SOCKET remoteSocket = accept(ControlSocket,NULL,NULL);
 						if (remoteSocket != INVALID_SOCKET)
 						{
-							setsockopt(remoteSocket, SOL_SOCKET, SO_KEEPALIVE, (char *)&on, sizeof(on));	// Attempt to see if this is related to why many of my transfers are failing.
 							#ifdef _DEBUG
+							stringstream ss;
+							ss << __FUNCTION__;
+							DWORD optval = FALSE;
+							int optlen = sizeof(optval);
+							getsockopt(remoteSocket, SOL_SOCKET, SO_KEEPALIVE, (char *)&optval, &optlen);
+							ss << " SO_KEEPALIVE: " << optval;
+							optval = FALSE;optlen = sizeof(optval);
+							getsockopt(remoteSocket, SOL_SOCKET, SO_SNDBUF, (char *)&optval, &optlen);
+							ss << " SO_SNDBUF: " << optval;
+							optval = FALSE;optlen = sizeof(optval);
+							getsockopt(remoteSocket, SOL_SOCKET, SO_RCVBUF, (char *)&optval, &optlen);
+							ss << " SO_RCVBUF: " << optval;
+							optval = FALSE;optlen = sizeof(optval);
+							getsockopt(remoteSocket, IPPROTO_TCP, TCP_BSDURGENT, (char *)&optval, &optlen);
+							ss << " TCP_BSDURGENT: " << optval;
+							optval = FALSE;optlen = sizeof(optval);
+							getsockopt(remoteSocket, IPPROTO_TCP, TCP_EXPEDITED_1122, (char *)&optval, &optlen);
+							ss << " TCP_EXPEDITED_1122: " << optval;
+							optval = FALSE;optlen = sizeof(optval);
+							getsockopt(remoteSocket, IPPROTO_TCP, TCP_NODELAY, (char *)&optval, &optlen);
+							ss << " TCP_NODELAY: " << optval;
+							ss << std::endl;
+							TRACE(ss.str().c_str());
 							HTTPChild((LPVOID)remoteSocket);
 							#else
 							AfxBeginThread(HTTPChild, (LPVOID)remoteSocket);
@@ -1819,7 +1941,7 @@ UINT TiVoConvertFileThread(LPVOID lvp)
 	TRACE(__FUNCTION__ " Exiting\n");
 	return(0);
 }
-bool TiVoBeaconSend(const CStringA & csServerBroadcast)
+bool TiVoBeaconSend(const std::string csServerBroadcast)
 {
 	bool rval = false;
 	// Create a UDP/IP datagram socket
@@ -1833,15 +1955,9 @@ bool TiVoBeaconSend(const CStringA & csServerBroadcast)
 	else
 	{
 		BOOL bBroadcastSocket = TRUE;
-		int nRet = setsockopt(theSocket,
-			SOL_SOCKET,
-			SO_BROADCAST,
-			(const char *)&bBroadcastSocket,
-			sizeof(bBroadcastSocket));
+		int nRet = setsockopt(theSocket, SOL_SOCKET, SO_BROADCAST, (const char *)&bBroadcastSocket, sizeof(bBroadcastSocket));
 		if (nRet == SOCKET_ERROR) 
-		{
 			TRACE("%s: %d\n","socket()",WSAGetLastError());
-		}
 		else
 		{
 			SOCKADDR_IN saBroadCast;
@@ -1849,8 +1965,8 @@ bool TiVoBeaconSend(const CStringA & csServerBroadcast)
 			saBroadCast.sin_addr.S_un.S_addr = INADDR_BROADCAST;
 			saBroadCast.sin_port = htons(2190);	// Port number
 			nRet = sendto(theSocket,			// Socket
-				csServerBroadcast.GetString(),	// Data buffer
-				csServerBroadcast.GetLength(),	// Length of data
+				csServerBroadcast.c_str(),		// Data buffer
+				csServerBroadcast.length(),		// Length of data
 				0,								// Flags
 				(LPSOCKADDR)&saBroadCast,		// Server address
 				sizeof(struct sockaddr));		// Length of address
@@ -1862,74 +1978,6 @@ bool TiVoBeaconSend(const CStringA & csServerBroadcast)
 		closesocket(theSocket);
 	}
 	return(rval);
-}
-UINT TiVoBeacon(LPVOID lvp)
-{
-	if (!AfxSocketInit())
-	{
-		printerr(_T("Fatal Error: Sockets initialization failed\n"));
-	}
-	else
-	{
-		/* Open a listening socket */
-		ControlSocket = socket(AF_INET,	/* Address family */
-							SOCK_STREAM,	/* Socket type */
-							IPPROTO_TCP);	/* Protocol */
-		if (ControlSocket == INVALID_SOCKET)
-			printerr(_T("Fatal Error: Socket could not be created"));
-		else
-		{
-			int on = 1;
-			SOCKADDR_IN saServer;
-			int nRet;
-			setsockopt(ControlSocket,SOL_SOCKET,SO_REUSEADDR,(char *)&on,sizeof(on));
-			saServer.sin_family = AF_INET;
-			saServer.sin_addr.s_addr = INADDR_ANY;	/* Let WinSock supply address */
-			saServer.sin_port = htons(8080);			/* Use port from command line */
-			nRet = bind(ControlSocket,		/* Socket */
-						(LPSOCKADDR)&saServer,		/* Our address */
-						sizeof(struct sockaddr));	/* Size of address structure */
-			if (nRet == SOCKET_ERROR)
-			{
-				closesocket(ControlSocket);
-				ControlSocket = INVALID_SOCKET;
-				printerr(_T("Fatal Error: Socket could not be bound"));
-			}
-			else
-			{
-				/* Set the socket to listen */
-				nRet = listen(ControlSocket,	/* Bound socket */
-							SOMAXCONN);			/* Number of connection request queue */
-				if (nRet == SOCKET_ERROR)
-				{
-					closesocket(ControlSocket);
-					ControlSocket = INVALID_SOCKET;
-					printerr(_T("Fatal Error: Socket could not be set to listen"));
-				}
-				else 
-				{
-					while (ControlSocket != INVALID_SOCKET)
-					{
-						SOCKET remoteSocket;
-						remoteSocket = accept(ControlSocket,NULL,NULL);
-						//PostGroomedDataStopRequested = true;
-						if (remoteSocket != INVALID_SOCKET)
-						{
-							char InBuff[1024];
-							int count = recv(remoteSocket,InBuff,sizeof(InBuff),0);
-							InBuff[count] = '\0';
-							int nRet = send(remoteSocket,"HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n",41,0);
-							if(bConsoleExists)
-								printf("%s",InBuff);
-							closesocket(remoteSocket);
-						}
-					}
-				}
-			}
-		}
-	}
-	SetEvent(terminateEvent);
-	return(0);
 }
 bool TiVoBeaconListen(SOCKADDR_IN &saServer)
 {
@@ -2294,10 +2342,9 @@ void SignalHandler(int signal)
 {
 	bRun = false;
 	cerr << "[" << getTimeISO8601() << "] SIGINT: Caught Ctrl-C, cleaning up and moving on." << endl;
-	CStringA csTiVoPacket("tivoconnect=0\r\n");
+	std::string csTiVoPacket("tivoconnect=0\r\n");
 	TiVoBeaconSend(csTiVoPacket);
 }
-extern bool TiVoBeaconListen(SOCKADDR_IN &saServer);
 int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 {
 	int nRetCode = 0;
@@ -2567,7 +2614,9 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 			}
 
 			TiVoFileList.reserve(1000);
-			if (!csMyHostName.CompareNoCase(_T("INSPIRON")))
+			if (!csMyHostName.CompareNoCase(_T("WimsDM1")))
+				PopulateTiVoFileList(TiVoFileList, ccTiVoFileListCritSec, "C:/Users/Wim/Videos/*");
+			else
 			{
 				#ifdef _DE_CHUNK_FILE_
 				std::ifstream FileToDeChunk;
@@ -2648,15 +2697,10 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 				#endif
 				AfxBeginThread(PopulateTiVoFileList, NULL);
 			}
-			else
-			{
-				PopulateTiVoFileList(TiVoFileList, ccTiVoFileList, "//Acid/TiVo/Evening*.TiVo");
-				PopulateTiVoFileList(TiVoFileList, ccTiVoFileList, "C:/Users/Wim/Videos/*.mp4");
-			}
-			ccTiVoFileList.Lock();
+			ccTiVoFileListCritSec.Lock();
 			std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate);
 			std::cout << "[" << getTimeISO8601() << "] TiVoFileList Size: " << TiVoFileList.size() << endl;
-			ccTiVoFileList.Unlock();
+			ccTiVoFileListCritSec.Unlock();
 
 			#ifdef _Original_Download_Tests_
 			if (SUCCEEDED(CoInitializeEx(0, COINIT_MULTITHREADED))) // COINIT_APARTMENTTHREADED
@@ -3022,31 +3066,16 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 					if (dwVersion < 0x80000000)              
 						dwBuild = (int)(HIWORD(dwVersion));
 
-					cTiVoServer myServer;
 					myServer.m_method = true?"broadcast":"connect";
-					{
-						std::stringstream ss;
-						ss << "pc/WinNT:" << dwMajorVersion << "." << dwMinorVersion << "." << dwBuild;
-						myServer.m_platform = ss.str();
-					}
+					std::stringstream ss;
+					ss << "pc/WinNT:" << dwMajorVersion << "." << dwMinorVersion << "." << dwBuild;
+					myServer.m_platform = ss.str();
 					myServer.m_machine = CStringA(csMyHostName).GetString();
 					myServer.m_identity = CStringA(csMyProgramGuid).GetString();
 					myServer.m_swversion = CStringA(csBuildDateTime).GetString();
 					for (auto index = 8*60; index > 0; --index)
 					{
-						struct sockaddr addr;
-						addr.sa_family = AF_UNSPEC;
-						socklen_t addr_len = sizeof(addr);
-						if (ControlSocket != INVALID_SOCKET)
-							getsockname(ControlSocket, &addr, &addr_len);
-						if (addr.sa_family == AF_INET)
-						{
-							struct sockaddr_in * saServer = (sockaddr_in *)&addr;
-							std::stringstream ss;
-							ss << "TiVoMediaServer:" << ntohs(saServer->sin_port) << "/http";
-							myServer.m_services = ss.str();
-						}
-						TiVoBeaconSend(CStringA(myServer.WriteTXT('\n').c_str()));
+						TiVoBeaconSend(myServer.WriteTXT('\n'));
 						Sleep(60 * 1000);
 					}
 					closesocket(ControlSocket);

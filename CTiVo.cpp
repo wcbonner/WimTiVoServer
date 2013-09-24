@@ -472,7 +472,7 @@ void cTiVoFile::GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const
 	pWriter->WriteStartElement(NULL, L"vBookmark", NULL);pWriter->WriteEndElement();
 	pWriter->WriteStartElement(NULL, L"recordingQuality", NULL);pWriter->WriteAttributeString(NULL,L"value",NULL,L"75");pWriter->WriteString(L"HIGH");pWriter->WriteEndElement();
 	pWriter->WriteStartElement(NULL, L"showing", NULL);
-		pWriter->WriteStartElement(NULL, L"showingBits", NULL);pWriter->WriteAttributeString(NULL,L"value",NULL,L"4609");pWriter->WriteEndElement();
+		pWriter->WriteStartElement(NULL, L"showingBits", NULL);pWriter->WriteAttributeString(NULL,L"value",NULL,L"0");pWriter->WriteEndElement();
 		pWriter->WriteElementString(NULL, L"time", NULL, m_CaptureDate.FormatGmt(_T("%Y-%m-%d:%H:%M:%SZ")));
 		pWriter->WriteElementString(NULL, L"duration", NULL, CString(timeToISO8601(CTimeSpan(m_Duration/1000)).c_str()).GetString());
 		pWriter->WriteStartElement(NULL, L"program", NULL);
@@ -482,7 +482,7 @@ void cTiVoFile::GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const
 			pWriter->WriteEndElement();
 			pWriter->WriteStartElement(NULL, L"vChoreographer", NULL);
 			pWriter->WriteEndElement();
-			pWriter->WriteStartElement(NULL, L"colorCode", NULL);pWriter->WriteAttributeString(NULL,L"value",NULL,L"4");pWriter->WriteEndElement();
+			pWriter->WriteStartElement(NULL, L"colorCode", NULL);pWriter->WriteAttributeString(NULL,L"value",NULL,L"4");pWriter->WriteString(L"COLOR");pWriter->WriteEndElement();
 			pWriter->WriteElementString(NULL, L"description", NULL, m_Description.GetString());
 			pWriter->WriteStartElement(NULL, L"vDirector", NULL);
 			pWriter->WriteEndElement();
