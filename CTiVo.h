@@ -46,8 +46,12 @@ private:
     unsigned long long m_Duration;
 	CTime m_CaptureDate;
 	CString m_csMAK;
+	bool m_AudioCompatible;
+	bool m_VideoCompatible;
 public:
 	cTiVoFile() : 
+	m_AudioCompatible(false),
+	m_VideoCompatible(false),
 	m_SourceSize(0),
     m_Duration(0)
 	{
@@ -81,6 +85,7 @@ public:
 	const unsigned long long & GetSourceSize(void) const { return(m_SourceSize); }
 	void GetXML(CComPtr<IXmlWriter> & pWriter) const;
 	void GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const;
+	const CString GetFFMPEGCommandLine(const CString & csFFMPEGPath = _T("ffmpeg.exe")) const;
 };
 bool cTiVoFileCompareDate(const cTiVoFile & a, const cTiVoFile & b);
 bool cTiVoFileCompareDateReverse(const cTiVoFile & a, const cTiVoFile & b);
