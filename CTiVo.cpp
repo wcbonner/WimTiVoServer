@@ -394,6 +394,12 @@ void cTiVoFile::PopulateFromFFMPEG(void)
 	av_log_set_level(Oldavlog);
 }
 #endif
+const CString & cTiVoFile::SetURL(const CString & csURL)
+{
+	CString csrVal(m_csURL);
+	m_csURL = csURL;
+	return(csrVal);
+}
 void cTiVoFile::GetXML(CComPtr<IXmlWriter> & pWriter) const
 {
 	pWriter->WriteStartElement(NULL, L"Item", NULL);
@@ -516,8 +522,9 @@ bool cTiVoFileComparePathReverse(const cTiVoFile & a, const cTiVoFile & b) { ret
 bool cTiVoFileCompareSize(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_SourceSize > b.m_SourceSize); }
 bool cTiVoFileCompareSizeReverse(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_SourceSize < b.m_SourceSize); }
 /////////////////////////////////////////////////////////////////////////////
-void XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, const CString & csMAK, std::vector<cTiVoFile> & TiVoFileList, std::vector<CTiVoContainer> & TiVoTiVoContainers)
+bool XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, const CString & csMAK, std::vector<cTiVoFile> & TiVoFileList, std::vector<CTiVoContainer> & TiVoTiVoContainers)
 {
+	bool rval = false;
 	HRESULT hr = S_OK;
 	CComPtr<IXmlReader> pReader; 
 	if (SUCCEEDED(hr = CreateXmlReader(__uuidof(IXmlReader), (void**) &pReader, NULL))) 
@@ -531,7 +538,6 @@ void XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, const CString & csMAK,
 				const WCHAR* pwszPrefix; 
 				const WCHAR* pwszLocalName; 
 				const WCHAR* pwszValue; 
-				//const WCHAR* pwsznsURI;
 				UINT cwchPrefix;
 				bool bIsItem = false;
 				bool bIsItemDetails = false;
@@ -552,6 +558,7 @@ void XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, const CString & csMAK,
 				const CString ccsUrl(_T("Url"));
 				const CString ccsContentType(_T("ContentType"));
 				const CString ccsContentTypeVideo(_T("video/x-tivo-raw-tts"));
+				const CString ccsContentTypeVideoAlternate(_T("video/x-tivo-mpeg"));
 				const CString ccsContentTypeContainer(_T("x-tivo-container/tivo-videos"));
 				const CString ccsContentTypeContainerAlternate(_T("x-container/tivo-videos"));
 				const CString ccsDetails(_T("Details"));
@@ -565,7 +572,7 @@ void XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, const CString & csMAK,
 				CString csContentType;
 				CTime ctCaptureDate;
 				CTimeSpan ctsDuration;
-				unsigned long long llSourceSize;
+				unsigned long long llSourceSize = 0;
 				//read until there are no more nodes 
 				while (S_OK == (hr = pReader->Read(&nodeType))) 
 				{ 
@@ -609,6 +616,8 @@ void XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, const CString & csMAK,
 											{
 												csContentType = pwszValue;
 												if (!ccsContentTypeVideo.CompareNoCase(csContentType))
+													bIsItemVideo = true;
+												else if (!ccsContentTypeVideoAlternate.CompareNoCase(csContentType))
 													bIsItemVideo = true;
 												else if (!ccsContentTypeContainer.Compare(csContentType))
 													bIsItemVideoContainer = true;
@@ -688,6 +697,7 @@ void XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, const CString & csMAK,
 									cTiVoFile MyFile;
 									MyFile.SetFromTiVoItem(csTitle, csEpisodeTitle, csDescription, csSourceStation, csContentURL, ctCaptureDate, ctsDuration, csMAK, llSourceSize);
 									TiVoFileList.push_back(MyFile);
+									rval = true;
 								}
 								else if (bIsItemVideoContainer)
 								{
@@ -701,6 +711,7 @@ void XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, const CString & csMAK,
 									auto pContainer = std::find(TiVoTiVoContainers.begin(), TiVoTiVoContainers.end(), myContainer);
 									if (pContainer == TiVoTiVoContainers.end())
 										TiVoTiVoContainers.push_back(myContainer);
+									rval = true;
 								}
 							}
 							else if (bIsItemDetails && !ccsDetails.Compare(pwszLocalName))
@@ -715,16 +726,19 @@ void XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, const CString & csMAK,
 			} 
 		}
 	}
+	return(rval);
 }
-void XML_Parse_TiVoNowPlaying(const CString & Source, const CString & csMAK, std::vector<cTiVoFile> & TiVoFileList, std::vector<CTiVoContainer> & TiVoTiVoContainers)
+bool XML_Parse_TiVoNowPlaying(const CString & Source, const CString & csMAK, std::vector<cTiVoFile> & TiVoFileList, std::vector<CTiVoContainer> & TiVoTiVoContainers)
 {
+	bool rval = false;
 	CComPtr<IStream> spFileStream;
 	if (SUCCEEDED(SHCreateStreamOnFile(Source.GetString(), STGM_READ, &spFileStream)))
-		XML_Parse_TiVoNowPlaying(spFileStream, csMAK, TiVoFileList, TiVoTiVoContainers);
+		rval = XML_Parse_TiVoNowPlaying(spFileStream, csMAK, TiVoFileList, TiVoTiVoContainers);
+	return(rval);
 }
 bool XML_Parse_TiVoNowPlaying(const CString & Source, std::vector<cTiVoFile> & TiVoFileList, std::vector<CTiVoContainer> & TiVoTiVoContainers, CInternetSession & serverSession)
 {
-	bool rval = true;
+	bool rval = false;
 	std::cout << "[" << getTimeISO8601() << "] Attempting: " << CStringA(Source).GetString() << endl;
 	DWORD dwServiceType;
 	CString strServer;
@@ -803,7 +817,7 @@ bool XML_Parse_TiVoNowPlaying(const CString & Source, std::vector<cTiVoFile> & T
 							LARGE_INTEGER position;
 							position.QuadPart = 0;
 							spMemoryStreamOne->Seek(position, STREAM_SEEK_SET, NULL);
-							XML_Parse_TiVoNowPlaying(spMemoryStreamOne, strPassword, TiVoFileList, TiVoTiVoContainers);
+							rval = XML_Parse_TiVoNowPlaying(spMemoryStreamOne, strPassword, TiVoFileList, TiVoTiVoContainers);
 							//#ifdef _DEBUG
 							//CComPtr<IStream> spMemoryStreamTwo;
 							//static int iFileCount = 0;
@@ -846,6 +860,7 @@ bool XML_Parse_TiVoNowPlaying(const CString & Source, std::vector<cTiVoFile> & T
 					while (0 < serverFile->Read(&ittybittybuffer, sizeof(ittybittybuffer)))
 						ss += ittybittybuffer;
 					std::cout << "[                   ] Returned File: " << ss << endl;
+					TRACE("[                   ] Returned File: %s\n", ss.c_str());
 				}
 				serverFile->Close();
 			}
@@ -855,7 +870,10 @@ bool XML_Parse_TiVoNowPlaying(const CString & Source, std::vector<cTiVoFile> & T
 				e->GetErrorMessage(szCause,sizeof(szCause)/sizeof(TCHAR));
 				CStringA csErrorMessage(szCause);
 				csErrorMessage.Trim();
-				std::cout << "[                   ] InternetException: " <<  csErrorMessage.GetString() << " (" << e->m_dwError << ") " << endl;
+				std::stringstream ss;
+				ss << "[                   ] InternetException: " <<  csErrorMessage.GetString() << " (" << e->m_dwError << ") " << std::endl;
+				std::cout << ss.str(); 
+				TRACE(ss.str().c_str());
 				if ((e->m_dwError == ERROR_INTERNET_INVALID_CA) || 
 					(e->m_dwError == ERROR_INTERNET_SEC_CERT_CN_INVALID) ||
 					(e->m_dwError == ERROR_INTERNET_SEC_CERT_DATE_INVALID) ||
@@ -1027,5 +1045,61 @@ bool GetTiVoFile(const cTiVoFile & TiVoFile, CInternetSession & serverSession, c
 		}
 	}
 	return(rval);
+}
+/////////////////////////////////////////////////////////////////////////////
+const std::string DereferenceURL(const std::string & URL, const std::string & URLParent)
+{
+	std::stringstream ss;
+	if (URL.substr(0,4) == "http")
+		ss << URL;
+	else
+	{
+		TCHAR szScheme[_MAX_PATH] = _T("");
+		DWORD dwSchemeLength = sizeof(szScheme) / sizeof(TCHAR);
+		TCHAR szHostName[_MAX_PATH] = _T("");
+		DWORD dwHostNameLength = sizeof(szHostName) / sizeof(TCHAR);
+		TCHAR szUserName[_MAX_PATH] = _T("");
+		DWORD dwUserNameLength = sizeof(szUserName) / sizeof(TCHAR);
+		TCHAR szPassword[_MAX_PATH] = _T("");
+		DWORD dwPasswordLength = sizeof(szPassword) / sizeof(TCHAR);
+		TCHAR szUrlPath[_MAX_PATH] = _T("");
+		DWORD dwUrlPathLength = sizeof(szUrlPath) / sizeof(TCHAR);
+		TCHAR szExtraInfo[_MAX_PATH] = _T("");
+		DWORD dwExtraInfoLength = sizeof(szExtraInfo) / sizeof(TCHAR);		
+		URL_COMPONENTS crackedURL;
+		crackedURL.dwStructSize = sizeof(URL_COMPONENTS);
+		crackedURL.lpszScheme = szScheme;					// pointer to scheme name
+		crackedURL.dwSchemeLength = dwSchemeLength;			// length of scheme name
+		crackedURL.nScheme;									// enumerated scheme type (if known)
+		crackedURL.lpszHostName = szHostName;				// pointer to host name
+		crackedURL.dwHostNameLength = dwHostNameLength;		// length of host name
+		crackedURL.nPort;									// converted port number
+		crackedURL.lpszUserName = szUserName;				// pointer to user name
+		crackedURL.dwUserNameLength = dwUserNameLength;		// length of user name
+		crackedURL.lpszPassword = szPassword;				// pointer to password
+		crackedURL.dwPasswordLength = dwPasswordLength;		// length of password
+		crackedURL.lpszUrlPath = szUrlPath;					// pointer to URL-path
+		crackedURL.dwUrlPathLength = dwUrlPathLength;		// length of URL-path
+		crackedURL.lpszExtraInfo = szExtraInfo;				// pointer to extra information (e.g. ?foo or #foo)
+		crackedURL.dwExtraInfoLength = dwExtraInfoLength;	// length of extra information
+		if (TRUE == InternetCrackUrl(CString(URLParent.c_str()).GetString(), CString(URLParent.c_str()).GetLength(), ICU_DECODE, &crackedURL))
+		{
+			ss << CStringA(crackedURL.lpszScheme).GetString() << "://";
+			if (!CStringA(crackedURL.lpszUserName).IsEmpty()) ss << CStringA(crackedURL.lpszUserName).GetString() << ":" << CStringA(crackedURL.lpszPassword).GetString() << "@";
+			ss << CStringA(crackedURL.lpszHostName).GetString() << ":" << crackedURL.nPort;
+			ss << URL;
+			//szUrlPath[0] = _T('');
+			//szExtraInfo[0] = _T('');
+			//BOOL Crack2 = InternetCrackUrl(CString(URL.c_str()).GetString(), CString(URL.c_str()).GetLength(), ICU_DECODE, &crackedURL);
+			//TCHAR rVal[512] = _T("");
+			//DWORD rValSize = sizeof(rVal) / sizeof(TCHAR);
+			//if (FALSE == Crack2)
+			//	Crack2 = InternetCombineUrl(CString(URLParent.c_str()).GetString(), CString(URL.c_str()).GetString(), rVal, &rValSize, 0);
+			//else
+			//	Crack2 = InternetCreateUrl(&crackedURL, ICU_ESCAPE, rVal, &rValSize);
+			//return(std::string(CStringA(rVal).GetString()));
+		}
+	}
+	return(ss.str());
 }
 /////////////////////////////////////////////////////////////////////////////

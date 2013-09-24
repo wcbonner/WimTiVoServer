@@ -65,6 +65,7 @@ public:
 	#ifdef AVCODEC_AVCODEC_H
 	void PopulateFromFFMPEG(void);
 	#endif
+	const CString & SetURL(const CString & csURL);
 	const CString & GetURL(void) const { return(m_csURL); }
 	const CString & GetTitle(void) const { return(m_Title); }
 	const CString & GetEpisodeTitle(void) const { return(m_EpisodeTitle); }
@@ -80,8 +81,10 @@ bool cTiVoFileCompareDate(const cTiVoFile & a, const cTiVoFile & b);
 bool cTiVoFileCompareDateReverse(const cTiVoFile & a, const cTiVoFile & b);
 extern const CString csUrlPrefix;
 /////////////////////////////////////////////////////////////////////////////
-void XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, const CString & csMAK, std::vector<cTiVoFile> & TiVoFileList, std::vector<CTiVoContainer> & TiVoTiVoContainers);
-void XML_Parse_TiVoNowPlaying(const CString & Source, const CString & csMAK, std::vector<cTiVoFile> & TiVoFileList, std::vector<CTiVoContainer> & TiVoTiVoContainers);
+bool XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, const CString & csMAK, std::vector<cTiVoFile> & TiVoFileList, std::vector<CTiVoContainer> & TiVoTiVoContainers);
+bool XML_Parse_TiVoNowPlaying(const CString & Source, const CString & csMAK, std::vector<cTiVoFile> & TiVoFileList, std::vector<CTiVoContainer> & TiVoTiVoContainers);
 bool XML_Parse_TiVoNowPlaying(const CString & Source, std::vector<cTiVoFile> & TiVoFileList, std::vector<CTiVoContainer> & TiVoTiVoContainers, CInternetSession & serverSession);
 bool GetTiVoFile(const cTiVoFile & TiVoFile, CInternetSession & serverSession, const CString & csTiVoMAK, const CString & csFileLocation = _T("//Acid/TiVo/"));
+/////////////////////////////////////////////////////////////////////////////
+const std::string DereferenceURL(const std::string & URL, const std::string & URLParent);
 /////////////////////////////////////////////////////////////////////////////
