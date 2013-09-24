@@ -470,8 +470,11 @@ UINT CWimTiVoClientDoc::TiVoBeaconListenThread(LPVOID lvp)
 								csURL.Append(CString(myServer.m_address.c_str()));
 								csURL.Append(_T(":"));
 								csURL.Append(csMediaServerPort);
-								csURL.Append(_T("/TiVoConnect?Command=QueryContainer%2F"));
+								csURL.Append(_T("/TiVoConnect?Command=QueryContainer&Container=%2F"));
+								TRACE(_T("URL: %s\n"), csURL.GetString());
+								TRACE(_T("Container Count: %d\n"),pDoc->m_TiVoTiVoContainers.size());
 								XML_Parse_TiVoNowPlaying(csURL, CString(myServer.m_MAK.c_str()), pDoc->m_TiVoFiles, pDoc->m_TiVoTiVoContainers, pDoc->m_InternetSession);
+								TRACE(_T("Container Count: %d\n"),pDoc->m_TiVoTiVoContainers.size());
 							}
 						}
 					}
