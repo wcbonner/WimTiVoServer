@@ -736,11 +736,11 @@ const CString QuoteFileName(const CString & Original)
 	return(csQuotedString);
 }
 /////////////////////////////////////////////////////////////////////////////
-void PopulateTiVoFileList(std::vector<cTiVoFile> & TiVoFileList, std::string FileSpec)
+void PopulateTiVoFileList(std::vector<cTiVoFile> & TiVoFileList, CCriticalSection & ccTiVoFileListCritSec, std::string FileSpec, bool Recurse = false)
 {
 	#ifdef _DEBUG
-	TRACE(__FUNCTION__ "\n");
-	std::cout << "[" << getTimeISO8601() << "] " << __FUNCTION__ << endl;
+	TRACE(__FUNCTION__ " %s\n", FileSpec.c_str());
+	std::cout << "[" << getTimeISO8601() << "] " << __FUNCTION__ << " " << FileSpec.c_str() << std::endl;
 	#endif
 	CFileFind finder;
 	
@@ -751,7 +751,15 @@ void PopulateTiVoFileList(std::vector<cTiVoFile> & TiVoFileList, std::string Fil
 		if (finder.IsDots())
 			continue;
 		if (finder.IsDirectory())
+		{
+			if (Recurse)
+			{
+				std::stringstream ss;
+				ss << CStringA(finder.GetFilePath()).GetString() << "\\*";
+				PopulateTiVoFileList(TiVoFileList, ccTiVoFileListCritSec, ss.str());
+			}
 			continue;
+		}
 		if (finder.IsHidden())
 			continue;
 		if (finder.IsSystem())
@@ -762,14 +770,13 @@ void PopulateTiVoFileList(std::vector<cTiVoFile> & TiVoFileList, std::string Fil
 		if (finder.GetLength() > 0)
 		{
 			myFile.SetPathName(finder);
+			ccTiVoFileListCritSec.Lock();
 			if (!myFile.GetSourceFormat().Left(6).CompareNoCase(_T("video/")))
 				TiVoFileList.push_back(myFile);
+			ccTiVoFileListCritSec.Unlock();
 		}
 	}
 	finder.Close();
-	#ifdef _DEBUG
-	std::cout << "[" << getTimeISO8601() << "] "  << __FUNCTION__ << "\texiting" << endl;
-	#endif
 }
 /////////////////////////////////////////////////////////////////////////////
 void printerr(TCHAR * errormsg)
@@ -859,8 +866,27 @@ int GetTiVoQueryFormats(SOCKET DataSocket, const char * InBuffer)
 	send(DataSocket, XMLDataBuff, strlen(XMLDataBuff),0);
 	return(0);
 }
+CCriticalSection ccTiVoFileList;
 std::vector<cTiVoFile> TiVoFileList;
 std::queue<cTiVoFile> TiVoFilesToConvert;
+UINT PopulateTiVoFileList(LPVOID lvp)
+{
+	//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/*.TiVo");
+	//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/Evening*.TiVo");
+	//PopulateTiVoFileList(TiVoFileList, "D:/Videos/Evening Magazine (Recorded Mar 26, 2010, KINGDT).TiVo");
+	PopulateTiVoFileList(TiVoFileList, ccTiVoFileList, "D:/Videos/*");
+	ccTiVoFileList.Lock(); std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate); ccTiVoFileList.Unlock();
+	PopulateTiVoFileList(TiVoFileList, ccTiVoFileList, "D:/Recorded TV/*");
+	ccTiVoFileList.Lock(); std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate); ccTiVoFileList.Unlock();
+	PopulateTiVoFileList(TiVoFileList, ccTiVoFileList, "//Acid/TiVo/*");
+	ccTiVoFileList.Lock(); std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate); ccTiVoFileList.Unlock();
+	PopulateTiVoFileList(TiVoFileList, ccTiVoFileList, "//Acid/Videos/*");
+	//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/*.TiVo");
+	//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/the.daily*");
+	//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/Archer.*");
+	ccTiVoFileList.Lock(); std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate); ccTiVoFileList.Unlock();
+	return(0);
+}
 int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 {
 	TRACE(__FUNCTION__ "\n");
@@ -874,6 +900,7 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 	getpeername(DataSocket, (struct sockaddr *)&adr_inet, &sa_len);
 	std::cout << "[" << getTimeISO8601() << "] "  << __FUNCTION__ << "\t" << inet_ntoa(adr_inet.sin_addr) << " " << csInBuffer.GetString() << endl;
 	#endif
+	ccTiVoFileList.Lock();
 	int rval = 0;
 	const int XMLDataBuffSize = 1024;
 	char* XMLDataBuff = new char[XMLDataBuffSize];
@@ -887,11 +914,13 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 		char MyHostName[80] = {0}; // winsock hostname used for data recordkeeping
 		gethostname(MyHostName,sizeof(MyHostName));
 		CString csContainer;
+		int iAnchorOffset = 0;
 		CString csAnchorItem;
+		ccTiVoFileList.Lock();
 		if (!TiVoFileList.empty())
 			csAnchorItem = TiVoFileList.begin()->GetURL();
-		int iAnchorOffset = 0;
 		int iItemCount = TiVoFileList.size();
+		ccTiVoFileList.Unlock();
 		CString csCommand(InBuffer);
 		int curPos = 0;
 		CString csToken(csCommand.Tokenize(_T("& ?"),curPos));
@@ -926,7 +955,7 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 			else if (!csKey.CompareNoCase(_T("ItemCount")))
 			{
 				std::wcout << L"[                   ] " << csToken.GetString() << endl;
-				iItemCount = atoi(CStringA(csValue).GetString());
+				iItemCount = min(iItemCount, atoi(CStringA(csValue).GetString()));
 			}
 			else if (!csKey.CompareNoCase(_T("AnchorItem")))
 			{
@@ -960,7 +989,6 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 			}
 			csToken = csCommand.Tokenize(_T("& ?"),curPos);
 		}
-		iItemCount = min(iItemCount, TiVoFileList.size());
 		CString csTemporary;
 		pWriter->SetOutput(spMemoryStream);
 		pWriter->SetProperty(XmlWriterProperty_Indent, TRUE);
@@ -996,6 +1024,7 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 			}
 			else
 			{
+				ccTiVoFileList.Lock();
 				// If Anchoritem not empty 
 				//		set pointer to anchor item in list
 				//		move pointer to anchoroffset
@@ -1046,6 +1075,7 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 					pItem++;
 					iItemCount--;
 				}
+				ccTiVoFileList.Unlock();
 			}
 			pWriter->WriteEndElement();	// TiVoContainer
 		pWriter->WriteComment(L" Copyright © 2013 William C Bonner ");
@@ -1081,6 +1111,7 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 	send(DataSocket, XMLDataBuff, strlen(XMLDataBuff), 0);
 	delete[] XMLDataBuff;
 
+	ccTiVoFileList.Unlock();
 #ifdef _DEBUG
 	std::cout << "[" << getTimeISO8601() << "] "  << __FUNCTION__ << "\texiting" << endl;
 #endif
@@ -1187,12 +1218,14 @@ int GetTiVoTVBusQuery(SOCKET DataSocket, const char * InBuffer)
 				//pWriter->WriteAttributeString(L"xmlns", L"TvDbBitstreamFormat", NULL, L"http://tivo.com/developer/xml/idl/TvDbBitstreamFormat");
 				//pWriter->WriteAttributeString(L"xmlns", L"schemaLocation", NULL, L"http://tivo.com/developer/xml/idl/TvBusMarshalledStruct TvBusMarshalledStruct.xsd http://tivo.com/developer/xml/idl/TvPgdRecording TvPgdRecording.xsd http://tivo.com/developer/xml/idl/TvBusDuration TvBusDuration.xsd http://tivo.com/developer/xml/idl/TvPgdShowing TvPgdShowing.xsd http://tivo.com/developer/xml/idl/TvDbShowingBit TvDbShowingBit.xsd http://tivo.com/developer/xml/idl/TvBusDateTime TvBusDateTime.xsd http://tivo.com/developer/xml/idl/TvPgdProgram TvPgdProgram.xsd http://tivo.com/developer/xml/idl/TvDbColorCode TvDbColorCode.xsd http://tivo.com/developer/xml/idl/TvPgdSeries TvPgdSeries.xsd http://tivo.com/developer/xml/idl/TvDbShowType TvDbShowType.xsd http://tivo.com/developer/xml/idl/TvPgdChannel TvPgdChannel.xsd http://tivo.com/developer/xml/idl/TvDbTvRating TvDbTvRating.xsd http://tivo.com/developer/xml/idl/TvDbRecordQuality TvDbRecordQuality.xsd http://tivo.com/developer/xml/idl/TvDbBitstreamFormat TvDbBitstreamFormat.xsd");
 				//pWriter->WriteAttributeString(L"xmlns", L"type", NULL, L"TvPgdRecording:TvPgdRecording");
+				ccTiVoFileList.Lock();
 				for (auto MyFile = TiVoFileList.begin(); MyFile != TiVoFileList.end(); MyFile++)
 					if (!MyFile->GetURL().CompareNoCase(csUrl))
 					{
 						MyFile->GetTvBusEnvelope(pWriter);
 						break;
 					}
+				ccTiVoFileList.Unlock();
 				//pWriter->WriteFullEndElement();
 			//pWriter->WriteComment(L" Copyright © 2013 William C Bonner ");
 			//pWriter->WriteEndDocument();
@@ -1255,24 +1288,17 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 	{
 		if (!csUrlPrefix.Compare(csToken.Left(csUrlPrefix.GetLength())))
 		{
+			ccTiVoFileList.Lock();
 			for (auto MyFile = TiVoFileList.begin(); MyFile != TiVoFileList.end(); MyFile++)
 				if (!MyFile->GetURL().CompareNoCase(csToken))
 				{
-					std::wcout << L"[                   ] Found File: " << MyFile->GetTitle().GetString() << std::endl;
+					std::wcout << L"[                   ] Found File: " << MyFile->GetPathName().GetString() << std::endl;
 					TiVoFileToSend = *MyFile;
-					//MyFile->GetTvBusEnvelope(pWriter);
 					break;
 				}
+			ccTiVoFileList.Unlock();			
 			if (TiVoFileToSend.GetSourceSize() == 0)
 				std::wcout << L"[                   ] Not Found File: " << csToken.GetString() << std::endl;
-			//csToken.Delete(0,csUrlPrefix.GetLength());
-			//TCHAR lpszBuffer[_MAX_PATH];
-			//DWORD dwBufferLength = sizeof(lpszBuffer) / sizeof(TCHAR);
-			//InternetCanonicalizeUrl(csToken.GetString(), lpszBuffer, &dwBufferLength, ICU_DECODE | ICU_NO_ENCODE);
-			//csFileName = CString(lpszBuffer, dwBufferLength);
-			//if (!csFileName.Left(7).CompareNoCase(_T("file://"))) 
-			//	csFileName.Delete(0,7);
-			//while (0 < csFileName.Replace(_T("%20"),_T(" "))); // take care of spaces that are still encoded
 		}
 		csToken = csCommand.Tokenize(_T("&? "),curPos);
 	}
@@ -1425,6 +1451,7 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 			ssChunkHeader << hex << TiVoChunkBufferSize << "\r\n";
 			send(DataSocket, ssChunkHeader.str().c_str(), ssChunkHeader.str().length(), 0);
 			send(DataSocket, TiVoChunkBuffer, TiVoChunkBufferSize, 0);
+			send(DataSocket, "\r\n", 2, 0);	// Chunk Footer
 			delete[] TiVoChunkBuffer;
 #pragma pack()
 #pragma pack(show)
@@ -1438,7 +1465,7 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 			// Create a pipe for the child process's STDOUT. 
 			HANDLE g_hChildStd_OUT_Rd = NULL;
 			HANDLE g_hChildStd_OUT_Wr = NULL;
-			if ( ! CreatePipe(&g_hChildStd_OUT_Rd, &g_hChildStd_OUT_Wr, &saAttr, 0x80000) ) 
+			if ( ! CreatePipe(&g_hChildStd_OUT_Rd, &g_hChildStd_OUT_Wr, &saAttr, 0x800000) ) 
 				std::cout << "[" << getTimeISO8601() << "] "  << __FUNCTION__ << "\t ERROR: StdoutRd CreatePipe" << endl;
 			else
 			{
@@ -1459,29 +1486,21 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 					STARTUPINFO siStartInfo;
 					ZeroMemory( &siStartInfo, sizeof(STARTUPINFO) );
 					siStartInfo.cb = sizeof(STARTUPINFO); 
-					//siStartInfo.hStdError = g_hChildStd_OUT_Wr;
-					//siStartInfo.hStdInput = g_hChildStd_IN_Rd;
 					siStartInfo.hStdError = GetStdHandle(STD_ERROR_HANDLE);
 					siStartInfo.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
 					siStartInfo.hStdOutput = g_hChildStd_OUT_Wr;
 					siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
  
-					// "D:\\pytivo\\bin\\ffmpeg.exe" -i "D:\\Videos\\archer\\Archer.2009.S03E12.HDTV.x264.mp4" -vcodec mpeg2video -b 16384k -maxrate 30000k -bufsize 4096k -ab 448k -ar 48000 -acodec ac3 -copyts -map 0:0 -map 0:1 -report -f vob -
 					std::wstringstream ss;
-					//ss << L"ffmpeg.exe -i " << QuoteFileName(csFileName).GetString() << L" -vcodec mpeg2video -acodec ac3 -copyts -report -f vob -";
-					// -vcodec copy -b 10871k -maxrate 30000k -bufsize 4096k -ab 448k -ar 48000 -acodec copy -map 0:1 -map 0:0 -report -f vob -
-					//ss << L"ffmpeg.exe -i " << QuoteFileName(TiVoFileToSend.GetPathName()).GetString() << L" -vcodec mpeg2video -b:v 16384k -maxrate 30000k -bufsize 4096k -ab 448k -ar 48000 -acodec ac3 -copyts -report -f vob -";
 					if (!TiVoFileToSend.GetSourceFormat().Compare(_T("video/mpeg2video")))
 						ss << L"ffmpeg.exe -i " << QuoteFileName(TiVoFileToSend.GetPathName()).GetString() << L" -vcodec copy -b:v 16384k -maxrate 30000k -bufsize 4096k -ab 448k -ar 48000 -acodec copy -report -f vob -";
 					else
-						ss << L"ffmpeg.exe -i " << QuoteFileName(TiVoFileToSend.GetPathName()).GetString() << L" -vcodec mpeg2video -b:v 16384k -maxrate 30000k -bufsize 4096k -ab 448k -ar 48000 -acodec ac3 -copyts -report -f vob -";
-						//ss << L"ffmpeg.exe -i " << QuoteFileName(TiVoFileToSend.GetPathName()).GetString() << L" -vcodec mpeg2video -b:v 16384k -maxrate 30000k -bufsize 4096k -ab 448k -ar 48000 -acodec ac3 -copyts -report -f vob -";
+						ss << L"ffmpeg.exe -i " << QuoteFileName(TiVoFileToSend.GetPathName()).GetString() << L" -vcodec mpeg2video -b:v 16384k -maxrate 30000k -bufsize 4096k -ab 448k -ar 48000 -acodec ac3 -report -f vob -";
 					TCHAR szCmdline[1024];
 					szCmdline[ss.str().copy(szCmdline, (sizeof(szCmdline)/sizeof(TCHAR))-sizeof(TCHAR))] = _T('\0');
 					std::wcout << L"[                   ] CreateProcess: " << szCmdline << std::endl;
 
 					// Create the child process.     
-					//TCHAR szCmdline[]=TEXT("child");
 					BOOL bSuccess = CreateProcess(NULL, 
 						szCmdline,     // command line 
 						NULL,          // process security attributes 
@@ -1497,23 +1516,47 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 					if ( bSuccess ) 
 					{
 						CloseHandle(g_hChildStd_OUT_Wr);	// If I don't do this, then the parent will never exit!
+						//BOOL on = 1;
+						//if (SOCKET_ERROR != setsockopt(DataSocket, IPPROTO_TCP, TCP_NODELAY, (char *)&on, sizeof(on)))	// Attempt to see if this is related to why many of my transfers are failing.
+						//	TRACE("NAGLE Disabled on socket\n");
+						//else
+						//	TRACE("NAGLE NOT Disabled on socket\n");
 						long long bytessent = 0;
-						char * RAWDataBuff = new char[0x80000];
-						DWORD dwRead, dwWritten; 
-						BOOL bSuccess = FALSE;
+						const int RAWDataBuffSize = 0x80000;	// 0x80000 is half a megabyte
+						//const int RAWDataBuffSize = 0x800;	// 0x800 is 2k
+						char * RAWDataBuff = new char[RAWDataBuffSize];
 						CTime ctStart(CTime::GetCurrentTime());
 						CTimeSpan ctsTotal = CTime::GetCurrentTime() - ctStart;
 						unsigned long long CurrentFileSize = 0;
+						unsigned long long ChunkCount = 0;
+						int MaxChunkSize = 0;
+						int MinChunkSize = INT_MAX;
 						for (;;) 
 						{ 
-							bSuccess = ReadFile(g_hChildStd_OUT_Rd, RAWDataBuff, 0x80000, &dwRead, NULL);
+							DWORD dwRead = 0;
+							BOOL bSuccess = ReadFile(g_hChildStd_OUT_Rd, RAWDataBuff, RAWDataBuffSize, &dwRead, NULL);
 							if( (!bSuccess) || (dwRead == 0)) break; 
+							MaxChunkSize = max(MaxChunkSize, dwRead);
+							MinChunkSize = min(MinChunkSize, dwRead);
 							if (DataSocket != INVALID_SOCKET) 
 							{
+								ChunkCount++;
 								ssChunkHeader.str("");
-								ssChunkHeader << hex << "\r\n" << dwRead << "\r\n";
-								send(DataSocket, ssChunkHeader.str().c_str(), ssChunkHeader.str().length(), 0);
-								int nRet = send(DataSocket, RAWDataBuff, dwRead, 0);
+								ssChunkHeader << hex << dwRead << "\r\n";
+								int nRet = 0;
+								//char * Payload = new char[ssChunkHeader.str().length()+dwRead+2];
+								//if (Payload != NULL)
+								//{
+								//	memcpy(Payload, ssChunkHeader.str().c_str(), ssChunkHeader.str().length());
+								//	memcpy(Payload+ssChunkHeader.str().length(), RAWDataBuff, dwRead);
+								//	memcpy(Payload+ssChunkHeader.str().length()+dwRead, "\r\n", 2);
+								//	nRet = send(DataSocket, Payload, ssChunkHeader.str().length()+dwRead+2, 0);
+								//}
+								//else
+								//{
+									send(DataSocket, ssChunkHeader.str().c_str(), ssChunkHeader.str().length(), 0);
+									nRet = send(DataSocket, RAWDataBuff, dwRead, 0);
+								//}
 								if (SOCKET_ERROR == nRet)
 								{
 									TerminateProcess(piProcInfo.hProcess, 0);
@@ -1549,39 +1592,41 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 									WSASetLastError(0);		// Reset this so that subsequent calls may be accurate
 									break;
 								}
+								//else if (Payload == NULL)
+									send(DataSocket, "\r\n", 2, 0);	// Chunk Footer
+								//if (Payload != NULL)
+								//	delete[] Payload;
 								bytessent += nRet;
-								if (nRet != dwRead)
-								{
-									std::cout << "\n\r[                   ] Not all Read Data was Sent. Read: " << dwRead << " Send: " << nRet << std::endl;
-									char * ptrData = RAWDataBuff + nRet;
-									int DataToSend = dwRead - nRet;
-									while ((DataSocket != INVALID_SOCKET) && (DataToSend > 0) && (SOCKET_ERROR != nRet))
-									{
-										nRet = send(DataSocket, ptrData, DataToSend, 0);
-										ptrData += nRet;
-										DataToSend -= nRet;
-									}
-								}
+								//if (nRet != dwRead)
+								//{
+								//	std::cout << "\n\r[                   ] Not all Read Data was Sent. Read: " << dwRead << " Send: " << nRet << std::endl;
+								//	char * ptrData = RAWDataBuff + nRet;
+								//	int DataToSend = dwRead - nRet;
+								//	while ((DataSocket != INVALID_SOCKET) && (DataToSend > 0) && (SOCKET_ERROR != nRet))
+								//	{
+								//		nRet = send(DataSocket, ptrData, DataToSend, 0);
+								//		ptrData += nRet;
+								//		DataToSend -= nRet;
+								//	}
+								//}
 								CurrentFileSize += nRet;
 								ctsTotal = CTime::GetCurrentTime() - ctStart;
 								// This is another experiment trying to find out why I'm failing to send files to the TiVo
 								// I was initially going to use select() on the socket, but later decided that the ioctlsocket() call mould be simpler.
 								// http://developerweb.net/viewtopic.php?id=2933
-								u_long iMode = 0;
-								if (SOCKET_ERROR != ioctlsocket(DataSocket, FIONREAD, &iMode))
-									if (iMode > 0)
-									{
-										char *JunkBuffer = new char[iMode+1];
-										recv(DataSocket, JunkBuffer, iMode, 0);
-										JunkBuffer[iMode] = '\0';
-										std::cout << "\n\r[                   ] Unexpected Stuff came from TiVo: " << JunkBuffer << std::endl;
-										delete[] JunkBuffer;
-									}
+								//u_long iMode = 0;
+								//if (SOCKET_ERROR != ioctlsocket(DataSocket, FIONREAD, &iMode))
+								//	if (iMode > 0)
+								//	{
+								//		char *JunkBuffer = new char[iMode+1];
+								//		recv(DataSocket, JunkBuffer, iMode, 0);
+								//		JunkBuffer[iMode] = '\0';
+								//		std::cout << "\n\r[                   ] Unexpected Stuff came from TiVo: " << JunkBuffer << std::endl;
+								//		delete[] JunkBuffer;
+								//	}
 							}
 						} 
-						ssChunkHeader.str("");
-						ssChunkHeader << hex << "\r\n" << 0 << "\r\n\r\n";	// \r\n ends previous chunk, 0\r\n is last chunk ending, and \r\n is the trailer.
-						send(DataSocket, ssChunkHeader.str().c_str(), ssChunkHeader.str().length(), 0);
+						send(DataSocket, "0\r\n\r\n", 5, 0); // 0\r\n is last chunk ending, and \r\n is the trailer.
 						delete[] RAWDataBuff;
 						// Close handles to the child process and its primary thread.
 						// Some applications might keep these handles to monitor the status
@@ -1593,6 +1638,8 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 							std::cout << "[" << getTimeISO8601() << "] Finished Sending File, BytesSent(" << bytessent << ")" << " Speed: " << (CurrentFileSize / TotalSeconds) << " B/s, " << CStringA(ctsTotal.Format(_T("%H:%M:%S"))).GetString() << std::endl;
 						else
 							std::cout << "[" << getTimeISO8601() << "] Finished Sending File, BytesSent(" << bytessent << ")" << std::endl;
+						std::cout << "[                   ] ChunkCount: " << ChunkCount << " AvgChunkSize: " << (CurrentFileSize / ChunkCount) << std::endl;
+						std::cout << "[                   ] MaxChunkSize: " << MaxChunkSize << " MinChunkSize: " << MinChunkSize << std::endl;
 					}
 				}
 				CloseHandle(g_hChildStd_OUT_Rd);
@@ -2547,21 +2594,17 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 				finder.Close();
 				AfxBeginThread(TiVoConvertFileThread, NULL);
 				#endif
-				//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/*.TiVo");
-				//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/Evening*.TiVo");
-				//PopulateTiVoFileList(TiVoFileList, "D:/Videos/Evening Magazine (Recorded Mar 26, 2010, KINGDT).TiVo");
-				PopulateTiVoFileList(TiVoFileList, "D:/Recorded TV/*.wtv");
-				//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/*.TiVo");
-				PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/*");
-				//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/Archer.*");
+				AfxBeginThread(PopulateTiVoFileList, NULL);
 			}
 			else
 			{
-				PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/Evening*.TiVo");
-				PopulateTiVoFileList(TiVoFileList, "C:/Users/Wim/Videos/*.mp4");
+				PopulateTiVoFileList(TiVoFileList, ccTiVoFileList, "//Acid/TiVo/Evening*.TiVo");
+				PopulateTiVoFileList(TiVoFileList, ccTiVoFileList, "C:/Users/Wim/Videos/*.mp4");
 			}
+			ccTiVoFileList.Lock();
 			std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate);
 			std::cout << "[" << getTimeISO8601() << "] TiVoFileList Size: " << TiVoFileList.size() << endl;
+			ccTiVoFileList.Unlock();
 
 			#ifdef _Original_Download_Tests_
 			if (SUCCEEDED(CoInitializeEx(0, COINIT_MULTITHREADED))) // COINIT_APARTMENTTHREADED

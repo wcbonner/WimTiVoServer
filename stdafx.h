@@ -30,6 +30,7 @@
 // TODO: reference additional headers your program requires here
 #include <afxsock.h>		// MFC socket extensions
 #include <afxinet.h>
+#include <afxmt.h>			// for CCriticalSection
 #include <iostream>
 #include <locale>
 #include <iomanip>
