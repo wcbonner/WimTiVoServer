@@ -339,6 +339,8 @@ void cTiVoFile::SetFromTiVoItem(const CString &csTitle, const CString &csEpisode
 	m_Title = csTitle;
 	m_EpisodeTitle = csEpisodeTitle;
 	m_Description = csDescription;
+	m_Description.Replace(_T("Copyright Tribune Media Services, Inc."), _T("")); // Hack to get rid of copyright notice in the descriptive text.
+	m_Description.Trim();
 	m_csURL = csContentURL;
 	m_CaptureDate = ctCaptureDate;
 	m_Duration = 1000 * ctsDuration.GetTotalSeconds();
