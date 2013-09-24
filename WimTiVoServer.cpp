@@ -2047,14 +2047,14 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 				//XML_Test_Write();
 				//XML_Test_Write_InMemory();
 				std::vector<cTiVoFile> FilesToGetFromTiVo;
-				XML_Parse_TiVoNowPlaying(_T("WimTivoServer.3.xml"), FilesToGetFromTiVo);
-				std::sort(FilesToGetFromTiVo.begin(),FilesToGetFromTiVo.end(),cTiVoFileCompareDateReverse);
+				//XML_Parse_TiVoNowPlaying(_T("WimTivoServer.3.xml"), FilesToGetFromTiVo);
+				//std::sort(FilesToGetFromTiVo.begin(),FilesToGetFromTiVo.end(),cTiVoFileCompareDateReverse);
 				FilesToGetFromTiVo.clear();
 				CInternetSession serverSession0;
-				XML_Parse_TiVoNowPlaying(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying&Recurse=Yes&SortOrder=!CaptureDate")), FilesToGetFromTiVo, serverSession0);
-				std::sort(FilesToGetFromTiVo.begin(),FilesToGetFromTiVo.end(),cTiVoFileCompareDateReverse);
-				for (auto TiVoFileToGet = FilesToGetFromTiVo.begin(); TiVoFileToGet != FilesToGetFromTiVo.end(); TiVoFileToGet++)
-					while (false == GetTiVoFile(*TiVoFileToGet, serverSession0, _T("1760168186")));
+				//XML_Parse_TiVoNowPlaying(CString(_T("https://tivo:1760168186@192.168.0.108:443/TiVoConnect?Command=QueryContainer&Container=/NowPlaying&Recurse=Yes&SortOrder=!CaptureDate")), FilesToGetFromTiVo, serverSession0);
+				//std::sort(FilesToGetFromTiVo.begin(),FilesToGetFromTiVo.end(),cTiVoFileCompareDateReverse);
+				//for (auto TiVoFileToGet = FilesToGetFromTiVo.begin(); TiVoFileToGet != FilesToGetFromTiVo.end(); TiVoFileToGet++)
+				//	while (false == GetTiVoFile(*TiVoFileToGet, serverSession0, _T("1760168186")));
 
 				if (!csMyHostName.CompareNoCase(_T("INSPIRON")))
 				{
