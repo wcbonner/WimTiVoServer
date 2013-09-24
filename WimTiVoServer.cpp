@@ -660,7 +660,7 @@ public:
 			//	//std::wcout << L"[                   ] " << showbase << dec << TimeDiff.GetTotalSeconds() - 0x50976384 << endl;
 			//	//std::wcout << L"[                   ] " << showbase << dec << TimeDiff.GetTotalSeconds() + OneWeek.GetTotalSeconds() - 0x50976384 << endl;
 			//	//std::wcout << L"[                   ] " << showbase << dec << TimeDiff.GetTotalSeconds() - OneWeek.GetTotalSeconds() - 0x50976384 << endl;
-			LastChangeDate.Format(_T("%#0x"),TimeDiff.GetTotalSeconds());
+			CaptureDate.Format(_T("%#0x"),TimeDiff.GetTotalSeconds()); // I'm still off by the time zone offset from UTC!
 
 			AVFormatContext *fmt_ctx = NULL;
 			if (0 == avformat_open_input(&fmt_ctx, CStringA(csPathName).GetString(), NULL, NULL))
@@ -676,46 +676,62 @@ public:
 						secs %= 60;
 						int hours = mins / 60;
 						mins %= 60;
-						cout << "[                   ] " << setw(20) << right << "Duration: " << " : ";
+						cout << "[                   ] " << setw(20) << right << "Duration" << " : ";
 						char oldfill = cout.fill('0');
 						streamsize oldwidth = cout.width(2);
 						cout << hours << ":" << mins << ":" << secs << "." << ((100 * us) / AV_TIME_BASE) << endl;
 						cout.width(oldwidth);
 						cout.fill(oldfill);
+						Duration /= 1000; // this makes at least my first example match the tivo desktop software
 					}
 					SourceFormat.Append(_T("video/"));
 					SourceFormat.Append(CString(CStringA(fmt_ctx->iformat->name)));
 					//av_dump_format(fmt_ctx, 0, CStringA(csPathName).GetString(), 0);
 
 					//// Find the first video stream
-					//int videoStream=-1;
-					//for(int i = 0; i < fmt_ctx->nb_streams; i++)
-					//	if(fmt_ctx->streams[i]->codec->codec_type == AVMEDIA_TYPE_VIDEO) 
-					//	{
-					//		videoStream=i;
-					//		break;
-					//	}
-					//if(videoStream != -1)
-					//{
-					//	//Duration = fmt_ctx->streams[videoStream]->duration;
-					//	//cout << "fmt_ctx->streams[videoStream]->duration " << fmt_ctx->streams[videoStream]->duration << endl;
-					//	//cout << "fmt_ctx->streams[videoStream]->time_base " << fmt_ctx->streams[videoStream]->time_base << endl;
-					//	// Get a pointer to the codec context for the video stream
-					//	AVCodecContext *pCodecCtx=fmt_ctx->streams[videoStream]->codec;
+					int videoStream=-1;
+					for(int i = 0; i < fmt_ctx->nb_streams; i++)
+						if(fmt_ctx->streams[i]->codec->codec_type == AVMEDIA_TYPE_VIDEO) 
+						{
+							videoStream=i;
+							break;
+						}
+					if(videoStream != -1)
+					{
+						const char *codec_type = av_get_media_type_string(fmt_ctx->streams[videoStream]->codec->codec_type);
+						const char *codec_name = avcodec_get_name(fmt_ctx->streams[videoStream]->codec->codec_id);
+						SourceFormat = CStringA(codec_type);
+						SourceFormat.Append(_T("/"));
+						SourceFormat.Append(CString(CStringA(codec_name)));
+						//if (fmt_ctx->streams[videoStream]->codec->codec_tag) 
+						//{
+						//	char tag_buf[32];
+						//	av_get_codec_tag_string(tag_buf, sizeof(tag_buf), fmt_ctx->streams[videoStream]->codec->codec_tag);
+						//	SourceFormat = CStringA(codec_type);
+						//	SourceFormat.Append(_T("/"));
+						//	SourceFormat.Append(CString(CStringA(tag_buf)));
+						//}
+						//char buf[256];
+						//avcodec_string(buf, sizeof(buf), fmt_ctx->streams[videoStream]->codec, 1);
+						//Duration = fmt_ctx->streams[videoStream]->duration;
+						//cout << "fmt_ctx->streams[videoStream]->duration " << fmt_ctx->streams[videoStream]->duration << endl;
+						//cout << "fmt_ctx->streams[videoStream]->time_base " << fmt_ctx->streams[videoStream]->time_base << endl;
+						// Get a pointer to the codec context for the video stream
+						//AVCodecContext *pCodecCtx=fmt_ctx->streams[videoStream]->codec;
 
-					//	// Find the decoder for the video stream
-					//	AVCodec *pCodec=avcodec_find_decoder(pCodecCtx->codec_id);
-					//	if(pCodec==NULL) 
-					//		cout << "Unsupported codec!" << endl;
-					//	else
-					//	{
-					//		// Open codec
-					//		if(avcodec_open(pCodecCtx, pCodec)<0)
-					//			cout << "Could not open codec!" << endl;
-					//		else
-					//			avcodec_close(pCodecCtx);
-					//	}
-					//}
+						//// Find the decoder for the video stream
+						//AVCodec *pCodec=avcodec_find_decoder(pCodecCtx->codec_id);
+						//if(pCodec==NULL) 
+						//	cout << "Unsupported codec!" << endl;
+						//else
+						//{
+						//	// Open codec
+						//	if(avcodec_open(pCodecCtx, pCodec)<0)
+						//		cout << "Could not open codec!" << endl;
+						//	else
+						//		avcodec_close(pCodecCtx);
+						//}
+					}
 					// This next section looks at metadata
 					AVDictionaryEntry *tag = NULL;
 					while (tag = av_dict_get(fmt_ctx->metadata, "", tag, AV_DICT_IGNORE_SUFFIX))
@@ -772,8 +788,8 @@ public:
 		wcout << L"[                   ] " << setw(20) << right << L"ContentType" << L" : " << ContentType.GetString() << endl;
 		wcout << L"[                   ] " << setw(20) << right << L"SourceFormat" << L" : " << SourceFormat.GetString() << endl;
 		wcout << L"[                   ] " << setw(20) << right << L"LastChangeDate" << L" : " << LastChangeDate.GetString() << endl;
-		wcout << L"[                   ] " << setw(20) << right << L"SourceSize" << L" : " << SourceSize << endl;
-		wcout << L"[                   ] " << setw(20) << right << L"Duration" << L" : " << Duration << endl;
+		wcout << L"[                   ] " << setw(20) << right << L"SourceSize" << L" : " << dec << SourceSize << endl;
+		wcout << L"[                   ] " << setw(20) << right << L"Duration" << L" : " << dec << Duration << endl;
 		wcout << L"[                   ] " << setw(20) << right << L"CaptureDate" << L" : " << CaptureDate.GetString() << endl;
 		wcout << L"[                   ] " << setw(20) << right << L"URL" << L" : " << csURL.GetString() << endl;
 		return(true);
@@ -819,25 +835,14 @@ private:
     unsigned long long Duration;
 	CString CaptureDate;
 };
-void PopulateTiVoFileList(std::vector<cTiVoFile> & TiVoFileList)
+void PopulateTiVoFileList(std::vector<cTiVoFile> & TiVoFileList, std::string FileSpec)
 {
 	TRACE(__FUNCTION__ "\n");
 	std::cout << "[" << getTimeISO8601() << "] " << __FUNCTION__ << endl;
 	CFileFind finder;
 	av_register_all(); // FFMPEG initialization
-	//BOOL bWorking = finder.FindFile(_T("//Acid/TiVo/fam*S11E03*.mp4"));
-	//BOOL bWorking = finder.FindFile(_T("//Acid/TiVo/Top*.mkv"));
-	//BOOL bWorking = finder.FindFile(_T("//Acid/TiVo/*.TiVo"));
-	//BOOL bWorking = finder.FindFile(_T("C:/Users/Wim/Videos/*.mp4"));
-	TCHAR HostName[256] = TEXT("");
-	DWORD dwSize = sizeof(HostName);
-	GetComputerNameEx((COMPUTER_NAME_FORMAT)0, HostName, &dwSize);
-	CString csMyHostName(HostName);
-	BOOL bWorking = FALSE;
-	if (!csMyHostName.CompareNoCase(_T("INSPIRON")))
-		bWorking = finder.FindFile(_T("D:/Recorded TV/Go*"));
-	else
-		bWorking = finder.FindFile(_T("C:/Users/Wim/Videos/*.mp4"));
+	
+	BOOL bWorking = finder.FindFile(CString(CStringA(FileSpec.c_str())));
 	while (bWorking)
 	{
 		bWorking = finder.FindNextFile();
@@ -1005,10 +1010,10 @@ int GetTiVoQueryFormats(SOCKET DataSocket)
 	strcat(XMLDataBuff,"    <ContentType>video/x-tivo-mpeg</ContentType>\n");
 	strcat(XMLDataBuff,"    <Description/>\n");
 	strcat(XMLDataBuff,"  </Format>\n");
-	strcat(XMLDataBuff,"  <Format>\n");
-	strcat(XMLDataBuff,"    <ContentType>video/x-tivo-raw-tts</ContentType>\n");
-	strcat(XMLDataBuff,"    <Description/>\n");
-	strcat(XMLDataBuff,"  </Format>\n");
+	//strcat(XMLDataBuff,"  <Format>\n");
+	//strcat(XMLDataBuff,"    <ContentType>video/x-tivo-raw-tts</ContentType>\n");
+	//strcat(XMLDataBuff,"    <Description/>\n");
+	//strcat(XMLDataBuff,"  </Format>\n");
 	strcat(XMLDataBuff,"</TiVoFormats>\n");
 
 	/* Create HTTP Header */
@@ -2002,7 +2007,15 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 				//XML_Test_Write_InMemory();
 
 				//std::vector<cTiVoFile> TiVoFileList;
-				PopulateTiVoFileList(TiVoFileList);
+				//BOOL bWorking = finder.FindFile(_T("//Acid/TiVo/fam*S11E03*.mp4"));
+				//BOOL bWorking = finder.FindFile(_T("//Acid/TiVo/Top*.mkv"));
+				//BOOL bWorking = finder.FindFile(_T("//Acid/TiVo/*.TiVo"));
+				//BOOL bWorking = finder.FindFile(_T("C:/Users/Wim/Videos/*.mp4"));
+				PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/Archer.2009.S02E14*");
+				if (!csMyHostName.CompareNoCase(_T("INSPIRON")))
+					PopulateTiVoFileList(TiVoFileList, "D:/Recorded TV/Go*");
+				else
+					PopulateTiVoFileList(TiVoFileList, "C:/Users/Wim/Videos/*.mp4");
 
 				std::vector<CString> myURLS;
 				myURLS.push_back(CString(_T("http://192.168.0.108/TiVoConnect?Command=QueryContainer&Container=/")));
