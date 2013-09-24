@@ -69,6 +69,7 @@ static std::string getTimeISO8601(void)
 	time(&timer);
 	return(timeToISO8601(timer));
 }
+/////////////////////////////////////////////////////////////////////////////
 bool cTiVoServer::operator==(const cTiVoServer & other) const
 {
 	return(
@@ -127,6 +128,49 @@ bool cTiVoServer::ReadTXT(const std::string & text, const char seperator)
 	}
 	return(rval);
 }
+/////////////////////////////////////////////////////////////////////////////
+bool CTiVoContainer::operator==(const CTiVoContainer & other) const
+{
+	return(
+		m_title == other.m_title
+		);
+}
+std::string CTiVoContainer::WriteTXT(const char seperator) const
+{
+	std::stringstream ssValue;
+	ssValue << "title=" << m_title;
+	if (!m_url.empty()) ssValue << seperator << "url=" << m_url;
+	if (!m_MAK.empty()) ssValue << seperator << "MAK=" << m_MAK;
+	if (!m_ContentType.empty()) ssValue << seperator << "ContentType=" << m_ContentType;
+	if (!m_SourceFormat.empty()) ssValue << seperator << "SourceFormat=" << m_SourceFormat;
+	return(ssValue.str());
+}
+bool CTiVoContainer::ReadTXT(const std::string & text, const char seperator)
+{
+	bool rval = true;
+	CString csText(text.c_str());
+	int SectPos = 0;
+	CString csSect(csText.Tokenize(CString(seperator), SectPos));
+	while (csSect != _T(""))
+	{
+		int KeyPos = 0;
+		CString csKey(csSect.Tokenize(_T("="),KeyPos));
+		CString csValue(csSect.Tokenize(_T("="),KeyPos));
+		if (!csKey.CompareNoCase(_T("title")))
+			m_title = CStringA(csValue);
+		else if (!csKey.CompareNoCase(_T("url")))
+			m_url = CStringA(csValue);
+		else if (!csKey.CompareNoCase(_T("MAK")))
+			m_MAK = CStringA(csValue);
+		else if (!csKey.CompareNoCase(_T("ContentType")))
+			m_ContentType = CStringA(csValue);
+		else if (!csKey.CompareNoCase(_T("SourceFormat")))
+			m_SourceFormat = CStringA(csValue);
+		csSect = csText.Tokenize(CString(seperator), SectPos);
+	}
+	return(rval);
+}
+/////////////////////////////////////////////////////////////////////////////
 bool cTiVoFile::operator==(const cTiVoFile & other) const
 {
 	return(
@@ -244,7 +288,6 @@ void cTiVoFile::SetFromTiVoItem(const CString &csTitle, const CString &csEpisode
 	m_csPathName = ssFileName.str().c_str();
 	m_csPathName.Replace(_T(":"),_T("_")); // http://msdn.microsoft.com/en-us/library/system.io.path.getinvalidfilenamechars.aspx should be further examined
 }
-
 #ifdef AVCODEC_AVCODEC_H
 void cTiVoFile::PopulateFromFFMPEG(void)
 {
