@@ -929,10 +929,20 @@ UINT PopulateTiVoFileList(LPVOID lvp)
 		//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/the.daily*");
 		//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/Archer.*");
 		CleanTiVoFileList(TiVoFileList, ccTiVoFileListCritSec);
+		std::stringstream ss;
 		ccTiVoFileListCritSec.Lock(); 
 		std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate); 
-		std::cout << "[" << getTimeISO8601() << "] TiVoFileList Size: " << TiVoFileList.size() << endl;
+		ss << "[" << getTimeISO8601() << "] TiVoFileList Size: " << TiVoFileList.size() << std::endl;
 		ccTiVoFileListCritSec.Unlock();
+		std::cout << ss;
+		if (ApplicationLogHandle != NULL) 
+		{
+			CString csSubstitutionText(__FUNCTION__);
+			csSubstitutionText.Append(_T("\n"));
+			csSubstitutionText.Append(CString(ss.str().c_str()));
+			LPCTSTR lpStrings[] = { csSubstitutionText.GetString(), NULL };
+			ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
+		}
 	} while (WAIT_TIMEOUT == WaitForSingleObject(terminateEvent_populate, 15*60*1000));
 	if (ApplicationLogHandle != NULL) 
 	{
@@ -1028,7 +1038,6 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 	getpeername(DataSocket, (struct sockaddr *)&adr_inet, &sa_len);
 	std::cout << "[" << getTimeISO8601() << "] "  << __FUNCTION__ << "\t" << inet_ntoa(adr_inet.sin_addr) << " " << csInBuffer.GetString() << endl;
 	#endif
-	ccTiVoFileListCritSec.Lock();
 	int rval = 0;
 	const int XMLDataBuffSize = 1024;
 	char* XMLDataBuff = new char[XMLDataBuffSize];
@@ -1039,8 +1048,10 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 	CComPtr<IStream> spMemoryStream(::SHCreateMemStream(NULL, 0));
 	if ((pWriter != NULL) && (spMemoryStream != NULL))
 	{
-		char MyHostName[80] = {0}; // winsock hostname used for data recordkeeping
-		gethostname(MyHostName,sizeof(MyHostName));
+		TCHAR buffer[256] = TEXT("");
+		DWORD dwSize = sizeof(buffer);
+		GetComputerNameEx(ComputerNameDnsHostname, buffer, &dwSize);
+		CString csMyHostName(buffer);
 		CString csContainer;
 		int iAnchorOffset = 0;
 		CString csAnchorItem;
@@ -1120,7 +1131,6 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 			}
 			csToken = csCommand.Tokenize("& ?",curPos);
 		}
-		CString csTemporary;
 		pWriter->SetOutput(spMemoryStream);
 		pWriter->SetProperty(XmlWriterProperty_Indent, TRUE);
 		pWriter->WriteStartDocument(XmlStandalone_Omit);
@@ -1128,18 +1138,14 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 			if (csContainer.Compare(_T("%2F")) == 0)
 			{
 				pWriter->WriteStartElement(NULL,_T("Details"),NULL);
-					csTemporary = CStringA(MyHostName);
-					csTemporary.Append(_T(" (WimTiVoServer)"));
-					pWriter->WriteElementString(NULL,_T("Title"),NULL, csTemporary.GetString());
+					pWriter->WriteElementString(NULL,_T("Title"),NULL, csMyHostName.GetString());
 					pWriter->WriteElementString(NULL,_T("ContentType"),NULL, _T("x-tivo-container/tivo-server"));
 					pWriter->WriteElementString(NULL,_T("SourceFormat"),NULL, _T("x-tivo-container/folder"));
 					pWriter->WriteElementString(NULL,_T("TotalItems"),NULL, _T("1"));
 				pWriter->WriteEndElement();	// Details
 				pWriter->WriteStartElement(NULL,_T("Item"),NULL);
 					pWriter->WriteStartElement(NULL,_T("Details"),NULL);
-						csTemporary = CStringA(MyHostName);
-						csTemporary.Append(_T(" (WimTiVoServer)"));
-						pWriter->WriteElementString(NULL,_T("Title"),NULL, csTemporary.GetString());
+						pWriter->WriteElementString(NULL,_T("Title"),NULL, csMyHostName.GetString());
 						pWriter->WriteElementString(NULL,_T("ContentType"),NULL, _T("x-tivo-container/tivo-videos"));
 						pWriter->WriteElementString(NULL,_T("SourceFormat"),NULL, _T("x-tivo-container/folder"));
 					pWriter->WriteEndElement();	// Details
@@ -1186,14 +1192,13 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 						pItem++;
 						iAnchorOffset--;
 					}
+				CString csTemporary;
 				csTemporary.Format(_T("%d"), pItem - TiVoFileList.begin());
 				pWriter->WriteElementString(NULL,L"ItemStart",NULL, csTemporary.GetString());
 				csTemporary.Format(_T("%d"), iItemCount);
 				pWriter->WriteElementString(NULL,L"ItemCount",NULL, csTemporary.GetString());
 				pWriter->WriteStartElement(NULL,L"Details",NULL);
-					csTemporary = CStringA(MyHostName);
-					csTemporary.Append(_T(" (WimTiVoServer)"));
-					pWriter->WriteElementString(NULL,L"Title",NULL, csTemporary.GetString());
+					pWriter->WriteElementString(NULL,L"Title",NULL, csMyHostName.GetString());
 					pWriter->WriteElementString(NULL,L"ContentType",NULL, L"x-tivo-container/folder");
 					pWriter->WriteElementString(NULL,L"SourceFormat",NULL, L"x-tivo-container/folder");
 					csTemporary.Format(_T("%d"), TiVoFileList.size());
@@ -1242,7 +1247,6 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 	send(DataSocket, XMLDataBuff, strlen(XMLDataBuff), 0);
 	delete[] XMLDataBuff;
 
-	ccTiVoFileListCritSec.Unlock();
 #ifdef _DEBUG
 	std::cout << "[" << getTimeISO8601() << "] "  << __FUNCTION__ << "\texiting" << endl;
 #endif
@@ -1627,6 +1631,14 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 					CString csCommandLine(TiVoFileToSend.GetFFMPEGCommandLine(csFFMPEGPath));
 					std::cout << "[" << getTimeISO8601() << "] CreateProcess: ";
 					std::wcout << csCommandLine.GetString() << std::endl;
+					TRACE(_T("CreateProcess: %s\n"), csCommandLine.GetString());
+					if (ApplicationLogHandle != NULL) 
+					{
+						CString csSubstitutionText(__FUNCTION__);
+						csSubstitutionText.AppendFormat(_T("\nCreateProcess: %s\n"), csCommandLine.GetString());
+						LPCTSTR lpStrings[] = { csSubstitutionText.GetString(), NULL };
+						ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
+					}
 					// Create the child process.
 					BOOL bSuccess = CreateProcess(NULL, 
 						(LPTSTR) csCommandLine.GetString(),     // command line 
@@ -1733,12 +1745,22 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 						CloseHandle(piProcInfo.hProcess);
 						CloseHandle(piProcInfo.hThread);
 						auto TotalSeconds = ctsTotal.GetTotalSeconds();
+						std::stringstream ss;
 						if (TotalSeconds > 0)
-							std::cout << "[" << getTimeISO8601() << "] Finished Sending File, BytesSent(" << bytessent << ")" << " Speed: " << (CurrentFileSize / TotalSeconds) << " B/s, " << CStringA(ctsTotal.Format(_T("%H:%M:%S"))).GetString() << std::endl;
+							ss << "[" << getTimeISO8601() << "] Finished Sending File, BytesSent(" << bytessent << ")" << " Speed: " << (CurrentFileSize / TotalSeconds) << " B/s, " << CStringA(ctsTotal.Format(_T("%H:%M:%S"))).GetString() << std::endl;
 						else
-							std::cout << "[" << getTimeISO8601() << "] Finished Sending File, BytesSent(" << bytessent << ")" << std::endl;
-						std::cout << "[                   ] ChunkCount: " << ChunkCount << " AvgChunkSize: " << (CurrentFileSize / ChunkCount) << std::endl;
-						std::cout << "[                   ] MaxChunkSize: " << MaxChunkSize << " MinChunkSize: " << MinChunkSize << std::endl;
+							ss << "[" << getTimeISO8601() << "] Finished Sending File, BytesSent(" << bytessent << ")" << std::endl;
+						ss << "[                   ] ChunkCount: " << ChunkCount << " AvgChunkSize: " << (CurrentFileSize / ChunkCount) << std::endl;
+						ss << "[                   ] MaxChunkSize: " << MaxChunkSize << " MinChunkSize: " << MinChunkSize << std::endl;
+						std::cout << ss;
+						if (ApplicationLogHandle != NULL) 
+						{
+							CString csSubstitutionText(__FUNCTION__);
+							csSubstitutionText.AppendFormat(_T("\nCreateProcess: %s\n"), csCommandLine.GetString());
+							csSubstitutionText.Append(CString(ss.str().c_str()));
+							LPCTSTR lpStrings[] = { csSubstitutionText.GetString(), NULL };
+							ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
+						}
 					}
 				}
 				CloseHandle(g_hChildStd_OUT_Rd);
@@ -2561,8 +2583,10 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 							(LPBYTE) &dwData,	// pointer to value data 
 							sizeof(DWORD));		// length of value data 
 						RegCloseKey(hk); 
-						// Here I atempt to write a message
-						_tprintf(_T("Sucessfully installed %s as a service\n"),tcModuleFileName);
+						std::cout << "Sucessfully installed " << CStringA(tcModuleFileName).GetString() << " as a service." << std::endl;
+						// I should add a rule to the Windows Firewall here so that the service is actually accessable without manually adding the rule.
+						// http://msdn.microsoft.com/en-us/library/windows/desktop/dd339604(v=vs.85).aspx
+						// Here I atempt to write a message to the event log
 						HANDLE h = RegisterEventSource(NULL,  // uses local computer 
 									theApp.m_pszAppName);	// source name 
 						if (h != NULL) 
@@ -2638,10 +2662,13 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 		}
 		else if (Parameters.CompareNoCase( _T("-ClearRegistry") ) == 0)
 		{
-			_tprintf(_T("Removing Registry Entries\n"));
-			CString csRegKey(_T("Software\\WimsWorld\\"));
-			csRegKey.Append(theApp.m_pszAppName);
+			std::cout << "Removing Registry Entries" << std::endl;
+			CString csRegKey;
+			csRegKey.Format(_T("Software\\WimsWorld\\%s"), theApp.m_pszAppName);
 			theApp.DelRegTree(HKEY_CURRENT_USER, csRegKey);
+			theApp.DelRegTree(HKEY_LOCAL_MACHINE, csRegKey);
+			csRegKey.Format(_T("SYSTEM\\CurrentControlSet\\Services\\EventLog\\Application\\%s"), theApp.m_pszAppName);
+			theApp.DelRegTree(HKEY_LOCAL_MACHINE, csRegKey);
 		}
 		// If I'm running as SYSTEM, I assume that I'm running as a service.
 		else if (UserName.CompareNoCase(_T("SYSTEM")) == 0)
