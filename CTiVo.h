@@ -76,6 +76,7 @@ public:
 	#ifdef AVCODEC_AVCODEC_H
 	void PopulateFromFFMPEG(void);
 	#endif
+	void PopulateFromFFProbe(void);
 	const CString & SetURL(const CString & csURL);
 	const CString & GetURL(void) const { return(m_csURL); }
 	const CString & GetTitle(void) const { return(m_Title); }
