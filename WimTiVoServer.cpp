@@ -1215,7 +1215,7 @@ void XML_Parse_TiVoNowPlaying(const CString & Source, std::vector<cTiVoFile> & T
 bool XML_Parse_TiVoNowPlaying(const CString & Source, std::vector<cTiVoFile> & TiVoFileList, CInternetSession & serverSession)
 {
 	bool rval = true;
-	std::cout << "[" << getTimeISO8601() << "] Attempting: " << CStringA(*Source).GetString() << endl;
+	std::cout << "[" << getTimeISO8601() << "] Attempting: " << CStringA(Source).GetString() << endl;
 	DWORD dwServiceType;
 	CString strServer;
 	CString strObject; 
@@ -1418,7 +1418,7 @@ bool GetTiVoFile(const cTiVoFile & TiVoFile, CInternetSession & serverSession, c
 						csContentType.Delete(csContentType.Find(_T(";")),csContentType.GetLength());									
 					if (!csContentType.CompareNoCase(_T("video/x-tivo-mpeg")))
 					{
-						std::cout << "[                   ] Writing File: " << TiVoFile.GetPathName() << endl;
+						std::wcout << L"[                   ] Writing File: " << TiVoFile.GetPathName().GetString() << endl;
 						std::ofstream OutputFile(TiVoFile.GetPathName(), ios_base::binary);
 						if (OutputFile.is_open())
 						{
