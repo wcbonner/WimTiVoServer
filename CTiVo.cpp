@@ -323,14 +323,14 @@ void cTiVoFile::GetXML(CComPtr<IXmlWriter> & pWriter) const
 }
 void cTiVoFile::GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const
 {
-	pWriter->WriteElementString(NULL, L"recordedDuration", NULL, L"PT30M");
+	pWriter->WriteElementString(NULL, L"recordedDuration", NULL, CTimeSpan(m_Duration/1000).Format(_T("PT%HH%MM%SS")));
 	pWriter->WriteStartElement(NULL, L"vActualShowing", NULL);pWriter->WriteEndElement();
 	pWriter->WriteStartElement(NULL, L"vBookmark", NULL);pWriter->WriteEndElement();
 	pWriter->WriteStartElement(NULL, L"recordingQuality", NULL);pWriter->WriteAttributeString(NULL,L"value",NULL,L"75");pWriter->WriteString(L"HIGH");pWriter->WriteEndElement();
 	pWriter->WriteStartElement(NULL, L"showing", NULL);
 		pWriter->WriteStartElement(NULL, L"showingBits", NULL);pWriter->WriteAttributeString(NULL,L"value",NULL,L"4609");pWriter->WriteEndElement();
-		pWriter->WriteElementString(NULL, L"time", NULL, L"2010-03-27T02:00:00Z");
-		pWriter->WriteElementString(NULL, L"duration", NULL, L"PT30M");
+		pWriter->WriteElementString(NULL, L"time", NULL, m_CaptureDate.FormatGmt(_T("%Y-%m-%d:%H:%M:%SZ")));
+		pWriter->WriteElementString(NULL, L"duration", NULL, CTimeSpan(m_Duration/1000).Format(_T("PT%HH%MM%SS")));
 		pWriter->WriteStartElement(NULL, L"program", NULL);
 			pWriter->WriteStartElement(NULL, L"vActor", NULL);
 			pWriter->WriteEndElement();				
@@ -352,16 +352,16 @@ void cTiVoFile::GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const
 			pWriter->WriteStartElement(NULL, L"vHost", NULL);
 			pWriter->WriteEndElement();
 			pWriter->WriteElementString(NULL, L"isEpisode", NULL, L"true");
-			pWriter->WriteElementString(NULL, L"originalAirDate", NULL, L"1992-09-07T00:00:00Z");
+			pWriter->WriteElementString(NULL, L"originalAirDate", NULL, m_CaptureDate.FormatGmt(_T("%Y-%m-%d:%H:%M:%SZ")));
 			pWriter->WriteStartElement(NULL, L"vProducer", NULL);
 			pWriter->WriteEndElement();
 			pWriter->WriteStartElement(NULL, L"series", NULL);
 				pWriter->WriteElementString(NULL, L"isEpisodic", NULL, L"true");
 				pWriter->WriteStartElement(NULL, L"vSeriesGenre", NULL);
-					pWriter->WriteElementString(NULL, L"element", NULL, L"Talk Show");
-					pWriter->WriteElementString(NULL, L"element", NULL, L"News Magazine");
-					pWriter->WriteElementString(NULL, L"element", NULL, L"News and Business");
-					pWriter->WriteElementString(NULL, L"element", NULL, L"Talk Shows");
+					//pWriter->WriteElementString(NULL, L"element", NULL, L"Talk Show");
+					//pWriter->WriteElementString(NULL, L"element", NULL, L"News Magazine");
+					//pWriter->WriteElementString(NULL, L"element", NULL, L"News and Business");
+					//pWriter->WriteElementString(NULL, L"element", NULL, L"Talk Shows");
 				pWriter->WriteEndElement();
 				pWriter->WriteElementString(NULL, L"seriesTitle", NULL, m_Title.GetString());
 			pWriter->WriteEndElement();
@@ -376,8 +376,8 @@ void cTiVoFile::GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const
 			pWriter->WriteElementString(NULL, L"callsign", NULL, NULL);
 		pWriter->WriteEndElement();
 	pWriter->WriteEndElement();
-	pWriter->WriteElementString(NULL, L"startTime", NULL, L"2010-03-27T01:59:58Z");
-	pWriter->WriteElementString(NULL, L"stopTime", NULL, L"2010-03-27T02:30:00Z");
+	pWriter->WriteElementString(NULL, L"startTime", NULL, m_CaptureDate.FormatGmt(_T("%Y-%m-%d:%H:%M:%SZ")));
+	pWriter->WriteElementString(NULL, L"stopTime", NULL, CTime(m_CaptureDate + CTimeSpan(m_Duration/1000)).FormatGmt(_T("%Y-%m-%d:%H:%M:%SZ")));
 }
 /////////////////////////////////////////////////////////////////////////////
 // Simple Sorting Routines
