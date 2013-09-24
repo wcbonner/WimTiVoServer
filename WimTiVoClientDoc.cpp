@@ -473,18 +473,29 @@ UINT CWimTiVoClientDoc::TiVoBeaconListenThread(LPVOID lvp)
 									pDoc->m_LogFile << "[                   ] " << CStringA(csURL).GetString() << std::endl;
 								}
 								TRACE(_T("[                   ] URL: %s\n"), csURL.GetString());
-								pDoc->m_ccTiVoContainers.Lock();
-								auto OldContainerCount = pDoc->m_TiVoContainers.size();
-								TRACE(_T("[                   ] Container Count: %d\n"), OldContainerCount);
-								XML_Parse_TiVoNowPlaying(csURL, pDoc->m_TiVoFiles, pDoc->m_TiVoContainers, pDoc->m_InternetSession);
-								if (pDoc->m_TiVoContainers.size() != OldContainerCount)
+								std::vector<cTiVoFile> TiVoFiles; // Local vector just to reduce multitasking issues
+								std::vector<CTiVoContainer> TiVoContainers;
+								XML_Parse_TiVoNowPlaying(csURL, TiVoFiles, TiVoContainers, pDoc->m_InternetSession);
+								if (!TiVoContainers.empty())
 								{
-									TRACE(_T("[                   ] Container Count: %d\n"),pDoc->m_TiVoContainers.size());
-									if (pDoc->m_LogFile.is_open())
-										for (auto Container = pDoc->m_TiVoContainers.begin(); Container != pDoc->m_TiVoContainers.end(); Container++)
-											pDoc->m_LogFile << "[                   ] " << Container->WriteTXT().c_str() << std::endl;
+									// This is where I should dereference any URLS in the containers!
+									pDoc->m_ccTiVoContainers.Lock();
+									auto OldContainerCount = pDoc->m_TiVoContainers.size();
+									TRACE(_T("[                   ] Container Count: %d\n"), OldContainerCount);
+									for (auto Container = TiVoContainers.begin(); Container != TiVoContainers.end(); Container++)
+									{
+										if (pDoc->m_TiVoContainers.end() == std::find(pDoc->m_TiVoContainers.begin(), pDoc->m_TiVoContainers.end(), *Container))
+											pDoc->m_TiVoContainers.push_back(*Container);
+									}
+									if (pDoc->m_TiVoContainers.size() != OldContainerCount)
+									{
+										TRACE(_T("[                   ] Container Count: %d\n"),pDoc->m_TiVoContainers.size());
+										if (pDoc->m_LogFile.is_open())
+											for (auto Container = pDoc->m_TiVoContainers.begin(); Container != pDoc->m_TiVoContainers.end(); Container++)
+												pDoc->m_LogFile << "[                   ] " << Container->WriteTXT().c_str() << std::endl;
+									}
+									pDoc->m_ccTiVoContainers.Unlock();
 								}
-								pDoc->m_ccTiVoContainers.Unlock();
 							}
 						}
 					}
