@@ -256,9 +256,12 @@ void cTiVoFile::SetPathName(const CFileFind & csNewPath)
 	m_csURL.Replace(_T(":"), _T("%3A"));
 	if (!csNewPath.GetFileName().Right(5).CompareNoCase(_T(".tivo")))
 		m_SourceFormat = _T("video/x-tivo-mpeg");
-	#ifdef AVCODEC_AVCODEC_H
-	PopulateFromFFMPEG();
-	#endif
+	else
+	{
+		#ifdef AVCODEC_AVCODEC_H
+		PopulateFromFFMPEG();
+		#endif
+	}
 	if (m_SourceSize == 0)
 		m_SourceSize = csNewPath.GetLength();
 	// Final Output of object values
@@ -316,25 +319,7 @@ void cTiVoFile::PopulateFromFFMPEG(void)
 		if(0 <= avformat_find_stream_info(fmt_ctx, NULL))					
 		{
 			if (fmt_ctx->duration != AV_NOPTS_VALUE) 
-			{
-				m_Duration = fmt_ctx->duration + 5000;
-				//int secs = m_Duration / AV_TIME_BASE;
-				//int us = m_Duration % AV_TIME_BASE;
-				//int mins = secs / 60;
-				//secs %= 60;
-				//int hours = mins / 60;
-				//mins %= 60;
-				//std::cout << "[                   ] " << setw(20) << right << "m_Duration" << " : ";
-				//char oldfill = std::cout.fill('0');
-				//streamsize oldwidth = std::cout.width(2);
-				//std::cout << hours << ":" << mins << ":" << secs << "." << ((100 * us) / AV_TIME_BASE) << endl;
-				//std::cout.width(oldwidth);
-				//std::cout.fill(oldfill);
-				m_Duration /= 1000; // this makes at least my first example match the tivo desktop software
-			}
-			m_SourceFormat.Append(_T("video/"));
-			m_SourceFormat.Append(CString(CStringA(fmt_ctx->iformat->name)));
-			//av_dump_format(fmt_ctx, 0, CStringA(m_csPathName).GetString(), 0);
+				m_Duration = (fmt_ctx->duration + 5000) / (AV_TIME_BASE / 1000); // this makes at least my first example match the tivo desktop software
 
 			//// Find the first video stream
 			int videoStream=-1;
@@ -351,6 +336,7 @@ void cTiVoFile::PopulateFromFFMPEG(void)
 				m_SourceFormat = CStringA(codec_type);
 				m_SourceFormat.Append(_T("/"));
 				m_SourceFormat.Append(CString(CStringA(codec_name)));
+				
 				//if (fmt_ctx->streams[videoStream]->codec->codec_tag) 
 				//{
 				//	char tag_buf[32];
