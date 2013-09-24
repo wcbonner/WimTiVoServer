@@ -34,15 +34,26 @@ public:
 	friend bool cTiVoFileCompareDateReverse(const cTiVoFile & a, const cTiVoFile & b);
 	void SetPathName(const CString csNewPath);
 	void SetPathName(const CFileFind & csNewPath);
-	const CString GetPathName(void) const { return(m_csPathName); }
+	const CString & GetPathName(void) const { return(m_csPathName); }
 	void SetFromTiVoItem(const CString &csTitle, const CString &csEpisodeTitle, const CString &csDescription, const CString &csSourceStation, const CString &csContentURL, const CTime &ctCaptureDate, const CTimeSpan &ctsDuration);
 	#ifdef AVCODEC_AVCODEC_H
 	void PopulateFromFFMPEG(void);
 	#endif
-	const CString GetURL(void) const { return(m_csURL); }
+	const CString & GetURL(void) const { return(m_csURL); }
+	const CString & GetTitle(void) const { return(m_Title); }
+	const CString & GetEpisodeTitle(void) const { return(m_EpisodeTitle); }
+	const CString & GetDescription(void) const { return(m_Description); }
+	const CTime & GetCaptureDate(void) const { return(m_CaptureDate); }
+	const unsigned long long & GetDuration(void) const { return(m_Duration); }
 	void GetXML(CComPtr<IXmlWriter> & pWriter) const;
 	void GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const;
 };
 bool cTiVoFileCompareDate(const cTiVoFile & a, const cTiVoFile & b);
 bool cTiVoFileCompareDateReverse(const cTiVoFile & a, const cTiVoFile & b);
 extern const CString csUrlPrefix;
+/////////////////////////////////////////////////////////////////////////////
+void XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, std::vector<cTiVoFile> & TiVoFileList);
+void XML_Parse_TiVoNowPlaying(const CString & Source, std::vector<cTiVoFile> & TiVoFileList);
+bool XML_Parse_TiVoNowPlaying(const CString & Source, std::vector<cTiVoFile> & TiVoFileList, CInternetSession & serverSession);
+bool GetTiVoFile(const cTiVoFile & TiVoFile, CInternetSession & serverSession, const CString & csTiVoMAK, const CString & csFileLocation = _T("//Acid/TiVo/"));
+/////////////////////////////////////////////////////////////////////////////
