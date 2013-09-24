@@ -69,6 +69,37 @@ static std::string getTimeISO8601(void)
 	time(&timer);
 	return(timeToISO8601(timer));
 }
+static time_t ISO8601totime(const std::string & ISOTime)
+{
+	struct tm UTC;
+	UTC.tm_year = atol(ISOTime.substr(0,4).c_str())-1900;
+	UTC.tm_mon = atol(ISOTime.substr(5,2).c_str())-1;
+	UTC.tm_mday = atol(ISOTime.substr(8,2).c_str());
+	UTC.tm_hour = atol(ISOTime.substr(11,2).c_str());
+	UTC.tm_min = atol(ISOTime.substr(14,2).c_str());
+	UTC.tm_sec = atol(ISOTime.substr(17,2).c_str());
+	#ifdef _MSC_VER
+	_tzset();
+	UTC.tm_isdst = _daylight;
+	#endif
+	time_t timer = mktime(&UTC);
+	#ifdef _MSC_VER
+	timer -= _timezone;
+	timer += _daylight*3600;
+	#endif
+	return(timer);
+}
+/////////////////////////////////////////////////////////////////////////////
+static const CString QuoteFileName(const CString & Original)
+{
+	CString csQuotedString(Original);
+	if (csQuotedString.Find(_T(" ")) >= 0)
+	{
+		csQuotedString.Insert(0,_T('"'));
+		csQuotedString.AppendChar(_T('"'));
+	}
+	return(csQuotedString);
+}
 /////////////////////////////////////////////////////////////////////////////
 bool cTiVoServer::operator==(const cTiVoServer & other) const
 {
@@ -333,6 +364,8 @@ void cTiVoFile::PopulateFromFFMPEG(void)
 			{
 				const char *codec_type = av_get_media_type_string(fmt_ctx->streams[videoStream]->codec->codec_type);
 				const char *codec_name = avcodec_get_name(fmt_ctx->streams[videoStream]->codec->codec_id);
+				if (!CStringA(codec_name).Compare("mpeg2video"))
+					m_VideoCompatible = true;
 				m_SourceFormat = CStringA(codec_type);
 				m_SourceFormat.Append(_T("/"));
 				m_SourceFormat.Append(CString(CStringA(codec_name)));
@@ -366,6 +399,21 @@ void cTiVoFile::PopulateFromFFMPEG(void)
 				//		avcodec_close(pCodecCtx);
 				//}
 			}
+			//// Find the first audio stream
+			int audioStream=-1;
+			for(int i = 0; i < fmt_ctx->nb_streams; i++)
+				if(fmt_ctx->streams[i]->codec->codec_type == AVMEDIA_TYPE_AUDIO) 
+				{
+					audioStream=i;
+					break;
+				}
+			if(audioStream != -1)
+			{
+				const char *codec_type = av_get_media_type_string(fmt_ctx->streams[audioStream]->codec->codec_type);
+				const char *codec_name = avcodec_get_name(fmt_ctx->streams[audioStream]->codec->codec_id);
+				if (!CStringA(codec_name).Compare("ac3"))
+					m_AudioCompatible = true;
+			}
 			// This next section looks at metadata
 			AVDictionaryEntry *tag = NULL;
 			while (tag = av_dict_get(fmt_ctx->metadata, "", tag, AV_DICT_IGNORE_SUFFIX))
@@ -393,6 +441,12 @@ void cTiVoFile::PopulateFromFFMPEG(void)
 					while (0 < Value.Replace(_T(";;"),_T(";")));
 					while (0 < Value.Replace(_T("//"),_T("/")));
 					m_vActor = Value;
+				}
+				if (_stricmp("WM/MediaOriginalBroadcastDateTime", tag->key) == 0)
+				{
+					CTime OriginalBroadcastDate = ISO8601totime(std::string(tag->value));
+					if (OriginalBroadcastDate > 0)
+						m_CaptureDate = OriginalBroadcastDate;
 				}
 				//if (_stricmp("m_Duration", tag->key) == 0)
 				//{
@@ -435,7 +489,7 @@ void cTiVoFile::GetXML(CComPtr<IXmlWriter> & pWriter) const
 			if (m_SourceSize > 0)
 			{
 				std::wstringstream ss;
-				ss << max(m_SourceSize, m_Duration * 1024);
+				ss << max(m_SourceSize, m_Duration * 1400);
 				pWriter->WriteElementString(NULL, L"SourceSize", NULL, ss.str().c_str());
 			}
 			if (m_Duration > 0)
@@ -556,6 +610,26 @@ void cTiVoFile::GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const
 	pWriter->WriteElementString(NULL, L"startTime", NULL, m_CaptureDate.FormatGmt(_T("%Y-%m-%d:%H:%M:%SZ")));
 	pWriter->WriteElementString(NULL, L"stopTime", NULL, CTime(m_CaptureDate + CTimeSpan(m_Duration/1000)).FormatGmt(_T("%Y-%m-%d:%H:%M:%SZ")));
 	pWriter->WriteRaw(L"</TvBusMarshalledStruct:TvBusEnvelope>");
+}
+const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath) const
+{
+	CString rval(QuoteFileName(csFFMPEGPath));
+	rval.Append(_T(" -i "));
+	rval.Append(QuoteFileName(m_csPathName));
+	if (m_VideoCompatible)
+		rval.Append(_T(" -vcodec copy"));
+	else 
+		rval.Append(_T(" -vcodec mpeg2video"));
+	rval.Append(_T(" -b:v 16384k -maxrate 30000k -bufsize 4096k -ab 448k -ar 48000"));
+	if (m_AudioCompatible)
+		rval.Append(_T(" -acodec copy"));
+	else
+		rval.Append(_T(" -acodec ac3"));
+	#ifdef _DEBUG
+	rval.Append(_T(" -report"));
+	#endif
+	rval.Append(_T(" -f vob -"));
+	return(rval);
 }
 /////////////////////////////////////////////////////////////////////////////
 // Simple Sorting Routines

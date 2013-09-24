@@ -769,14 +769,46 @@ void PopulateTiVoFileList(std::vector<cTiVoFile> & TiVoFileList, CCriticalSectio
 		cTiVoFile myFile;
 		if (finder.GetLength() > 0)
 		{
-			myFile.SetPathName(finder);
+			bool bNotInList = true;
 			ccTiVoFileListCritSec.Lock();
-			if (!myFile.GetSourceFormat().Left(6).CompareNoCase(_T("video/")))
-				TiVoFileList.push_back(myFile);
+			for (auto TiVoFile = TiVoFileList.begin(); TiVoFile != TiVoFileList.end(); TiVoFile++)
+				if (!TiVoFile->GetPathName().CompareNoCase(finder.GetFilePath()))
+				{
+					bNotInList = false;
+					break;
+				}
 			ccTiVoFileListCritSec.Unlock();
+			if (bNotInList)
+			{
+				myFile.SetPathName(finder);
+				if (!myFile.GetSourceFormat().Left(6).CompareNoCase(_T("video/")))
+				{
+					ccTiVoFileListCritSec.Lock();
+					TiVoFileList.push_back(myFile);
+					ccTiVoFileListCritSec.Unlock();
+				}
+			}
 		}
 	}
 	finder.Close();
+}
+void CleanTiVoFileList(std::vector<cTiVoFile> & TiVoFileList, CCriticalSection & ccTiVoFileListCritSec)
+{
+	#ifdef _DEBUG
+	TRACE(__FUNCTION__ "\n");
+	std::cout << "[" << getTimeISO8601() << "] " << __FUNCTION__ << std::endl;
+	#endif
+	ccTiVoFileListCritSec.Lock();
+	for (auto TiVoFile = TiVoFileList.begin(); TiVoFile != TiVoFileList.end(); TiVoFile++)
+	{
+		CFileStatus status;
+		if (!CFile::GetStatus(TiVoFile->GetPathName(), status))
+		{
+			TiVoFileList.erase(TiVoFile);
+			TiVoFile = TiVoFileList.begin();
+		}
+	}
+	ccTiVoFileListCritSec.Unlock();
 }
 /////////////////////////////////////////////////////////////////////////////
 void printerr(TCHAR * errormsg)
@@ -882,6 +914,7 @@ UINT PopulateTiVoFileList(LPVOID lvp)
 	//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/*.TiVo");
 	//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/the.daily*");
 	//PopulateTiVoFileList(TiVoFileList, "//Acid/TiVo/Archer.*");
+	CleanTiVoFileList(TiVoFileList, ccTiVoFileListCritSec);
 	ccTiVoFileListCritSec.Lock(); 
 	std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate); 
 	std::cout << "[" << getTimeISO8601() << "] TiVoFileList Size: " << TiVoFileList.size() << endl;
@@ -1565,18 +1598,12 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 					siStartInfo.hStdOutput = g_hChildStd_OUT_Wr;
 					siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
  
-					std::wstringstream ss;
-					if (!TiVoFileToSend.GetSourceFormat().Compare(_T("video/mpeg2video")))
-						ss << L"ffmpeg.exe -i " << QuoteFileName(TiVoFileToSend.GetPathName()).GetString() << L" -vcodec copy -b:v 16384k -maxrate 30000k -bufsize 4096k -ab 448k -ar 48000 -acodec copy -report -f vob -";
-					else
-						ss << L"ffmpeg.exe -i " << QuoteFileName(TiVoFileToSend.GetPathName()).GetString() << L" -vcodec mpeg2video -b:v 16384k -maxrate 30000k -bufsize 4096k -ab 448k -ar 48000 -acodec ac3 -report -f vob -";
-					TCHAR szCmdline[1024];
-					szCmdline[ss.str().copy(szCmdline, (sizeof(szCmdline)/sizeof(TCHAR))-sizeof(TCHAR))] = _T('\0');
-					std::wcout << L"[                   ] CreateProcess: " << szCmdline << std::endl;
-
+					static const CString csFFMPEGPath(FindEXEFromPath(_T("ffmpeg.exe")));
+					CString csCommandLine(TiVoFileToSend.GetFFMPEGCommandLine(csFFMPEGPath));
+					std::wcout << L"[                   ] CreateProcess: " << csCommandLine.GetString() << std::endl;
 					// Create the child process.     
 					BOOL bSuccess = CreateProcess(NULL, 
-						szCmdline,     // command line 
+						(LPTSTR) csCommandLine.GetString(),     // command line 
 						NULL,          // process security attributes 
 						NULL,          // primary thread security attributes 
 						TRUE,          // handles are inherited 
@@ -2614,6 +2641,7 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 				ZeroMemory(buffer, dwSize);
 			}
 
+			CTime ctLastPopulate(CTime::GetCurrentTime());
 			TiVoFileList.reserve(1000);
 			if (!csMyHostName.CompareNoCase(_T("WimsDM1")))
 				PopulateTiVoFileList(TiVoFileList, ccTiVoFileListCritSec, "C:/Users/Wim/Videos/*");
@@ -3074,10 +3102,16 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 					myServer.m_machine = CStringA(csMyHostName).GetString();
 					myServer.m_identity = CStringA(csMyProgramGuid).GetString();
 					myServer.m_swversion = CStringA(csBuildDateTime).GetString();
-					for (auto index = 8*60; index > 0; --index)
+					for (auto index = 12*60; index > 0; --index)
 					{
 						TiVoBeaconSend(myServer.WriteTXT('\n'));
 						Sleep(60 * 1000);
+						CTime ctCurrent(CTime::GetCurrentTime());
+						if ((ctCurrent - ctLastPopulate) > CTimeSpan(0,0,30,0))
+						{
+							ctLastPopulate = ctCurrent;
+							AfxBeginThread(PopulateTiVoFileList, NULL);
+						}
 					}
 					closesocket(ControlSocket);
 					ControlSocket = INVALID_SOCKET;
@@ -3089,6 +3123,7 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 						CloseHandle(terminateEvent);
 				}
 			}
+			std::cout << "[" << getTimeISO8601() << "] Exiting" << std::endl;
 		}
 	}
 	TRACE(__FUNCTION__ " Exiting\n");
