@@ -1,0 +1,1583 @@
+// WimTiVoServer.cpp : Defines the entry point for the console application.
+//
+
+// Other Things to look at:
+// StreamBaby http://code.google.com/p/streambaby/
+// TiVoStream http://code.google.com/p/tivostream/wiki/native_video_formats
+// http://www.tivocommunity.com/tivo-vb/showthread.php?t=403066
+// TiVoSDKs .Net Libraries http://code.google.com/p/tivo-sdks/source/browse/trunk/Tivo.Hme/Tivo.Hmo/Calypso16.cs?spec=svn112&r=112
+// TiVoServer http://tivoserver.cvs.sourceforge.net/viewvc/tivoserver/tivoserver/BeaconManager.cc?revision=1.16&view=markup
+// TiVo Disk Space Viewer http://peterkellner.net/2008/01/18/tivospaceviewerwithlinq/
+
+// ffmpeg getting started: http://ffmpeg.org/trac/ffmpeg/wiki/Using%20libav*
+// some possible settings info: http://pytivo.sourceforge.net/forum/hd-tivo-ideal-settings-t40.html
+
+// Wim's TiVoHD (MAK) Media Access Key: 1760168186
+// Logon to Tivo with username: "tivo" password: MAK
+
+#include "stdafx.h"
+#include "WimTiVoServer.h"
+
+#ifdef _DEBUG
+#define new DEBUG_NEW
+#endif
+
+// The one and only application object
+
+CWinApp theApp;
+
+using namespace std;
+
+//////////////////////////////////////////////////////////////////////////////
+HANDLE terminateEvent = NULL;
+SERVICE_STATUS_HANDLE serviceStatusHandle = NULL;
+bool pauseService = false;
+CWinThread * threadHandle = NULL;
+SOCKET ControlSocket = INVALID_SOCKET;
+bool bConsoleExists = false;
+HANDLE ApplicationLogHandle = NULL;
+
+/////////////////////////////////////////////////////////////////////////////
+#pragma comment(lib, "version")
+CString GetFileVersion(const CString & filename, const int digits = 4)
+{
+	CString rval;
+	// get The Version number of the file
+	DWORD dwVerHnd = 0;
+	DWORD nVersionInfoSize = ::GetFileVersionInfoSize((LPTSTR)filename.GetString(), &dwVerHnd);
+	if (nVersionInfoSize > 0)
+	{
+		UINT *puVersionLen = new UINT;
+		LPVOID pVersionInfo = new char[nVersionInfoSize];
+		BOOL bTest = ::GetFileVersionInfo((LPTSTR)filename.GetString(), dwVerHnd, nVersionInfoSize, pVersionInfo);
+		// Pull out the version number
+		if (bTest)
+		{
+			LPVOID pVersionNum = NULL;
+			bTest = ::VerQueryValue(pVersionInfo, _T("\\"), &pVersionNum, puVersionLen);
+			if (bTest)
+			{
+				DWORD dwFileVersionMS = ((VS_FIXEDFILEINFO *)pVersionNum)->dwFileVersionMS;
+				DWORD dwFileVersionLS = ((VS_FIXEDFILEINFO *)pVersionNum)->dwFileVersionLS;
+				switch (digits)
+				{
+				default:
+				case 4:
+					rval.Format(_T("%d.%d.%d.%d"), HIWORD(dwFileVersionMS), LOWORD(dwFileVersionMS), HIWORD(dwFileVersionLS), LOWORD(dwFileVersionLS));
+					break;
+				case 3:
+					rval.Format(_T("%d.%d.%d"), HIWORD(dwFileVersionMS), LOWORD(dwFileVersionMS), HIWORD(dwFileVersionLS));
+					break;
+				case 2:
+					rval.Format(_T("%d.%d"), HIWORD(dwFileVersionMS), LOWORD(dwFileVersionMS));
+					break;
+				case 1:
+					rval.Format(_T("%d"), HIWORD(dwFileVersionMS));
+				}
+			}
+		}
+		delete puVersionLen;
+		delete [] pVersionInfo;	
+	}
+	return(rval);
+}
+/////////////////////////////////////////////////////////////////////////////
+string timeToISO8601(const time_t & TheTime)
+{
+	ostringstream ISOTime;
+	time_t timer = TheTime;
+	struct tm * UTC = gmtime(&timer);
+	if (UTC != NULL)
+	{
+		ISOTime.fill('0');
+		ISOTime << UTC->tm_year+1900 << "-";
+		ISOTime.width(2);
+		ISOTime << UTC->tm_mon+1 << "-";
+		ISOTime.width(2);
+		ISOTime << UTC->tm_mday << "T";
+		ISOTime.width(2);
+		ISOTime << UTC->tm_hour << ":";
+		ISOTime.width(2);
+		ISOTime << UTC->tm_min << ":";
+		ISOTime.width(2);
+		ISOTime << UTC->tm_sec;
+	}
+	return(ISOTime.str());
+}
+string timeToExcelDate(const time_t & TheTime)
+{
+	ostringstream ISOTime;
+	time_t timer = TheTime;
+	struct tm * UTC = gmtime(&timer);
+	if (UTC != NULL)
+	{
+		ISOTime.fill('0');
+		ISOTime << UTC->tm_year+1900 << "-";
+		ISOTime.width(2);
+		ISOTime << UTC->tm_mon+1 << "-";
+		ISOTime.width(2);
+		ISOTime << UTC->tm_mday << " ";
+		ISOTime.width(2);
+		ISOTime << UTC->tm_hour << ":";
+		ISOTime.width(2);
+		ISOTime << UTC->tm_min << ":";
+		ISOTime.width(2);
+		ISOTime << UTC->tm_sec;
+	}
+	return(ISOTime.str());
+}
+string getTimeISO8601(void)
+{
+	time_t timer;
+	time(&timer);
+	return(timeToISO8601(timer));
+}
+time_t ISO8601totime(const string & ISOTime)
+{
+	struct tm UTC;
+	UTC.tm_year = atol(ISOTime.substr(0,4).c_str())-1900;
+	UTC.tm_mon = atol(ISOTime.substr(5,2).c_str())-1;
+	UTC.tm_mday = atol(ISOTime.substr(8,2).c_str());
+	UTC.tm_hour = atol(ISOTime.substr(11,2).c_str());
+	UTC.tm_min = atol(ISOTime.substr(14,2).c_str());
+	UTC.tm_sec = atol(ISOTime.substr(17,2).c_str());
+	#ifdef _MSC_VER
+	_tzset();
+	UTC.tm_isdst = _daylight;
+	#endif
+	time_t timer = mktime(&UTC);
+	#ifdef _MSC_VER
+	timer -= _timezone;
+	timer += _daylight*3600;
+	#endif
+	return(timer);
+}
+/////////////////////////////////////////////////////////////////////////////
+void printerr(TCHAR * errormsg)
+{
+	if (bConsoleExists)
+	{
+		_ftprintf(stderr, _T("%s\n"), errormsg);
+	}
+	else
+	{
+		if (ApplicationLogHandle != NULL) 
+		{
+			LPCTSTR lpStrings[] = { errormsg, NULL };
+			ReportEvent(ApplicationLogHandle, EVENTLOG_INFORMATION_TYPE, 0, WIMSWORLD_EVENT_GENERIC, NULL, 1, 0, lpStrings, NULL);
+		}
+	}
+}
+int GetTiVoConnect(SOCKET DataSocket)
+{
+	TRACE(__FUNCTION__ "\n");
+	int rval = 0;
+	char MyHostName[255] = {0}; // winsock hostname used for data recordkeeping
+	gethostname(MyHostName,sizeof(MyHostName)); 
+	char XMLDataBuff[1024*11];
+	strcpy(XMLDataBuff,"<?xml version=\"1.0\" encoding=\"iso-8859-1\" ?>\n");
+	strcat(XMLDataBuff,"<TiVoContainer>\n");
+	strcat(XMLDataBuff,"  <Details>\n");
+	strcat(XMLDataBuff,"    <Title>"); strcat(XMLDataBuff, MyHostName); strcat(XMLDataBuff,"</Title>\n");
+	strcat(XMLDataBuff,"    <ContentType>x-tivo-container/tivo-server</ContentType>\n");
+	strcat(XMLDataBuff,"    <SourceFormat>x-tivo-container/folder</SourceFormat>\n");
+	strcat(XMLDataBuff,"    <TotalItems>1</TotalItems>\n");
+	strcat(XMLDataBuff,"  </Details>\n");
+	strcat(XMLDataBuff,"  <Item>\n");
+	strcat(XMLDataBuff,"    <Details>\n");
+	strcat(XMLDataBuff,"      <Title>"); strcat(XMLDataBuff, MyHostName); strcat(XMLDataBuff," (WimTiVoServer)</Title>\n");
+	strcat(XMLDataBuff,"      <ContentType>x-tivo-container/tivo-videos</ContentType>\n");
+	strcat(XMLDataBuff,"      <SourceFormat>x-tivo-container/folder</SourceFormat>\n");
+	strcat(XMLDataBuff,"    </Details>\n");
+	strcat(XMLDataBuff,"    <Links>\n");
+	strcat(XMLDataBuff,"      <Content>\n");
+	strcat(XMLDataBuff,"        <Url>/TiVoConnect?Command=QueryContainer&amp;Container=%2FTivoNowPlaying</Url>\n");
+	strcat(XMLDataBuff,"        <ContentType>x-tivo-container/tivo-videos</ContentType>\n");
+	strcat(XMLDataBuff,"      </Content>\n");
+	strcat(XMLDataBuff,"    </Links>\n");
+	strcat(XMLDataBuff,"  </Item>\n");
+	strcat(XMLDataBuff,"  <ItemStart>0</ItemStart>\n");
+	strcat(XMLDataBuff,"  <ItemCount>1</ItemCount>\n");
+	strcat(XMLDataBuff,"</TiVoContainer>\n");
+//	strcat(XMLDataBuff,"<!-- Copyright © 2003-2010 TiVo Inc.-->\n");
+
+	/* Create HTTP Header */
+	char tmpBuff[1024];
+	char HttpResponse[1024];
+	strcpy(HttpResponse,"HTTP/1.1 200 OK\r\n");
+	strcat(HttpResponse,"Content-Type: text/html\r\n");
+	strcat(HttpResponse,"Connection: close\r\n");
+	time_t timer;
+	/* Get Current Time */
+	time(&timer);
+	sprintf(tmpBuff,"Date: %s",asctime(gmtime(&timer)));
+	tmpBuff[30] = '\0';
+	strcat(tmpBuff," GMT\r\n");
+	strcat(HttpResponse,tmpBuff);
+	sprintf(tmpBuff,"Content-Length: %d\r\n",strlen(XMLDataBuff));
+	strcat(HttpResponse,tmpBuff);
+	strcat(HttpResponse,"\r\n");
+
+	int nRet;
+	nRet = send(DataSocket, HttpResponse, strlen(HttpResponse),0);
+	nRet = send(DataSocket, XMLDataBuff, strlen(XMLDataBuff),0);
+	return(0);
+}
+int GetTiVoQueryFormats(SOCKET DataSocket)
+{
+	TRACE(__FUNCTION__ "\n");
+	int rval = 0;
+	char MyHostName[255] = {0}; // winsock hostname used for data recordkeeping
+	gethostname(MyHostName,sizeof(MyHostName)); 
+	char XMLDataBuff[1024*11];
+	strcpy(XMLDataBuff,"<?xml version=\"1.0\" encoding=\"iso-8859-1\" ?>\n");
+	strcat(XMLDataBuff,"<TiVoFormats xmlns=\"http://www.tivo.com/developer/calypso-protocol-1.6/\">\n");
+	strcat(XMLDataBuff,"  <Format>\n");
+	strcat(XMLDataBuff,"    <ContentType>video/x-tivo-mpeg</ContentType>\n");
+	strcat(XMLDataBuff,"    <Description/>\n");
+	strcat(XMLDataBuff,"  </Format>\n");
+	strcat(XMLDataBuff,"  <Format>\n");
+	strcat(XMLDataBuff,"    <ContentType>video/x-tivo-raw-tts</ContentType>\n");
+	strcat(XMLDataBuff,"    <Description/>\n");
+	strcat(XMLDataBuff,"  </Format>\n");
+	strcat(XMLDataBuff,"</TiVoFormats>\n");
+
+	/* Create HTTP Header */
+	char tmpBuff[1024];
+	char HttpResponse[1024];
+	time_t timer;
+	/* Get Current Time */
+	time(&timer);
+	strcpy(HttpResponse,"HTTP/1.1 200 OK\r\n");
+	strcat(HttpResponse,"Content-Type: text/html\r\n");
+	strcat(HttpResponse,"Connection: close\r\n");
+	sprintf(tmpBuff,"Date: %s",asctime(gmtime(&timer)));
+	tmpBuff[30] = '\0';
+	strcat(tmpBuff," GMT\r\n");
+	strcat(HttpResponse,tmpBuff);
+	sprintf(tmpBuff,"Content-Length: %d\r\n",strlen(XMLDataBuff));
+	strcat(HttpResponse,tmpBuff);
+	strcat(HttpResponse,"\r\n");
+
+	int nRet;
+	nRet = send(DataSocket, HttpResponse, strlen(HttpResponse),0);
+	nRet = send(DataSocket, XMLDataBuff, strlen(XMLDataBuff),0);
+	return(0);
+}
+int GetTivoNowPlaying(SOCKET DataSocket)
+{
+	TRACE(__FUNCTION__ "\n");
+	int rval = 0;
+	char MyHostName[255] = {0}; // winsock hostname used for data recordkeeping
+	gethostname(MyHostName,sizeof(MyHostName)); 
+	char XMLDataBuff[1024*11];
+	strcpy(XMLDataBuff,"<?xml version=\"1.0\" encoding=\"iso-8859-1\" ?>\n");
+	strcat(XMLDataBuff,"<TiVoContainer>\n");
+	strcat(XMLDataBuff,"  <ItemStart>0</ItemStart>\n");
+	strcat(XMLDataBuff,"  <ItemCount>2</ItemCount>\n");
+	strcat(XMLDataBuff,"  <Details>\n");
+	strcat(XMLDataBuff,"    <Title>"); strcat(XMLDataBuff, MyHostName); strcat(XMLDataBuff," (WimTiVoServer)</Title>\n");
+	strcat(XMLDataBuff,"    <ContentType>x-tivo-container/folder</ContentType>\n");
+	strcat(XMLDataBuff,"    <SourceFormat>x-tivo-container/folder</SourceFormat>\n");
+	strcat(XMLDataBuff,"    <TotalItems>2</TotalItems>\n");
+	strcat(XMLDataBuff,"  </Details>\n");
+
+	strcat(XMLDataBuff,"  <Item>\n");
+	strcat(XMLDataBuff,"    <Details>\n");
+	strcat(XMLDataBuff,"      <Title>Family.Guy.S11E03.HDTV.x264-LOL</Title>\n");
+	strcat(XMLDataBuff,"      <ContentType>video/x-tivo-mpeg</ContentType>\n");
+	strcat(XMLDataBuff,"      <SourceFormat>video/mp4</SourceFormat>\n");
+	strcat(XMLDataBuff,"      <CopyProtected>No</CopyProtected>\n");
+	strcat(XMLDataBuff,"      <Duration>1298171</Duration>\n");
+	strcat(XMLDataBuff,"      <SourceSize>1285727232</SourceSize>\n");
+	strcat(XMLDataBuff,"      <ContentSize>1285727232</ContentSize>\n");
+	strcat(XMLDataBuff,"      <HighDefinition>Yes</HighDefinition>\n");
+	strcat(XMLDataBuff,"      <CaptureDate>0x50976384</CaptureDate>\n");
+	strcat(XMLDataBuff,"    </Details>\n");
+	strcat(XMLDataBuff,"    <Links>\n");
+	strcat(XMLDataBuff,"      <Content>\n");
+	strcat(XMLDataBuff,"        <ContentType>video/x-tivo-mpeg</ContentType>\n");
+	strcat(XMLDataBuff,"        <Url>/TiVoConnect/TivoNowPlaying/Family.Guy.S11E03.HDTV.x264-LOL.mp4</Url>\n");
+//	strcat(XMLDataBuff,"        <Url>http://192.168.0.5:8080/TiVoConnect/TivoNowPlaying/IFamily.Guy.S11E03.HDTV.x264-LOL.mp4</Url>\n");
+	strcat(XMLDataBuff,"      </Content>\n");
+	strcat(XMLDataBuff,"      <CustomIcon>\n");
+	strcat(XMLDataBuff,"        <ContentType>image/x-tivo-urn</ContentType>\n");
+	strcat(XMLDataBuff,"        <AcceptsParams>No</AcceptsParams>\n");
+	strcat(XMLDataBuff,"        <Url>urn:tivo:image:save-until-i-delete-recording</Url>\n");
+	strcat(XMLDataBuff,"      </CustomIcon>\n");
+	strcat(XMLDataBuff,"    </Links>\n");
+	strcat(XMLDataBuff,"  </Item>\n");
+
+	strcat(XMLDataBuff,"  <Item>\n");
+	strcat(XMLDataBuff,"    <Details>\n");
+	strcat(XMLDataBuff,"      <Title>NBC Nightly News</Title>\n");
+	strcat(XMLDataBuff,"      <ContentType>video/x-tivo-mpeg</ContentType>\n");
+	strcat(XMLDataBuff,"      <SourceFormat>video/x-tivo-mpeg</SourceFormat>\n");
+	strcat(XMLDataBuff,"      <CaptureDate>0x4E2E1190</CaptureDate>\n");
+	strcat(XMLDataBuff,"      <Description>The latest world and national news. Copyright Tribune Media Services, Inc.</Description>\n");
+	strcat(XMLDataBuff,"      <Duration>1798000</Duration>\n");
+	strcat(XMLDataBuff,"      <SourceSize>2805738488</SourceSize>\n");
+	strcat(XMLDataBuff,"      <ContentSize>2805738488</ContentSize>\n");
+	strcat(XMLDataBuff,"      <HighDefinition>Yes</HighDefinition>\n");
+	strcat(XMLDataBuff,"    </Details>\n");
+	strcat(XMLDataBuff,"    <Links>\n");
+	strcat(XMLDataBuff,"      <Content>\n");
+	strcat(XMLDataBuff,"        <ContentType>video/x-tivo-mpeg</ContentType>\n");
+	strcat(XMLDataBuff,"        <Url>/TiVoConnect/TivoNowPlaying/NBC%20Nightly%20News%20(Recorded%20Jul%2025,%202011,%20KINGDT).TiVo</Url>\n");
+	strcat(XMLDataBuff,"      </Content>\n");
+	strcat(XMLDataBuff,"      <CustomIcon>\n");
+	strcat(XMLDataBuff,"        <ContentType>image/x-tivo-urn</ContentType>\n");
+	strcat(XMLDataBuff,"        <AcceptsParams>No</AcceptsParams>\n");
+	strcat(XMLDataBuff,"        <Url>urn:tivo:image:save-until-i-delete-recording</Url>\n");
+	strcat(XMLDataBuff,"      </CustomIcon>\n");
+	strcat(XMLDataBuff,"      <TiVoVideoDetails>\n");
+	strcat(XMLDataBuff,"        <ContentType>text/xml</ContentType>\n");
+	strcat(XMLDataBuff,"        <AcceptsParams>No</AcceptsParams>\n");
+	strcat(XMLDataBuff,"        <Url>/TiVoConnect/TivoNowPlaying/INBC%20Nightly%20News%20(Recorded%20Jul%2025,%202011,%20KINGDT).TiVo?Format=text%2Fxml</Url>\n");
+	strcat(XMLDataBuff,"      </TiVoVideoDetails>\n");
+	strcat(XMLDataBuff,"    </Links>\n");
+	strcat(XMLDataBuff,"  </Item>\n");
+
+
+	strcat(XMLDataBuff,"</TiVoContainer>\n");
+
+	/* Create HTTP Header */
+	char tmpBuff[1024];
+	char HttpResponse[1024];
+	time_t timer;
+	/* Get Current Time */
+	time(&timer);
+	strcpy(HttpResponse,"HTTP/1.1 200 OK\r\n");
+	strcat(HttpResponse,"Content-Type: text/html\r\n");
+	strcat(HttpResponse,"Connection: close\r\n");
+	sprintf(tmpBuff,"Date: %s",asctime(gmtime(&timer)));
+	tmpBuff[30] = '\0';
+	strcat(tmpBuff," GMT\r\n");
+	strcat(HttpResponse,tmpBuff);
+	sprintf(tmpBuff,"Content-Length: %d\r\n",strlen(XMLDataBuff));
+	strcat(HttpResponse,tmpBuff);
+	strcat(HttpResponse,"\r\n");
+
+	int nRet;
+	nRet = send(DataSocket, HttpResponse, strlen(HttpResponse),0);
+	nRet = send(DataSocket, XMLDataBuff, strlen(XMLDataBuff),0);
+	return(0);
+}
+int GetFile(SOCKET DataSocket)
+{
+	TRACE(__FUNCTION__ "\n");
+	int rval = 0;
+
+	/* Create HTTP Header */
+	char tmpBuff[1024];
+	char HttpResponse[1024];
+	time_t timer;
+	/* Get Current Time */
+	time(&timer);
+	strcpy(HttpResponse,"HTTP/1.1 200 OK\r\n");
+	strcat(HttpResponse,"Content-Type: video/x-tivo-mpeg\r\n");
+	strcat(HttpResponse,"Connection: close\r\n");
+	sprintf(tmpBuff,"Date: %s",asctime(gmtime(&timer)));
+	tmpBuff[30] = '\0';
+	strcat(tmpBuff," GMT\r\n");
+	strcat(HttpResponse,tmpBuff);
+	sprintf(tmpBuff,"Content-Length: 2805738488\r\n");
+	strcat(HttpResponse,tmpBuff);
+	strcat(HttpResponse,"\r\n");
+
+	int nRet;
+	nRet = send(DataSocket, HttpResponse, strlen(HttpResponse),0);
+	std::ifstream FileToTransfer;
+//	FileToTransfer.open("//Acid/TiVo/Family.Guy.S11E03.HDTV.x264-LOL.mp4", ios_base::in | ios_base::binary);
+	FileToTransfer.open("//Acid/TiVo/Evening Magazine (Recorded Mar 26, 2010, KINGDT).TiVo", ios_base::in | ios_base::binary);
+	if (FileToTransfer.good())
+	{
+		cout << " Sending File " << endl;
+		cout << HttpResponse << endl;
+		char XMLDataBuff[1024];
+		while (!FileToTransfer.eof())
+		{
+			FileToTransfer.read(XMLDataBuff,sizeof(XMLDataBuff));
+			nRet = send(DataSocket, XMLDataBuff, FileToTransfer.gcount(), 0);
+			//nRet = send(DataSocket, XMLDataBuff, strlen(XMLDataBuff),0);
+		}
+	}
+	return(0);
+}
+int GetSlash(SOCKET DataSocket)
+{
+	TRACE(__FUNCTION__ "\n");
+	int rval = -1;
+	char tmpBuff[1024];
+	char XMLDataBuff[1024*11];
+	int  XMLDataSize = 0;
+	int nRet;
+	int index = 0;
+	time_t timer;
+	struct tm *newtime = NULL;
+	char HttpResponse[1024];
+	/* Get Current Time */
+	time(&timer);
+
+	/* Create XML Data */
+	strcpy(XMLDataBuff,"<html>\r\n");
+	strcat(XMLDataBuff,"<head><title>RFSAW Reader</title></head>\r\n");
+	strcat(XMLDataBuff,"<body ms_positioning=\"GridLayout\">\r\n");
+	strcat(XMLDataBuff,"<IMG style=\"Z-INDEX: 101; LEFT: 337px; POSITION: absolute; TOP: 16px\" src=\"http://www.rfsaw.com/imgs/rfsaw_home_logo.gif\">\r\n");
+	strcat(XMLDataBuff,"<TEXTAREA id=\"Textarea1\" style=\"Z-INDEX: 102; LEFT: 337px; WIDTH: 319px; POSITION: absolute; TOP: 112px; HEIGHT: 82px\" name=\"Textarea1\" rows=\"5\" cols=\"37\">");
+	strcat(XMLDataBuff,"RFSAW EPC Reader\r\nVersion 1.0\r\nCopyright 2003-2004\r\n");
+	strcat(XMLDataBuff,"</TEXTAREA>\r\n");
+	strcat(XMLDataBuff,"<p><a href=\"/Setup/Net/\">Setup Network</a></p>\r\n");
+	strcat(XMLDataBuff,"<p><a href=\"/GroomedData/\">Get Groomed Data</a></p>\r\n");
+	strcat(XMLDataBuff,"<p><a href=\"/Calibrate/\">Calibrate</a></p>\r\n");
+
+	strcat(XMLDataBuff,"<form action=\"/GroomedPoster/\" method=\"post\">\r\n");
+	sockaddr_in HostName;
+	int HostNameSize = sizeof(HostName);
+	if (0 == getpeername(DataSocket, (sockaddr *)&HostName, &HostNameSize))
+	{
+		strcat(XMLDataBuff,"Host<INPUT type=\"text\" name=\"host\" value=\"");
+		strcat(XMLDataBuff,inet_ntoa(HostName.sin_addr));
+		strcat(XMLDataBuff,"\"><br>\r\n");
+	}
+	else
+	{
+		strcat(XMLDataBuff,"Host<INPUT type=\"text\" name=\"host\" value=\"datacolector.rfsaw.com\"><br>\r\n");
+	}
+	strcat(XMLDataBuff,"Port<INPUT type=\"text\" name=\"port\" value=\"80\"><br>\r\n");
+	strcat(XMLDataBuff,"<INPUT type=\"submit\" value=\"Start Data Poster\">\r\n");
+	strcat(XMLDataBuff,"</form>\r\n");
+
+	strcat(XMLDataBuff,"</body>\r\n");
+	strcat(XMLDataBuff,"</html>\r\n");
+
+	XMLDataSize = strlen(XMLDataBuff);
+
+	/* Create HTTP Header */
+	strcpy(HttpResponse,"HTTP/1.1 200 OK\r\n");
+	strcat(HttpResponse,"Content-Type: text/html\r\n");
+	strcat(HttpResponse,"Connection: close\r\n");
+	sprintf(tmpBuff,"Date: %s",asctime(gmtime(&timer)));
+	tmpBuff[30] = '\0';
+	strcat(tmpBuff," GMT\r\n");
+	strcat(HttpResponse,tmpBuff);
+	sprintf(tmpBuff,"Content-Length: %d\r\n",XMLDataSize);
+	strcat(HttpResponse,tmpBuff);
+	strcat(HttpResponse,"\r\n");
+
+	nRet = send(DataSocket,HttpResponse,strlen(HttpResponse),0);
+	nRet = send(DataSocket,XMLDataBuff,strlen(XMLDataBuff),0);
+	return(0);
+}
+//int GetNetSetup(SOCKET DataSocket)
+//{
+//	int rval = -1;
+//	char tmpBuff[1024];
+//	char XMLDataBuff[1024*11];
+//	int  XMLDataSize = 0;
+//	int nRet;
+//	int index = 0;
+//	time_t timer;
+//	struct tm *newtime = NULL;
+//	char HttpResponse[1024];
+//	/* Get Current Time */
+//	time(&timer);
+//	/* Create XML Data */
+//	strcpy(XMLDataBuff,"<html>\r\n");
+//	strcat(XMLDataBuff,"<head><title>RFSAW Reader</title></head>\r\n");
+//	strcat(XMLDataBuff,"<body ms_positioning=\"GridLayout\">\r\n");
+//	strcat(XMLDataBuff,"<IMG style=\"Z-INDEX: 101; LEFT: 337px; POSITION: absolute; TOP: 16px\" src=\"http://www.rfsaw.com/imgs/rfsaw_home_logo.gif\">\r\n");
+//	strcat(XMLDataBuff,"<P>\n");
+//	strcat(XMLDataBuff,"<INPUT id=\"Radio1\" type=\"radio\" value=\"Radio1\" name=\"RadioGroup\" CHECKED>Set up Network Automatically Using DHCP<BR>\n");
+//	strcat(XMLDataBuff,"<INPUT id=\"Radio2\" type=\"radio\" value=\"Radio2\" name=\"RadioGroup\">Set up Network Manually\n");
+//	strcat(XMLDataBuff,"</P>\n<P>");
+//	if (0 == gethostname(tmpBuff,sizeof(tmpBuff)))
+//	{
+//		strcat(XMLDataBuff,"<INPUT id=\"IPADDR\" type=\"text\" name=\"IPADDR\" VALUE=\"");
+//		strcat(XMLDataBuff,tmpBuff);
+//		strcat(XMLDataBuff,"\">IP Address<BR>\n");
+//		strcat(XMLDataBuff,"<INPUT id=\"IPMASK\" type=\"text\" name=\"IPMASK\" VALUE=\"");
+//		strcat(XMLDataBuff,tmpBuff);
+//		strcat(XMLDataBuff,"\">IP Netmask<BR>\n");
+//		//FIXED_INFO mf;
+//		//if (ERROR_SUCCESS == GetNetworkParams(&mf,sizeof(mf)))
+//		MIB_IPADDRTABLE IpAddrTable;
+//		ULONG dwSize = sizeof(IpAddrTable);
+//		if (NO_ERROR == GetIpAddrTable(&IpAddrTable,&dwSize,TRUE))
+//		{
+//		}
+//		DWORD ifcount;
+//		GetNumberOfInterfaces(&ifcount);
+//		while (ifcount>0)
+//		{
+//			MIB_IFROW ifrowmib;
+//			ifrowmib.dwIndex = ifcount--;
+//			if (NO_ERROR == GetIfEntry(&ifrowmib))
+//			{
+//				if ((MIB_IF_TYPE_ETHERNET == ifrowmib.dwType) &&
+//					(MIB_IF_OPER_STATUS_OPERATIONAL == ifrowmib.dwOperStatus))
+//				{
+//					strcat(XMLDataBuff,"");
+//				}
+//			}
+//		}
+//		//MIB_IPNETTABLE nettable;
+//		//DWORD dwSize = sizeof(nettable);
+//		//if (NO_ERROR == GetIpNetTable(&nettable,&dwSize,TRUE))
+//		//{
+//		//}
+//	}
+//	else
+//	{
+//		strcat(XMLDataBuff,"<INPUT id=\"IPADDR\" type=\"text\" name=\"IPADDR\" VALUE=\"127.0.0.1\">IP Address<BR>\n");
+//		strcat(XMLDataBuff,"<INPUT id=\"IPMASK\" type=\"text\" name=\"IPMASK\" VALUE=\"255.255.255.0\">IP Netmask<BR>\n");
+//	}
+//	strcat(XMLDataBuff,"<INPUT id=\"IPGATE\" type=\"text\" name=\"IPGATE\">Default Gateway\n");
+//	strcat(XMLDataBuff,"</P>\n");
+//	strcat(XMLDataBuff,"<P><INPUT id=\"Checkbox1\" type=\"checkbox\" name=\"Checkbox1\">SNMP Enabled<BR>\n");
+//	strcat(XMLDataBuff,"<INPUT id=\"Checkbox2\" type=\"checkbox\" name=\"Checkbox2\" CHECKED>Web Server Enabled\n");
+//	strcat(XMLDataBuff,"</P>\n");
+//	strcat(XMLDataBuff,"<P><INPUT id=\"Submit1\" type=\"submit\" value=\"Submit\" name=\"Submit1\"></P>\n");
+//	strcat(XMLDataBuff,"</body>\n");
+//	XMLDataSize = strlen(XMLDataBuff);
+//
+//	/* Create HTTP Header */
+//	strcpy(HttpResponse,"HTTP/1.1 200 OK\r\n");
+//	strcat(HttpResponse,"Content-Type: text/html\r\n");
+//	strcat(HttpResponse,"Connection: close\r\n");
+//	sprintf(tmpBuff,"Date: %s",asctime(gmtime(&timer)));
+//	tmpBuff[30] = '\0';
+//	strcat(tmpBuff," GMT\r\n");
+//	strcat(HttpResponse,tmpBuff);
+//	sprintf(tmpBuff,"Content-Length: %d\r\n",XMLDataSize);
+//	strcat(HttpResponse,tmpBuff);
+//	strcat(HttpResponse,"\r\n");
+//
+//	nRet = send(DataSocket,HttpResponse,strlen(HttpResponse),0);
+//	nRet = send(DataSocket,XMLDataBuff,strlen(XMLDataBuff),0);
+//	return(0);
+//}
+UINT HTTPMain(LPVOID lvp)
+{
+	if (!AfxSocketInit())
+	{
+		printerr(_T("Fatal Error: Sockets initialization failed\n"));
+	}
+	else
+	{
+		/* Open a listening socket */
+		ControlSocket = socket(AF_INET,	/* Address family */
+							SOCK_STREAM,	/* Socket type */
+							IPPROTO_TCP);	/* Protocol */
+		if (ControlSocket == INVALID_SOCKET)
+			printerr(_T("Fatal Error: Socket could not be created"));
+		else
+		{
+			int on = 1;
+			SOCKADDR_IN saServer;
+			int nRet;
+			setsockopt(ControlSocket,SOL_SOCKET,SO_REUSEADDR,(char *)&on,sizeof(on));
+			saServer.sin_family = AF_INET;
+			saServer.sin_addr.s_addr = INADDR_ANY;	/* Let WinSock supply address */
+//			saServer.sin_port = htons(2190);		/* Use port from command line */
+			saServer.sin_port = htons(0);			/* Use unique port */
+			nRet = bind(ControlSocket,				/* Socket */
+						(LPSOCKADDR)&saServer,		/* Our address */
+						sizeof(struct sockaddr));	/* Size of address structure */
+			if (nRet == SOCKET_ERROR)
+			{
+				closesocket(ControlSocket);
+				ControlSocket = INVALID_SOCKET;
+				printerr(_T("Fatal Error: Socket could not be bound"));
+			}
+			else
+			{
+				/* Set the socket to listen */
+				nRet = listen(ControlSocket,	/* Bound socket */
+							SOMAXCONN);			/* Number of connection request queue */
+				if (nRet == SOCKET_ERROR)
+				{
+					closesocket(ControlSocket);
+					ControlSocket = INVALID_SOCKET;
+					printerr(_T("Fatal Error: Socket could not be set to listen"));
+				}
+				else 
+				{
+					while (ControlSocket != INVALID_SOCKET)
+					{
+						SOCKET remoteSocket;
+						remoteSocket = accept(ControlSocket,NULL,NULL);
+						if (remoteSocket != INVALID_SOCKET)
+						{
+							char InBuff[1024];
+							int count = recv(remoteSocket,InBuff,sizeof(InBuff),0);
+							InBuff[count] = '\0';
+							//if (strncmp(InBuff,"GET /GroomedData/",17) == 0)
+							//{
+							//	GetGroomedData(remoteSocket);
+							//	if(bConsoleExists)
+							//		printf("%s",InBuff);
+							//}
+							//else if (strncmp(InBuff,"POST /GroomedPoster/",20) == 0)
+							//{
+							//	if(bConsoleExists)
+							//		printf("%s",InBuff);
+							//	CString * csRequest = new CString(InBuff,count);
+							//	AfxBeginThread(PostGroomedDataThread,csRequest);
+							//	GetSlash(remoteSocket);
+							//	//CString csResponse("HTTP/1.1 200 OK\r\nConnection: close\r\n");
+							//	//csResponse.AppendFormat("\r\n");
+							//	//send(remoteSocket,LPCSTR(csResponse),csResponse.GetLength(),0);
+							//	if(bConsoleExists)
+							//		printf("%s",InBuff);
+							//}
+							//else if (strncmp(InBuff,"GET /Calibrate/",15) == 0)
+							//{
+							//	GetCalibrate(remoteSocket);
+							//	if(bConsoleExists)
+							//		printf("%s",InBuff);
+							//}
+							//else if (strncmp(InBuff,"GET /Setup/Net/",15) == 0)
+							//{
+							//	GetNetSetup(remoteSocket);
+							//	if(bConsoleExists)
+							//		printf("%s",InBuff);
+							//}
+							//else 
+							if (strncmp(InBuff,"GET /TiVoConnect?Command=QueryContainer&Container=%2FTivoNowPlaying",67) == 0)
+							{
+								GetTivoNowPlaying(remoteSocket);
+								if(bConsoleExists)
+									cout << "GetTivoNowPlaying\t" << InBuff;
+							}
+							else if (strncmp(InBuff,"GET /TiVoConnect?Command=QueryContainer&Container=%2F",53) == 0)
+							{
+								GetTiVoConnect(remoteSocket);
+								if(bConsoleExists)
+									cout << "GetTiVoConnect\t" << InBuff;
+							}
+							else if (strncmp(InBuff,"GET /TiVoConnect/TivoNowPlaying/",32) == 0)
+							{
+								GetFile(remoteSocket);
+								if(bConsoleExists)
+									cout << "GetFile\t" << InBuff;
+							}
+							else if (strncmp(InBuff,"GET /TiVoConnect?Command=QueryFormats&SourceFormat=video%2Fx-tivo-mpeg",70) == 0)
+							{
+								GetTiVoQueryFormats(remoteSocket);
+								if(bConsoleExists)
+									cout << "GetTiVoQueryFormats\t" << InBuff;
+							}						
+							//else if (strncmp(InBuff,"GET /",5) == 0)
+							//{
+							//	GetSlash(remoteSocket);
+							//	if(bConsoleExists)
+							//		printf("%s",InBuff);
+							//}
+							else
+							{
+								int nRet = send(remoteSocket,"HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n",41,0);
+								if(bConsoleExists)
+									cout << "HTTP/1.1 404 Not Found\t" << InBuff;
+							}
+							closesocket(remoteSocket);
+						}
+					}
+				}
+			}
+		}
+	}
+	SetEvent(terminateEvent);
+	return(0);
+}
+
+bool TiVoBeaconSend(const CStringA & csServerBroadcast)
+{
+	bool rval = false;
+	// Create a UDP/IP datagram socket
+	SOCKET theSocket = socket(AF_INET,		// Address family
+						SOCK_DGRAM,			// Socket type
+						IPPROTO_UDP);		// Protocol
+	if (theSocket == INVALID_SOCKET)
+	{
+		TRACE("%s: %d\n","socket()",WSAGetLastError());
+	}
+	else
+	{
+		BOOL bBroadcastSocket = TRUE;
+		int nRet = setsockopt(theSocket,
+			SOL_SOCKET,
+			SO_BROADCAST,
+			(const char *)&bBroadcastSocket,
+			sizeof(bBroadcastSocket));
+		if (nRet == SOCKET_ERROR) 
+		{
+			TRACE("%s: %d\n","socket()",WSAGetLastError());
+		}
+		else
+		{
+			SOCKADDR_IN saBroadCast;
+			saBroadCast.sin_family = AF_INET;
+			saBroadCast.sin_addr.S_un.S_addr = INADDR_BROADCAST;
+			saBroadCast.sin_port = htons(2190);	// Port number
+			nRet = sendto(theSocket,			// Socket
+				csServerBroadcast.GetString(),	// Data buffer
+				csServerBroadcast.GetLength(),	// Length of data
+				0,								// Flags
+				(LPSOCKADDR)&saBroadCast,		// Server address
+				sizeof(struct sockaddr));		// Length of address
+			if (nRet == SOCKET_ERROR) 
+				TRACE("%s: %d\n","socket()",WSAGetLastError());
+			else
+				rval = true;
+		}
+		closesocket(theSocket);
+	}
+	return(rval);
+}
+
+UINT TiVoBeacon(LPVOID lvp)
+{
+	if (!AfxSocketInit())
+	{
+		printerr(_T("Fatal Error: Sockets initialization failed\n"));
+	}
+	else
+	{
+		/* Open a listening socket */
+		ControlSocket = socket(AF_INET,	/* Address family */
+							SOCK_STREAM,	/* Socket type */
+							IPPROTO_TCP);	/* Protocol */
+		if (ControlSocket == INVALID_SOCKET)
+			printerr(_T("Fatal Error: Socket could not be created"));
+		else
+		{
+			int on = 1;
+			SOCKADDR_IN saServer;
+			int nRet;
+			setsockopt(ControlSocket,SOL_SOCKET,SO_REUSEADDR,(char *)&on,sizeof(on));
+			saServer.sin_family = AF_INET;
+			saServer.sin_addr.s_addr = INADDR_ANY;	/* Let WinSock supply address */
+			saServer.sin_port = htons(8080);			/* Use port from command line */
+			nRet = bind(ControlSocket,		/* Socket */
+						(LPSOCKADDR)&saServer,		/* Our address */
+						sizeof(struct sockaddr));	/* Size of address structure */
+			if (nRet == SOCKET_ERROR)
+			{
+				closesocket(ControlSocket);
+				ControlSocket = INVALID_SOCKET;
+				printerr(_T("Fatal Error: Socket could not be bound"));
+			}
+			else
+			{
+				/* Set the socket to listen */
+				nRet = listen(ControlSocket,	/* Bound socket */
+							SOMAXCONN);			/* Number of connection request queue */
+				if (nRet == SOCKET_ERROR)
+				{
+					closesocket(ControlSocket);
+					ControlSocket = INVALID_SOCKET;
+					printerr(_T("Fatal Error: Socket could not be set to listen"));
+				}
+				else 
+				{
+					while (ControlSocket != INVALID_SOCKET)
+					{
+						SOCKET remoteSocket;
+						remoteSocket = accept(ControlSocket,NULL,NULL);
+						//PostGroomedDataStopRequested = true;
+						if (remoteSocket != INVALID_SOCKET)
+						{
+							char InBuff[1024];
+							int count = recv(remoteSocket,InBuff,sizeof(InBuff),0);
+							InBuff[count] = '\0';
+							//if (strncmp(InBuff,"GET /GroomedData/",17) == 0)
+							//{
+							//	GetGroomedData(remoteSocket);
+							//	if(bConsoleExists)
+							//		printf("%s",InBuff);
+							//}
+							//else if (strncmp(InBuff,"POST /GroomedPoster/",20) == 0)
+							//{
+							//	if(bConsoleExists)
+							//		printf("%s",InBuff);
+							//	CString * csRequest = new CString(InBuff,count);
+							//	AfxBeginThread(PostGroomedDataThread,csRequest);
+							//	GetSlash(remoteSocket);
+							//	//CString csResponse("HTTP/1.1 200 OK\r\nConnection: close\r\n");
+							//	//csResponse.AppendFormat("\r\n");
+							//	//send(remoteSocket,LPCSTR(csResponse),csResponse.GetLength(),0);
+							//	if(bConsoleExists)
+							//		printf("%s",InBuff);
+							//}
+							//else if (strncmp(InBuff,"GET /Calibrate/",15) == 0)
+							//{
+							//	GetCalibrate(remoteSocket);
+							//	if(bConsoleExists)
+							//		printf("%s",InBuff);
+							//}
+							//else if (strncmp(InBuff,"GET /Setup/Net/",15) == 0)
+							//{
+							//	GetNetSetup(remoteSocket);
+							//	if(bConsoleExists)
+							//		printf("%s",InBuff);
+							//}
+							//else 
+							if (strncmp(InBuff,"GET /",5) == 0)
+							{
+								GetSlash(remoteSocket);
+								if(bConsoleExists)
+									printf("%s",InBuff);
+							}
+							else
+							{
+								int nRet = send(remoteSocket,"HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n",41,0);
+								if(bConsoleExists)
+									printf("%s",InBuff);
+							}
+							closesocket(remoteSocket);
+						}
+					}
+				}
+			}
+		}
+	}
+	SetEvent(terminateEvent);
+	return(0);
+}
+bool TiVoBeaconListen(SOCKADDR_IN &saServer)
+{
+	bool rval = false;
+	// Create a UDP/IP datagram socket
+	SOCKET theSocket = socket(AF_INET,		// Address family
+							SOCK_DGRAM,		// Socket type
+							IPPROTO_UDP);	// Protocol
+	if (theSocket == INVALID_SOCKET)
+	{
+		TRACE("%s: %d\n","socket()",WSAGetLastError());
+	}
+	else
+	{
+		// Fill in the address structure
+		SOCKADDR_IN saClient;
+		saClient.sin_family = AF_INET;
+		saClient.sin_addr.s_addr = INADDR_ANY;	// Let WinSock assign address
+		saClient.sin_port = htons(2190);		// Use port passed from user
+		// bind the name to the socket
+		int nRet = bind(theSocket,		// Socket descriptor
+				(LPSOCKADDR)&saClient,	// Address to bind to
+				sizeof(SOCKADDR_IN)		// Size of address
+				);
+		if (nRet == SOCKET_ERROR)
+		{
+			TRACE("%s: %d\n","bind()",WSAGetLastError());
+			closesocket(theSocket);
+		}
+		else
+		{
+			char szBuf[2048];
+			int nLen = sizeof(SOCKADDR_IN);
+			nRet = recvfrom(theSocket,			// Bound socket
+						szBuf,					// Receive buffer
+						sizeof(szBuf),			// Size of buffer in bytes
+						0,						// Flags
+						(LPSOCKADDR)&saServer,	// Buffer to receive client address 
+						&nLen);					// Length of client address buffer
+
+			if (nRet == INVALID_SOCKET)
+			{
+				TRACE("%s: %d\n","recvfrom()",WSAGetLastError());
+			}
+			else
+			{
+				// here's where I should look at what I recieve.
+				CStringA csServerBroadcast(szBuf, nRet);
+				csServerBroadcast.Replace("\n", " ");
+				csServerBroadcast.Trim();
+				cout << "[" << getTimeISO8601() << "] " << inet_ntoa(saServer.sin_addr) << " " << csServerBroadcast.GetString() << endl;
+//				printf("%s\t%s\n", inet_ntoa(saServer.sin_addr), csServerBroadcast.GetString());
+				rval = true;
+
+				//if (strncmp(szBuf,csServerBroadcast,nRet) == 0)
+				//{
+				//	TRACE("Server at: %s\n",inet_ntoa(saServer.sin_addr));
+				//	rval = true;
+				//}
+				//else
+				//	TRACE("Someone not wanting to be decoded at: %s\n",inet_ntoa(saServer.sin_addr));
+			}
+			closesocket(theSocket);
+		}
+	}
+	return(rval);
+}
+UINT TiVoBeaconListenThread(LPVOID lvp)
+{
+	//static CString csPutDecodedTags;
+	//if (csPutDecodedTags.IsEmpty()) 
+	//	csPutDecodedTags.LoadString(IDS_PUT_DECODED_TAG);
+	//SOCKADDR_IN saServer;
+	//while ((theApp.UDPClientListen(saServer) == true) && 
+	//	(theApp.m_bDecodeRemoteStopRequested == false))
+	//{
+	//	bool bHappyWithCurrentServer = true;
+	//	// Complete the address structure
+	//	saServer.sin_family = AF_INET;
+	//	saServer.sin_port = htons(4096);
+	//	// these I want to optimize and only ask for if they changed
+	//	CCorelateParameters D4Params;
+	//	void * EPCParams = NULL;
+	//	bool bD4Correlate = true;
+	//	vector<CTagData> Hints;
+	//	while ((bHappyWithCurrentServer == true) &&
+	//		(theApp.m_bDecodeRemoteStopRequested == false))
+	//	{
+	//		CRawReadData RawData;
+	//		bHappyWithCurrentServer = GetRawData(saServer,RawData);
+	//		if (bHappyWithCurrentServer)
+	//		{
+	//			CTime OldTime(D4Params.m_ChangeTime.time);
+	//			bHappyWithCurrentServer = GetParams(saServer,D4Params);
+	//			if (!bHappyWithCurrentServer)
+	//			{
+	//				bHappyWithCurrentServer = GetParams(saServer,&EPCParams);
+	//				if (bHappyWithCurrentServer)
+	//				{
+	//					bD4Correlate = false;
+	//					D4Params.m_ChangeTime.time = theApp.EPCTagDLL.GetEPCModificationTime(EPCParams); // hack
+	//				}
+	//			}
+	//			CTime NewTime(D4Params.m_ChangeTime.time);
+	//			bool NewParams = (OldTime != NewTime);
+	//			if (bHappyWithCurrentServer)
+	//			{
+	//				if (NewParams)
+	//					bHappyWithCurrentServer = GetHints(saServer,Hints);
+	//				if (bHappyWithCurrentServer)
+	//				{
+	//					if (NewParams)
+	//					{
+	//						D4Params.m_TagList.resize(Hints.size());
+	//						for (int index = 0, stop = (int) Hints.size(); index < stop; index++)
+	//						{
+	//							D4Params.m_TagList[index].m_lTagNumber = Hints[index].EPC.i[3];
+	//							bHappyWithCurrentServer = GetRefData(saServer,D4Params.m_TagList[index]);
+	//						}
+	//					}
+	//					CTagData NewTags[30];
+	//					// Then I decode the tags.
+	//					int Count = 0;
+	//					if (!Hints.empty())
+	//					{
+	//						if (bD4Correlate == true)
+	//							Count = ReadTagD4(&RawData,NewTags,sizeof(NewTags),&(Hints[0]),sizeof(CTagData),&D4Params);
+	//						else
+	//							Count = theApp.EPCTagDLL.ReadTagEPC(&RawData,NewTags,sizeof(NewTags),&(Hints[0]),sizeof(CTagData),EPCParams);
+	//					}
+	//					else
+	//					{
+	//						if (bD4Correlate == true)
+	//							Count = ReadTagD4(&RawData,NewTags,sizeof(NewTags),NULL,0,&D4Params);
+	//						else
+	//							Count = theApp.EPCTagDLL.ReadTagEPC(&RawData,NewTags,sizeof(NewTags),NULL,0,EPCParams);
+	//					}
+	//					TRACE("\nDetected %d Tags\n",Count);
+	//					char xmltags[1024*25];
+	//					int offset = sprintf(xmltags,"<RawDataInfo><TagCount %d><DataType %d><DateTime>%d.%03d %d %d</DateTime></RawDataInfo>\n",
+	//						Count,
+	//						RawData.DataType,
+	//						RawData.m_FileTime.time,
+	//						RawData.m_FileTime.millitm,
+	//						RawData.m_FileTime.timezone,
+	//						RawData.m_FileTime.dstflag);
+	//					// Write the tags back to a buffer.
+	//					for (int index = 0; index < Count; index++)
+	//						offset += NewTags[index].XMLWrite(xmltags+offset,sizeof(xmltags)-offset);
+	//					xmltags[offset] = '\0';
+
+	//					CString csRequest;
+	//					csRequest.Format("%s HTTP/1.1\r\nHost: %s\r\n",csPutDecodedTags,inet_ntoa(saServer.sin_addr));
+	//					csRequest += "Connection: close\r\n";
+	//					//csRequest += "User-Agent: EPCPalletReader\r\n";
+	//					csRequest.Format("%sContent-Length: %d\r\n\r\n",csRequest,offset);
+	//					csRequest += xmltags;
+
+	//					// then I connect back to the server and upload the tagdata.
+	//					// connect to the server
+	//					// Create a TCP/IP stream socket
+	//					SOCKET TagSocket = socket(AF_INET,		// Address family
+	//										SOCK_STREAM,		// Socket type
+	//										IPPROTO_TCP);		// Protocol
+	//					if (TagSocket == INVALID_SOCKET) 
+	//					{
+	//						TRACE("%s: %d\n","socket()",WSAGetLastError());
+	//						bHappyWithCurrentServer = false;
+	//					}
+	//					else
+	//					{
+	//						// connect to the server
+	//						int nRet = connect(TagSocket,	// Socket
+	//							(LPSOCKADDR)&saServer,		// Server address
+	//							sizeof(struct sockaddr));	// Length of server address structure
+	//						nRet = send(TagSocket,csRequest,csRequest.GetLength(),0);
+	//						nRet = recv(TagSocket,xmltags,sizeof(xmltags),0);
+	//						closesocket(TagSocket);
+	//						#ifdef _DEBUG
+	//						CString csTrace(csRequest,132);
+	//						csTrace.Replace("\r\n"," ");
+	//						TRACE("==> %s\n",csTrace);
+	//						CString csResponse(xmltags,nRet);
+	//						csResponse.Replace("\r\n"," ");
+	//						TRACE("<== %s\n",csResponse);
+	//						#endif
+	//					}
+	//				}
+	//			}
+	//		}
+	//	}
+	//	theApp.EPCTagDLL.DestroyHistoryEPC(EPCParams);
+	//}
+	//theApp.m_bDecodeRemoteRunning = false;
+	return(0);
+}
+/////////////////////////////////////////////////////////////////////////////
+BOOL SendStatusToSCM(DWORD dwCurrentState, 
+					 DWORD dwWin32ExitCode, 
+					 DWORD dwServiceSpecificExitCode,
+					 DWORD dwCheckPoint,
+					 DWORD dwWaitHint)
+{
+	SERVICE_STATUS service_Status;
+	service_Status.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
+	service_Status.dwCurrentState = dwCurrentState;
+	if (service_Status.dwCurrentState == SERVICE_START_PENDING)
+		service_Status.dwControlsAccepted = 0;
+	else
+		service_Status.dwControlsAccepted = SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_PAUSE_CONTINUE | SERVICE_ACCEPT_SHUTDOWN;
+	if (dwServiceSpecificExitCode == 0)
+		service_Status.dwWin32ExitCode = dwWin32ExitCode;
+	else
+		service_Status.dwWin32ExitCode = ERROR_SERVICE_SPECIFIC_ERROR;
+	service_Status.dwServiceSpecificExitCode = dwServiceSpecificExitCode;
+	service_Status.dwCheckPoint = dwCheckPoint;
+	service_Status.dwWaitHint = dwWaitHint;
+	BOOL success = SetServiceStatus(serviceStatusHandle,&service_Status);
+	return(success);
+}
+DWORD WINAPI ServiceCtrlHandler(
+  DWORD controlCode,
+  DWORD dwEventType,
+  LPVOID lpEventData,
+  LPVOID lpContext)
+{
+	DWORD currentState = 0;
+	BOOL success;
+	CString csSubstitutionText;
+	switch(controlCode)
+	{
+	case SERVICE_CONTROL_STOP:
+		currentState = SERVICE_STOP_PENDING;
+		success = SendStatusToSCM(SERVICE_STOP_PENDING,NO_ERROR,0,1,5000);
+		csSubstitutionText.Format(_T("Service %s is stopping"),theApp.m_pszAppName);
+		closesocket(ControlSocket);
+		ControlSocket = INVALID_SOCKET;
+		//		SetEvent(terminateEvent);
+		break;
+	case SERVICE_CONTROL_PAUSE:
+		if (pauseService == false)
+		{
+			SendStatusToSCM(SERVICE_PAUSE_PENDING,NO_ERROR,0,0,0);
+			currentState = SERVICE_PAUSED;
+			pauseService = true;
+			threadHandle->SuspendThread();
+			csSubstitutionText.Format(_T("Service %s is paused"),theApp.m_pszAppName);
+		}
+		SendStatusToSCM(currentState,NO_ERROR,0,0,0);
+		break;
+	case SERVICE_CONTROL_CONTINUE:
+		if (pauseService == true)
+		{
+			SendStatusToSCM(SERVICE_CONTINUE_PENDING,NO_ERROR,0,1,1000);
+			currentState = SERVICE_RUNNING;
+			pauseService = false;
+			threadHandle->ResumeThread();
+			csSubstitutionText.Format(_T("Service %s has resumed"),theApp.m_pszAppName);
+		}
+		SendStatusToSCM(currentState,NO_ERROR,0,0,0);
+		break;
+	case SERVICE_CONTROL_INTERROGATE:
+		SendStatusToSCM(currentState,NO_ERROR,0,0,0);
+		break;
+	case SERVICE_CONTROL_SHUTDOWN:
+		break;
+	default:
+		SendStatusToSCM(currentState,NO_ERROR,0,0,0);
+		break;
+	}
+	//if ((ApplicationLogHandle != NULL) & (csSubstitutionText.GetLength() > 0))
+	//{
+	//	LPCTSTR lpStrings[] = { LPCTSTR(csSubstitutionText), NULL };
+	//	ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
+	//}
+	return(NO_ERROR);
+}
+VOID ServiceMain(DWORD argc, LPTSTR * argv)
+// I believe that ServiceMain is what gets run if the program is run as a
+// service.  These comments are being added when it's been a year since 
+// I've last looked at this code, so I'm remembering things and may need
+// to correct them later.
+// On further reading the process happens that _tmain is the starting 
+// point in all cases, but if it is running as a service the control is 
+// passed to this function by a call to the service manager.
+// In any case the important work of this function is that it starts a thread 
+// running the function HTTPMain().
+{
+	serviceStatusHandle = RegisterServiceCtrlHandlerEx(theApp.m_pszAppName,
+		(LPHANDLER_FUNCTION_EX)ServiceCtrlHandler,NULL);
+	if (serviceStatusHandle != 0)
+	{
+		BOOL success = SendStatusToSCM(SERVICE_START_PENDING,NO_ERROR,0,1,5000);
+		if (success == FALSE) // error
+		{
+			SendStatusToSCM(SERVICE_STOPPED,GetLastError(),0,0,0);
+		}
+		else
+		{
+			terminateEvent = CreateEvent(0,TRUE,FALSE,0);
+			if (terminateEvent == NULL) // error
+			{
+				//#ifdef _DEBUG
+				//if (ApplicationLogHandle != NULL) 
+				//{
+				//	LPCTSTR lpStrings[] = { _T("terminateEvent == NULL"), NULL };
+				//	ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
+				//}
+				//#endif
+				SendStatusToSCM(SERVICE_STOPPED,GetLastError(),0,0,0);
+			}
+			else
+			{
+				success = SendStatusToSCM(SERVICE_START_PENDING,NO_ERROR,0,2,1000);
+				if (success == FALSE) // error
+				{
+					CloseHandle(terminateEvent);
+					SendStatusToSCM(SERVICE_STOPPED,GetLastError(),0,0,0);
+				}
+				else
+				{
+					//theApp.FFTWLoad();
+					//threadHandle = AfxBeginThread(HTTPDecodeClientThread, NULL);
+					threadHandle = AfxBeginThread(HTTPMain, NULL, THREAD_PRIORITY_NORMAL, 0, CREATE_SUSPENDED);
+					if (threadHandle != NULL)
+					{
+						threadHandle->m_bAutoDelete = false;
+						threadHandle->ResumeThread();
+						success = SendStatusToSCM(SERVICE_RUNNING, NO_ERROR, 0, 0, 0);
+						if (success != FALSE) 
+						{
+							if (ApplicationLogHandle != NULL) 
+							{
+								TCHAR UserNameBuff[256];
+								DWORD UserNameSize = sizeof(UserNameBuff)/sizeof(TCHAR);
+								GetUserName(UserNameBuff,&UserNameSize); // this is "wim" when I run it.
+								CString csSubstitutionText;
+								csSubstitutionText.Format(_T("Service %s has been started by %s"),theApp.m_pszAppName,UserNameBuff);
+								LPCTSTR lpStrings[] = { csSubstitutionText.GetString(), NULL };
+								//ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
+							}
+							WaitForSingleObject(terminateEvent,INFINITE);
+						}
+						if (terminateEvent)
+							CloseHandle(terminateEvent);
+						if (threadHandle)
+						{
+							delete threadHandle;
+							threadHandle = NULL;
+						}
+						if (serviceStatusHandle)
+							SendStatusToSCM(SERVICE_STOPPED,GetLastError(),0,0,500);
+					}
+				}
+			}
+		}
+	}
+}
+/////////////////////////////////////////////////////////////////////////////
+volatile bool bRun = true;
+void SignalHandler(int signal)
+{
+	bRun = false;
+	cerr << "[" << getTimeISO8601() << "] SIGINT: Caught Ctrl-C, cleaning up and quitting." << endl;
+	CStringA csTiVoPacket("tivoconnect=0\r\n");
+	TiVoBeaconSend(csTiVoPacket);
+}
+extern bool TiVoBeaconListen(SOCKADDR_IN &saServer);
+int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
+{
+	int nRetCode = 0;
+
+	HMODULE hModule = ::GetModuleHandle(NULL);
+
+	if (hModule != NULL)
+	{
+		// initialize MFC and print and error on failure
+		if (!AfxWinInit(hModule, NULL, ::GetCommandLine(), 0))
+		{
+			// TODO: change error code to suit your needs
+			_tprintf(_T("Fatal Error: MFC initialization failed\n"));
+			nRetCode = 1;
+		}
+		else
+		if (!AfxSocketInit())
+		{
+			_tprintf(_T("Fatal Error: Sockets initialization failed\n"));
+		}
+		else
+		{
+			//theApp.SetRegistryKey(_T("WimsWorld"));
+			CString Parameters(theApp.m_lpCmdLine);
+			if (argc > 1)
+				Parameters = argv[1];
+			TCHAR UserNameBuff[256];
+			DWORD UserNameSize = sizeof(UserNameBuff)/sizeof(TCHAR);
+			GetUserName(UserNameBuff,&UserNameSize); // this is "wim" when I run it.
+			CString UserName(UserNameBuff,UserNameSize);
+
+			CString csMyProgramGuid(theApp.GetProfileString(_T("Settings"), _T("GUID")));
+			if (csMyProgramGuid.IsEmpty())
+			{
+				GUID MyProgramGuid;
+				if (S_OK == CoCreateGuid(&MyProgramGuid))
+				{
+					OLECHAR MyProgramGuidString[40] = {0};
+					StringFromGUID2(MyProgramGuid, MyProgramGuidString, sizeof(MyProgramGuidString) / sizeof(OLECHAR));
+					csMyProgramGuid = CString(MyProgramGuidString);
+					theApp.WriteProfileString(_T("Settings"), _T("GUID"), csMyProgramGuid);
+				}
+			}
+
+			CString csMyHostName;
+			if (csMyHostName.IsEmpty())
+			{
+				char MyHostName[255]; // winsock hostname used for data recordkeeping
+				gethostname(MyHostName,sizeof(MyHostName)); 
+				csMyHostName = MyHostName;
+			}
+
+			const char * BuildDateTime = "<BuildDateTime>" __DATE__ " " __TIME__ "</BuildDateTime>";
+			char cmonth[4];
+			int year, day, hour, min, sec;
+			sscanf(&(BuildDateTime[15]),"%s %d %d %d:%d:%d",cmonth,&day,&year,&hour,&min,&sec);
+			const char * Months[] = { "Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec" };
+			int month = 0;
+			while (strcmp(cmonth,Months[month]) != 0)
+				month++;
+			month++;
+			CString csBuildDateTime;
+			csBuildDateTime.Format(_T("%04d%02d%02d%02d%02d%02d"),year,month,day,hour,min,sec);
+
+			if (Parameters.CompareNoCase( _T("-?") ) == 0)
+			{
+				CString csBox;
+				csBox += _T("Optional Parameters:\n");
+				csBox += _T("\t-install\n");
+				csBox += _T("\t-remove\n");
+				csBox += _T("\t-ClearRegistry\n");
+				_tprintf(csBox);
+			}
+			// install this program in the service control manager
+			else if (Parameters.CompareNoCase( _T("-install") ) == 0)
+			{
+				SC_HANDLE scm = OpenSCManager(0,0,SC_MANAGER_CREATE_SERVICE);
+				if (scm != NULL)
+				{
+					// Get the file name that we are running from.
+					TCHAR tcModuleFileName[MAX_PATH];
+					unsigned long buffersize = sizeof(tcModuleFileName)/sizeof(TCHAR);
+					GetModuleFileName(AfxGetResourceHandle(), tcModuleFileName, buffersize );
+					DWORD ModuleFileNameBytes = (_tcslen(tcModuleFileName) + 1) * sizeof(TCHAR);
+					SC_HANDLE newService = CreateService(
+						scm,
+						theApp.m_pszAppName,
+						_T("WimTiVoServer"),
+						SERVICE_ALL_ACCESS,
+						SERVICE_WIN32_OWN_PROCESS,
+						SERVICE_AUTO_START,
+						SERVICE_ERROR_NORMAL,
+						tcModuleFileName,
+						0,0,0,0,0);
+					if (newService != NULL)
+					{
+						// successfully installed the service
+						// Add a description to the entry.
+						SERVICE_DESCRIPTION servdesc;
+						servdesc.lpDescription = _TEXT("WimsWorld TiVo Server");
+						ChangeServiceConfig2(newService,SERVICE_CONFIG_DESCRIPTION,&servdesc);
+
+						// set up the event log stuff.
+						// Add your source name as a subkey under the Application 
+						// key in the EventLog registry key. 
+						HKEY hk; 
+						CString csRegKey("SYSTEM\\CurrentControlSet\\Services\\EventLog\\Application\\");
+						csRegKey.Append(theApp.m_pszAppName);
+						if (ERROR_SUCCESS == RegCreateKey(HKEY_LOCAL_MACHINE,csRegKey, &hk))
+						{
+							// Add the name to the EventMessageFile subkey. 
+							RegSetValueEx(hk,		// subkey handle 
+								_T("EventMessageFile"),	// value name 
+								0,					// must be zero 
+								REG_EXPAND_SZ,		// value type 
+								(LPBYTE) tcModuleFileName,	// pointer to value data 
+								ModuleFileNameBytes);// length of value data 
+							// Set the supported event types in the TypesSupported subkey.
+							DWORD dwData = EVENTLOG_ERROR_TYPE | EVENTLOG_WARNING_TYPE | EVENTLOG_INFORMATION_TYPE;
+							RegSetValueEx(hk,		// subkey handle 
+								_T("TypesSupported"),	// value name 
+								0,					// must be zero 
+								REG_DWORD,			// value type 
+								(LPBYTE) &dwData,	// pointer to value data 
+								sizeof(DWORD));		// length of value data 
+							RegCloseKey(hk); 
+							// Here I atempt to write a message
+							_tprintf(_T("Sucessfully installed %s as a service\n"),tcModuleFileName);
+							HANDLE h = RegisterEventSource(NULL,  // uses local computer 
+										theApp.m_pszAppName);	// source name 
+							if (h != NULL) 
+							{
+								CString csSubstitutionText(tcModuleFileName);
+								LPCTSTR lpStrings[] = { LPCTSTR(csSubstitutionText), NULL };
+								ReportEvent(h,			// event log handle 
+									EVENTLOG_INFORMATION_TYPE,// event type 
+									0,					// category zero 
+									WIMSWORLD_EVENT_INSTALL,// event identifier 
+									NULL,				// no user security identifier 
+									1,					// one substitution string 
+									0,					// no data 
+									lpStrings,			// pointer to string array 
+									NULL);				// pointer to data 
+								DeregisterEventSource(h);
+							}
+						}
+						CloseServiceHandle(newService);
+					}
+					CloseServiceHandle(scm);
+				}
+			}
+			// remove this program from the service control manager
+			else if (Parameters.CompareNoCase( _T("-remove") ) == 0)
+			{
+				SC_HANDLE scm = OpenSCManager(0,0,SC_MANAGER_CREATE_SERVICE);
+				if (scm != NULL)
+				{
+					SC_HANDLE theService = OpenService(
+						scm,
+						theApp.m_pszAppName,
+						SERVICE_ALL_ACCESS | DELETE);
+					if (theService != NULL)
+					{
+						SERVICE_STATUS status;
+						if (QueryServiceStatus(theService,&status))
+						{
+							if (status.dwCurrentState != SERVICE_STOPPED)
+							{
+								ControlService(theService,SERVICE_CONTROL_STOP,&status);
+								Sleep(5000);
+							}
+							DeleteService(theService);
+							// Here I atempt to write a message
+							HANDLE h = RegisterEventSource(NULL,  // uses local computer 
+										theApp.m_pszAppName);	// source name 
+							if (h != NULL) 
+							{
+								CString csSubstitutionText(theApp.m_pszAppName);
+								LPCTSTR lpStrings[] = { csSubstitutionText.GetString(), NULL };
+								ReportEvent(h,			// event log handle 
+									EVENTLOG_INFORMATION_TYPE,// event type 
+									0,					// category zero 
+									WIMSWORLD_EVENT_REMOVE,	// event identifier 
+									NULL,				// no user security identifier 
+									1,					// one substitution string 
+									0,					// no data 
+									lpStrings,			// pointer to string array 
+									NULL);				// pointer to data 
+								DeregisterEventSource(h);
+							}
+							// remove the ability to write to the application log
+							CString csRegKey(_T("SYSTEM\\CurrentControlSet\\Services\\EventLog\\Application\\"));
+							csRegKey.Append(theApp.m_pszAppName);
+							RegDeleteKey(HKEY_LOCAL_MACHINE,csRegKey);
+							_tprintf(_T("Sucessfully removed the service %s\n"),theApp.m_pszAppName);
+						}
+						CloseServiceHandle(theService);
+					}
+					CloseServiceHandle(scm);
+				}
+			}
+			else if (Parameters.CompareNoCase( _T("-ClearRegistry") ) == 0)
+			{
+				_tprintf(_T("Removing Registry Entries\n"));
+				CString csRegKey(_T("Software\\WimsWorld\\"));
+				csRegKey.Append(theApp.m_pszAppName);
+				theApp.DelRegTree(HKEY_CURRENT_USER, csRegKey);
+			}
+			// If I'm running as SYSTEM, I assume that I'm running as a service.
+			else if (UserName.CompareNoCase(_T("SYSTEM")) == 0)
+			{
+				ApplicationLogHandle = RegisterEventSource(NULL,theApp.m_pszAppName);
+				if (ApplicationLogHandle != NULL) 
+				{
+					CString csSubstitutionText;
+					csSubstitutionText.Format(_T("Service %s has been started by %s"), theApp.m_pszAppName, UserNameBuff);
+					LPCTSTR lpStrings[] = { csSubstitutionText.GetString(), NULL };
+					ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
+				}
+				SERVICE_TABLE_ENTRY serviceTable[] =
+				{
+					//{ m_pszAppName, (LPSERVICE_MAIN_FUNCTION) ServiceMain },
+					{ NULL, (LPSERVICE_MAIN_FUNCTION) ServiceMain },
+					{ NULL, NULL }
+				};
+				serviceTable[0].lpServiceName = (LPWSTR) theApp.m_pszAppName;
+				BOOL success = StartServiceCtrlDispatcher(serviceTable);
+				if (ApplicationLogHandle != NULL) 
+				{
+					CString csSubstitutionText;
+					csSubstitutionText.Format(_T("StartServiceCtrlDispatcher returned %d (TRUE = %d)"), success, TRUE);
+					LPCTSTR lpStrings[] = { LPCTSTR(csSubstitutionText), NULL };
+					ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
+					DeregisterEventSource(ApplicationLogHandle);
+				}
+			}
+			// Otherwise I assume I've been run in a console window
+			else
+			{
+				bConsoleExists = true;
+				cout << "[" << getTimeISO8601() << "] Running Application from the command line." << endl;
+				cout << "[" << getTimeISO8601() << "] Built on " << __DATE__ << " at " <<  __TIME__ << endl;
+				cout << "[" << getTimeISO8601() << "] Use key combination Ctrl-C to end the program." << endl;
+
+				char szDescription[8][32] = {
+					"NetBIOS", 
+					"DNS hostname", 
+					"DNS domain", 
+					"DNS fully-qualified", 
+					"Physical NetBIOS", 
+					"Physical DNS hostname", 
+					"Physical DNS domain", 
+					"Physical DNS fully-qualified"};
+				TCHAR buffer[256] = TEXT("");
+				DWORD dwSize = sizeof(buffer);
+				cout << "[" << getTimeISO8601() << "] Determining Machine name with various methods:" << endl;
+				for (int cnf = 0; cnf < ComputerNameMax; cnf++)
+				{
+					if (!GetComputerNameEx((COMPUTER_NAME_FORMAT)cnf, buffer, &dwSize))
+					{
+						cout << "[" << getTimeISO8601() << "] GetComputerNameEx failed (" << GetLastError() << ")" << endl;
+						break;
+					}
+					else
+						cout << "[" << getTimeISO8601() << "] " << setw(28) << right << szDescription[cnf] << " : " << left << CStringA(buffer).GetString() << endl;
+					dwSize = _countof(buffer);
+					ZeroMemory(buffer, dwSize);
+				}
+
+				cout << "[" << getTimeISO8601() << "] Listening for TiVo Broadcast packets on UDP port 2190" << endl;
+
+				// Set up CTR-C signal handler
+				typedef void (*SignalHandlerPointer)(int);
+				SignalHandlerPointer previousHandler = signal(SIGINT, SignalHandler);
+				int loopCounter = 0;
+				bRun = true;
+				SOCKADDR_IN saServer;
+				while (bRun && (TiVoBeaconListen(saServer) == true))
+				{
+					cout << "[" << getTimeISO8601() << "] \r";
+				}
+				// remove our special Ctrl-C signal handler and restore previous one
+				signal(SIGINT, previousHandler);
+				cout << "\n[" << getTimeISO8601() << "] No longer listening for TiVo Broadcast packets on UDP port 2190" << endl;
+
+				terminateEvent = CreateEvent(0,TRUE,FALSE,0);
+				if (terminateEvent != NULL) 
+				{
+					threadHandle = AfxBeginThread(HTTPMain, NULL, THREAD_PRIORITY_NORMAL, 0, CREATE_SUSPENDED);
+					if (threadHandle != NULL)
+					{
+						threadHandle->m_bAutoDelete = false;
+						threadHandle->ResumeThread();
+
+						DWORD dwVersion = GetVersion();
+						int dwMajorVersion = (int)(LOBYTE(LOWORD(dwVersion)));
+						int dwMinorVersion = (int)(HIBYTE(LOWORD(dwVersion)));
+						int dwBuild = 0;
+						if (dwVersion < 0x80000000)              
+							dwBuild = (int)(HIWORD(dwVersion));
+
+						CStringA csTiVoPacket("tivoconnect=1\n");
+						csTiVoPacket.AppendFormat("method=%s\n",true?"broadcast":"connect");
+						csTiVoPacket.AppendFormat("platform=pc/WinNT:%d.%d.%d\n", dwMajorVersion, dwMinorVersion, dwBuild);
+						csTiVoPacket.Append("machine="); csTiVoPacket.Append(CStringA(csMyHostName).GetString());csTiVoPacket.Append("\n");
+						csTiVoPacket.Append("identity="); csTiVoPacket.Append(CStringA(csMyProgramGuid).GetString());csTiVoPacket.Append("\n");
+						struct sockaddr addr;
+						socklen_t addr_len = sizeof(addr);
+						getsockname(ControlSocket, &addr, &addr_len);
+						if (addr.sa_family == AF_INET)
+						{
+							struct sockaddr_in * saServer = (sockaddr_in *)&addr;
+							csTiVoPacket.AppendFormat("services=TiVoMediaServer:%hu/http\n",ntohs(saServer->sin_port));
+						}
+						//csTiVoPacket.AppendFormat(_T("services=<name>[:<port>][/<protocol>], ...\r\n"));
+						csTiVoPacket.Append("swversion=");csTiVoPacket.Append(CStringA(csBuildDateTime));csTiVoPacket.Append("\n");
+						cout << csTiVoPacket.GetString();
+						for (auto index = 600; index > 0; --index)
+						{
+							CStringA csTiVoPacket("tivoconnect=1\n");
+							csTiVoPacket.AppendFormat("method=%s\n",true?"broadcast":"connect");
+							csTiVoPacket.AppendFormat("platform=pc/WinNT:%d.%d.%d\n", dwMajorVersion, dwMinorVersion, dwBuild);
+							csTiVoPacket.Append("machine="); csTiVoPacket.Append(CStringA(csMyHostName).GetString());csTiVoPacket.Append("\n");
+							csTiVoPacket.Append("identity="); csTiVoPacket.Append(CStringA(csMyProgramGuid).GetString());csTiVoPacket.Append("\n");
+							struct sockaddr addr;
+							addr.sa_family = AF_UNSPEC;
+							socklen_t addr_len = sizeof(addr);
+							if (ControlSocket != INVALID_SOCKET)
+								getsockname(ControlSocket, &addr, &addr_len);
+							if (addr.sa_family == AF_INET)
+							{
+								struct sockaddr_in * saServer = (sockaddr_in *)&addr;
+								csTiVoPacket.AppendFormat("services=TiVoMediaServer:%hu/http\n",ntohs(saServer->sin_port));
+							}
+							else
+								csTiVoPacket.AppendFormat("services=TiVoMediaServer:%d/http\n",2190);
+							//csTiVoPacket.AppendFormat(_T("services=<name>[:<port>][/<protocol>], ...\r\n"));
+							//csTiVoPacket.AppendFormat(_T("swversion=<string>\r\n"));
+							TiVoBeaconSend(csTiVoPacket);
+							csTiVoPacket.Replace("\n", " ");
+							csTiVoPacket.Trim();
+							cout << "[" << getTimeISO8601() << "] (" << index << ") " << csTiVoPacket.GetString() << endl;
+							Sleep(1000);
+						}
+						closesocket(ControlSocket);
+						ControlSocket = INVALID_SOCKET;
+
+						WaitForSingleObject(terminateEvent,INFINITE);
+
+						if (terminateEvent)
+							CloseHandle(terminateEvent);
+						if (threadHandle)
+						{
+							delete threadHandle;
+							threadHandle = NULL;
+						}
+					}
+				}
+			}
+		}
+	}
+	else
+	{
+		// TODO: change error code to suit your needs
+		_tprintf(_T("Fatal Error: GetModuleHandle failed\n"));
+		nRetCode = 1;
+	}
+	return nRetCode;
+}
