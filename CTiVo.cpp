@@ -785,7 +785,7 @@ void cTiVoFile::GetTiVoItem(CComPtr<IXmlWriter> & pWriter) const
 			{
 				std::wstringstream ss;
 				if (m_VideoHighDefinition)
-					ss << max(m_SourceSize, m_Duration * 10000);
+					ss << max(m_SourceSize, m_Duration * 2800);
 				else
 					ss << max(m_SourceSize, m_Duration * 1400);
 				pWriter->WriteElementString(NULL, L"SourceSize", NULL, ss.str().c_str());

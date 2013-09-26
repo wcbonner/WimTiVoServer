@@ -22,9 +22,10 @@
     <ProjectGuid>{0F0FCDD1-0C7F-48F0-846A-20384EBF9AFB}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>WimTiVoServer</RootNamespace>
-    <SccProjectName>"%24/WimTiVoServer", LEKAAAAA</SccProjectName>
+    <SccProjectName>%24/WimsWorldSourceSafe/WimTiVoServer</SccProjectName>
     <SccLocalPath>.</SccLocalPath>
-    <SccProvider>MSSCCI:Microsoft Visual SourceSafe</SccProvider>
+    <SccProvider>{4CA58AB2-18FA-4F8D-95D4-32DDF27D184C}</SccProvider>
+    <SccAuxPath>http://acid:8080/tfs/wimsworld</SccAuxPath>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
