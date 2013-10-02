@@ -81,6 +81,13 @@ HANDLE ApplicationLogHandle = NULL;
 cTiVoServer myServer;
 CCriticalSection ccTiVoFileListCritSec;
 std::vector<cTiVoFile> TiVoFileList;
+enum TiVoFileListSortOrder { 
+	CaptureDateReverse, // !CaptureDate
+	Title, // Title
+	CaptureDate, 
+	TitleReverse
+};
+TiVoFileListSortOrder CurrentTiVoFileListSortOrder = CaptureDateReverse;
 /////////////////////////////////////////////////////////////////////////////
 #pragma comment(lib, "version")
 CString GetFileVersion(const CString & filename, const int digits = 4)
@@ -469,7 +476,8 @@ UINT PopulateTiVoFileList(LPVOID lvp)
 		{
 			PopulateTiVoFileList(TiVoFileList, ccTiVoFileListCritSec, CStringA(csToken).GetString(), true);
 			ccTiVoFileListCritSec.Lock(); 
-			std::sort(TiVoFileList.begin(), TiVoFileList.end(), cTiVoFileCompareDate);
+			std::sort(TiVoFileList.begin(), TiVoFileList.end(), cTiVoFileCompareDateReverse);
+			CurrentTiVoFileListSortOrder = CaptureDateReverse;
 			ccTiVoFileListCritSec.Unlock();
 			csToken = csLocalContainers.Tokenize(_T(";"), iPos);
 		}
@@ -528,6 +536,7 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 		CString csContainer;
 		int iAnchorOffset = 0;
 		CString csAnchorItem;
+		TiVoFileListSortOrder RequestedTiVoFileListSortOrder = CaptureDateReverse;
 		ccTiVoFileListCritSec.Lock();
 		if (!TiVoFileList.empty())
 			csAnchorItem = TiVoFileList.begin()->GetURL();
@@ -550,7 +559,14 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 			else if (!csKey.CompareNoCase("SortOrder"))
 			{
 				std::cout << "[                   ] " << csToken.GetString() << std::endl;
-				//std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate);
+				if (!csValue.CompareNoCase("!CaptureDate"))
+					RequestedTiVoFileListSortOrder = CaptureDateReverse;
+				else if (!csValue.CompareNoCase("Title"))
+					RequestedTiVoFileListSortOrder = Title;
+				else if (!csValue.CompareNoCase("CaptureDate"))
+					RequestedTiVoFileListSortOrder = CaptureDate;
+				else if (!csValue.CompareNoCase("!Title"))
+					RequestedTiVoFileListSortOrder = TitleReverse;
 			}
 			else if (!csKey.CompareNoCase("RandomSeed"))
 				std::cout << "[                   ] " << csToken.GetString() << std::endl;
@@ -635,6 +651,30 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 			else
 			{
 				ccTiVoFileListCritSec.Lock();
+				if (CurrentTiVoFileListSortOrder != RequestedTiVoFileListSortOrder)
+				{
+					switch(RequestedTiVoFileListSortOrder)
+					{
+					case Title:
+						std::sort(TiVoFileList.begin(), TiVoFileList.end(), cTiVoFileCompareTitle);
+						CurrentTiVoFileListSortOrder = Title;
+						break;
+					case TitleReverse:
+						std::sort(TiVoFileList.begin(), TiVoFileList.end(), cTiVoFileCompareTitle);
+						CurrentTiVoFileListSortOrder = TitleReverse;
+						break;
+					case CaptureDate:
+						std::sort(TiVoFileList.begin(), TiVoFileList.end(), cTiVoFileCompareDate);
+						CurrentTiVoFileListSortOrder = CaptureDate;
+						break;
+					default:
+					case CaptureDateReverse:
+						std::sort(TiVoFileList.begin(), TiVoFileList.end(), cTiVoFileCompareDateReverse);
+						CurrentTiVoFileListSortOrder = CaptureDateReverse;
+						break;
+					}
+				}
+
 				// If Anchoritem not empty 
 				//		set pointer to anchor item in list
 				//		move pointer to anchoroffset
@@ -1356,7 +1396,7 @@ UINT HTTPMain(LPVOID lvp)
 					myServer.m_services = ss.str();
 					long errCode;
 					HKEY hKey;
-					if (ERROR_SUCCESS == (errCode = RegCreateKeyEx(HKEY_LOCAL_MACHINE, csRegKey, 0, NULL, REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL, &hKey, NULL)))
+					if (SUCCEEDED(errCode = RegCreateKeyEx(HKEY_LOCAL_MACHINE, csRegKey, 0, NULL, REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL, &hKey, NULL)))
 					{
 						vData = ntohs(saServer->sin_port);
 						cbData = sizeof(vData);
@@ -1500,7 +1540,7 @@ UINT TiVoBeaconSendThread(LPVOID lvp)
 	csRegKey.Append(theApp.m_pszAppName);
 	TCHAR vData[1024];
 	DWORD cbData = sizeof(vData);
-	if (ERROR_SUCCESS == RegGetValue(HKEY_LOCAL_MACHINE, csRegKey, _T("GUID"), RRF_RT_REG_SZ, NULL, vData, &cbData))
+	if (SUCCEEDED(RegGetValue(HKEY_LOCAL_MACHINE, csRegKey, _T("GUID"), RRF_RT_REG_SZ, NULL, vData, &cbData)))
 		csMyProgramGuid = CString(vData);
 	if (csMyProgramGuid.IsEmpty())
 	{
@@ -1510,12 +1550,41 @@ UINT TiVoBeaconSendThread(LPVOID lvp)
 			OLECHAR MyProgramGuidString[40] = {0};
 			StringFromGUID2(MyProgramGuid, MyProgramGuidString, sizeof(MyProgramGuidString) / sizeof(OLECHAR));
 			csMyProgramGuid = CString(MyProgramGuidString);
+			long errCode;
 			HKEY hKey;
-			if (ERROR_SUCCESS == RegCreateKeyEx(HKEY_LOCAL_MACHINE, csRegKey, 0, NULL, REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL, &hKey, NULL))
+			if (SUCCEEDED(errCode = RegCreateKeyEx(HKEY_LOCAL_MACHINE, csRegKey, 0, NULL, REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL, &hKey, NULL)))
 			{
 				DWORD cbData = (csMyProgramGuid.GetLength() + 1) * sizeof(TCHAR);
 				RegSetValueEx(hKey, _T("GUID"), 0, REG_SZ, (const BYTE *)csMyProgramGuid.GetString(), cbData);
-				RegCloseKey(hKey);
+				if (FAILED(errCode = RegCloseKey(hKey)))
+				{
+					LPTSTR errString = NULL;  // will be allocated and filled by FormatMessage  
+					int size = FormatMessage( FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, // use windows internal message table
+						0,			// 0 since source is internal message table
+						errCode,	// this is the error code returned by WSAGetLastError()
+									// Could just as well have been an error code from generic
+									// Windows errors from GetLastError()
+						MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),	// auto-determine language to use
+						(LPTSTR)&errString, // this is WHERE we want FormatMessage
+									// to plunk the error string.  Note the
+									// peculiar pass format:  Even though
+									// errString is already a pointer, we
+									// pass &errString (which is really type LPSTR* now)
+									// and then CAST IT to (LPSTR).  This is a really weird
+									// trip up.. but its how they do it on msdn:
+									// http://msdn.microsoft.com/en-us/library/ms679351(VS.85).aspx
+						0,			// min size for buffer
+						NULL );		// 0, since getting message from system tables
+					std::stringstream ss;
+					ss << "[" << getTimeISO8601() << "] " << __FUNCTION__ << " RegCreateKeyEx() Error code: " << errCode << " " << CStringA(errString, size).Trim().GetString() << std::endl;
+					LocalFree(errString);	// if you don't do this, you will get an
+											// ever so slight memory leak, since we asked
+											// FormatMessage to FORMAT_MESSAGE_ALLOCATE_BUFFER,
+											// and it does so using LocalAlloc
+											// Gotcha!  I guess.
+					TRACE(ss.str().c_str());
+					std::cout << ss.str().c_str();
+				}
 			}
 		}
 	}

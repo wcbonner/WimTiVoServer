@@ -68,6 +68,8 @@ public:
 	friend bool cTiVoFileComparePathReverse(const cTiVoFile & a, const cTiVoFile & b);
 	friend bool cTiVoFileCompareSize(const cTiVoFile & a, const cTiVoFile & b);
 	friend bool cTiVoFileCompareSizeReverse(const cTiVoFile & a, const cTiVoFile & b);
+	friend bool cTiVoFileCompareTitle(const cTiVoFile & a, const cTiVoFile & b);
+	friend bool cTiVoFileCompareTitleReverse(const cTiVoFile & a, const cTiVoFile & b);
 	// Access Routines
 	void SetPathName(const CString csNewPath);
 	void SetPathName(const CFileFind & csNewPath);
