@@ -448,13 +448,6 @@ int GetTiVoQueryFormats(SOCKET DataSocket, const char * InBuffer)
 UINT PopulateTiVoFileList(LPVOID lvp)
 {
 	HANDLE LocalTerminationEventHandle = lvp;
-	if (ApplicationLogHandle != NULL) 
-	{
-		CString csSubstitutionText(__FUNCTION__);
-		csSubstitutionText.Append(_T(" Has Started"));
-		LPCTSTR lpStrings[] = { csSubstitutionText.GetString(), NULL };
-		ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
-	}
 	CString csLocalContainers;
 	if (csLocalContainers.IsEmpty())
 	{
@@ -464,6 +457,16 @@ UINT PopulateTiVoFileList(LPVOID lvp)
 		DWORD cbData = sizeof(vData);
 		if (ERROR_SUCCESS == RegGetValue(HKEY_LOCAL_MACHINE, csRegKey, _T("Container"), RRF_RT_REG_SZ, NULL, vData, &cbData))
 			csLocalContainers = CString(vData);
+	}
+	if (ApplicationLogHandle != NULL) 
+	{
+		CString csSubstitutionText(__FUNCTION__);
+		csSubstitutionText.Append(_T(" Has Started"));
+		csSubstitutionText.Append(_T("\nffprobe.exe: ")); csSubstitutionText.Append(FindEXEFromPath(_T("ffprobe.exe")));
+		csSubstitutionText.Append(_T("\nffmpeg.exe: ")); csSubstitutionText.Append(FindEXEFromPath(_T("ffmpeg.exe")));
+		csSubstitutionText.Append(_T("\ncsLocalContainers: ")); csSubstitutionText.Append(csLocalContainers);
+		LPCTSTR lpStrings[] = { csSubstitutionText.GetString(), NULL };
+		ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
 	}
 	do {
 		ccTiVoFileListCritSec.Lock(); 
@@ -491,6 +494,7 @@ UINT PopulateTiVoFileList(LPVOID lvp)
 		if ((ApplicationLogHandle != NULL) && (TiVoFileListSizeBefore != TiVoFileListSizeAfter))
 		{
 			CString csSubstitutionText(__FUNCTION__);
+			csSubstitutionText.Append(_T("\ncsLocalContainers: ")); csSubstitutionText.Append(csLocalContainers);
 			csSubstitutionText.Append(_T("\n"));
 			csSubstitutionText.Append(CString(ss.str().c_str()));
 			LPCTSTR lpStrings[] = { csSubstitutionText.GetString(), NULL };
@@ -1360,18 +1364,17 @@ UINT HTTPMain(LPVOID lvp)
 			SOCKADDR_IN saServer;
 			saServer.sin_family = AF_INET;
 			saServer.sin_addr.s_addr = INADDR_ANY;	/* Let WinSock supply address */
+			#ifndef _DEBUG
+			saServer.sin_port = htons(0);			/* Use unique port */
+			#else
+			saServer.sin_port = htons(64321);
+			#endif
 			CString csRegKey(_T("Software\\WimsWorld\\"));
 			csRegKey.Append(theApp.m_pszAppName);
 			DWORD vData = 0;
 			DWORD cbData = sizeof(vData);
 			if (ERROR_SUCCESS == RegGetValue(HKEY_LOCAL_MACHINE, csRegKey, _T("TCPPort"), RRF_RT_REG_DWORD, NULL, &vData, &cbData))
 				saServer.sin_port = htons(vData);
-			else
-				#ifdef _DEBUG
-				saServer.sin_port = htons(64321);
-				#else
-				saServer.sin_port = htons(0);			/* Use unique port */
-				#endif
 			int nRet = bind(ControlSocket,			/* Socket */
 						(LPSOCKADDR)&saServer,		/* Our address */
 						sizeof(struct sockaddr));	/* Size of address structure */
@@ -1925,6 +1928,18 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 							csContainers.AppendFormat(_T(";//%s/Videos/*"), tcHostName);
 							DWORD cbData = (csContainers.GetLength() + 1) * sizeof(TCHAR);
 							RegSetValueEx(hKey, _T("Container"), 0, REG_SZ, (const BYTE *)csContainers.GetString(), cbData);
+							GUID MyProgramGuid;
+							if (SUCCEEDED(CoCreateGuid(&MyProgramGuid)))
+							{
+								OLECHAR MyProgramGuidString[40] = {0};
+								StringFromGUID2(MyProgramGuid, MyProgramGuidString, sizeof(MyProgramGuidString) / sizeof(OLECHAR));
+								CString csMyProgramGuid = CString(MyProgramGuidString);
+								cbData = (csMyProgramGuid.GetLength() + 1) * sizeof(TCHAR);
+								RegSetValueEx(hKey, _T("GUID"), 0, REG_SZ, (const BYTE *)csMyProgramGuid.GetString(), cbData);
+							}
+							DWORD vData = 0;
+							cbData = sizeof(vData);
+							RegSetValueEx(hKey, _T("TCPPort"), 0, REG_DWORD, (const BYTE *)vData, cbData);
 							RegCloseKey(hKey);
 						}
 
