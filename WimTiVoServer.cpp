@@ -2076,7 +2076,7 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 						AfxBeginThread(TiVoBeaconSendThread, terminateEvent_beacon);
 						#ifdef _DEBUG
 						std::cout << "[" << getTimeISO8601() << "] Running for 30 minutes" << std::endl;
-						Sleep(30 * 60 * 1000); // Sleep 30 minutes
+						Sleep(90 * 60 * 1000); // Sleep 30 minutes
 						#else
 						std::cout << "[" << getTimeISO8601() << "] Running for 12 hours" << std::endl;
 						Sleep(12 * 60 * 60 * 1000); // Sleep 12 hours
