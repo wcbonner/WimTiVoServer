@@ -644,8 +644,16 @@ void cTiVoFile::PopulateFromFFProbe(void)
 														std::wstringstream ss;
 														ss << cs_width.GetString();
 														ss >> width;
+														if (width > m_VideoWidth)
+															m_VideoWidth = width;
 														if (width >= 1280)
 															m_VideoHighDefinition = true;
+														int hieght = 0;
+														ss = std::wstringstream();
+														ss << cs_height.GetString();
+														ss >> hieght;
+														if (hieght > m_VideoHeight)
+															m_VideoHeight = hieght;
 														double duration = 0;
 														ss = std::wstringstream();
 														ss << cs_duration.GetString();
@@ -921,8 +929,12 @@ const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath) cons
 	rval.Append(QuoteFileName(m_csPathName));
 	if (m_VideoCompatible)
 		rval.Append(_T(" -vcodec copy"));
-	else 
+	else
+	{
 		rval.Append(_T(" -vcodec mpeg2video"));
+		if ((m_VideoWidth > 1920) || (m_VideoHeight > 1080))
+			rval.Append(_T(" -s 1920x1080"));
+	}
 	rval.Append(_T(" -b:v 16384k -maxrate 30000k -bufsize 4096k -ab 448k -ar 48000"));
 	if (m_AudioCompatible)
 		rval.Append(_T(" -acodec copy"));

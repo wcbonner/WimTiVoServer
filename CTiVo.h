@@ -50,12 +50,16 @@ private:
 	bool m_AudioCompatible;
 	bool m_VideoCompatible;
 	bool m_VideoHighDefinition;
+	int m_VideoWidth;
+	int m_VideoHeight;
 	CString m_TvBusEnvelope;
 public:
 	cTiVoFile() : 
 	m_AudioCompatible(false),
 	m_VideoCompatible(false),
 	m_VideoHighDefinition(false),
+	m_VideoWidth(0),
+	m_VideoHeight(0),
 	m_SourceSize(0),
     m_Duration(0)
 	{
