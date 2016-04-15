@@ -724,9 +724,12 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 				while ((pItem != TiVoFileList.end()) && (iItemCount > 0))
 				{
 					std::wcout << L"[                   ] Item: " << pItem->GetPathName().GetString() << std::endl;
-					pItem->GetTiVoItem(pWriter);
+					if (pItem->GetDuration() > 0) // This might not work for .TiVo files, needs further checking
+					{
+						pItem->GetTiVoItem(pWriter);
+						iItemCount--;
+					}
 					pItem++;
-					iItemCount--;
 				}
 				ccTiVoFileListCritSec.Unlock();
 			}
