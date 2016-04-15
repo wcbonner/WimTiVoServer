@@ -310,7 +310,7 @@ void PopulateTiVoFileList(std::vector<cTiVoFile> & TiVoFileList, CCriticalSectio
 			{
 				std::stringstream ss;
 				ss << CStringA(finder.GetFilePath()).GetString() << "\\*";
-				PopulateTiVoFileList(TiVoFileList, ccTiVoFileListCritSec, ss.str());
+				PopulateTiVoFileList(TiVoFileList, ccTiVoFileListCritSec, ss.str(), Recurse);
 			}
 			continue;
 		}
@@ -702,12 +702,14 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 					if (iAnchorOffset < 0)
 					{
 						pItem--;
-						iAnchorOffset++;
+						if (pItem->GetDuration() > 1000)
+							iAnchorOffset++;
 					}
 					else
 					{
 						pItem++;
-						iAnchorOffset--;
+						if (pItem->GetDuration() > 1000)
+							iAnchorOffset--;
 					}
 				CString csTemporary;
 				csTemporary.Format(_T("%d"), pItem - TiVoFileList.begin());
@@ -723,8 +725,8 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 				pWriter->WriteEndElement();
 				while ((pItem != TiVoFileList.end()) && (iItemCount > 0))
 				{
-					std::wcout << L"[                   ] Item: " << pItem->GetPathName().GetString() << std::endl;
-					if (pItem->GetDuration() > 0) // This might not work for .TiVo files, needs further checking
+					std::wcout << L"[                   ] Item: " << pItem->GetPathName().GetString() << L" Duration: " << pItem->GetDuration() << std::endl;
+					if (pItem->GetDuration() > 1000) // This might not work for .TiVo files, needs further checking
 					{
 						pItem->GetTiVoItem(pWriter);
 						iItemCount--;
