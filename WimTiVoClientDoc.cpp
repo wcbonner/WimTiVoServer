@@ -982,7 +982,17 @@ UINT CWimTiVoClientDoc::TiVoConvertFileThread(LPVOID lvp)
 									CString csDescription(TiVoFile.GetDescription()); while(0 < csDescription.Replace(_T("\""), _T("'"))); csDescription.Insert(0,_T("description=\""));csDescription.Append(_T("\""));
 									CString csEpisodeID(TiVoFile.GetEpisodeTitle()); while(0 < csEpisodeID.Replace(_T("\""), _T("'"))); csEpisodeID.Insert(0,_T("episode_id=\""));csEpisodeID.Append(_T("\""));
 									if (pDoc->m_LogFile.is_open())
-										pDoc->m_LogFile << "[" << getTimeISO8601() << "]\tspawn: " << CStringA(pDoc->m_csFFMPEGPath).GetString() << " " << CStringA(pDoc->m_csFFMPEGPath).GetString() << " -i " << CStringA(QuoteFileName(csMPEGPathName)).GetString() << " -metadata " << CStringA(csTitle).GetString() << " -metadata " << CStringA(csShow).GetString() << " -metadata " << CStringA(csDescription).GetString() << " -metadata " << CStringA(csEpisodeID).GetString() << " -vcodec copy -acodec copy -y " << CStringA(QuoteFileName(csMP4PathName)).GetString() << std::endl;
+									{ 
+										pDoc->m_LogFile << "[" << getTimeISO8601() << "]\tspawn: " << CStringA(pDoc->m_csFFMPEGPath).GetString() << " " << CStringA(pDoc->m_csFFMPEGPath).GetString();
+										pDoc->m_LogFile << " -i " << CStringA(QuoteFileName(csMPEGPathName)).GetString();
+										pDoc->m_LogFile << " -metadata " << CStringA(csTitle).GetString();
+										pDoc->m_LogFile << " -metadata " << CStringA(csShow).GetString();
+										pDoc->m_LogFile << " -metadata " << CStringA(csDescription).GetString();
+										pDoc->m_LogFile << " -metadata " << CStringA(csEpisodeID).GetString();
+										//pDoc->m_LogFile << " -vcodec copy";
+										//pDoc->m_LogFile << " -acodec copy ";
+										pDoc->m_LogFile << "-y " << CStringA(QuoteFileName(csMP4PathName)).GetString() << std::endl;
+									}
 									if (-1 == _tspawnlp(_P_WAIT, pDoc->m_csFFMPEGPath.GetString(), pDoc->m_csFFMPEGPath.GetString(), _T("-i"), QuoteFileName(csMPEGPathName).GetString(), 
 										_T("-metadata"), csTitle.GetString(),
 										_T("-metadata"), csShow.GetString(),

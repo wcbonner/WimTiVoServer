@@ -237,8 +237,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,1,0,421
- PRODUCTVERSION 1,1,0,421
+ FILEVERSION 1,1,0,422
+ PRODUCTVERSION 1,1,0,422
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -255,12 +255,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "WimsWorld"
             VALUE "FileDescription", "WimTiVoClient"
-            VALUE "FileVersion", "1.1.0.421"
+            VALUE "FileVersion", "1.1.0.422"
             VALUE "InternalName", "WimTiVoClient.exe"
-            VALUE "LegalCopyright", "Copyright © 2013 William C Bonner.  All rights reserved."
+            VALUE "LegalCopyright", "Copyright © 2016 William C Bonner.  All rights reserved."
             VALUE "OriginalFilename", "WimTiVoClient.exe"
             VALUE "ProductName", "WimTiVoClient"
-            VALUE "ProductVersion", "1.1.0.421"
+            VALUE "ProductVersion", "1.1.0.422"
         END
     END
     BLOCK "VarFileInfo"
