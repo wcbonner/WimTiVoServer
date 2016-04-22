@@ -988,8 +988,8 @@ UINT CWimTiVoClientDoc::TiVoConvertFileThread(LPVOID lvp)
 										_T("-metadata"), csShow.GetString(),
 										_T("-metadata"), csDescription.GetString(),
 										_T("-metadata"), csEpisodeID.GetString(),
-										_T("-vcodec"), _T("copy"),
-										_T("-acodec"), _T("copy"),
+										//_T("-vcodec"), _T("copy"),
+										//_T("-acodec"), _T("copy"),
 										_T("-y"), // Cause it to overwrite exiting output files
 										QuoteFileName(csMP4PathName).GetString(), NULL))
 										if (pDoc->m_LogFile.is_open())

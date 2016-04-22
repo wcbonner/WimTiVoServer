@@ -226,6 +226,7 @@ void CWimTiVoClientView::OnTiviNowplaying()
 		CWaitCursor wait;
 		CString csURL(pDoc->m_TiVoContainer.m_url.c_str());
 		csURL.Append(_T("&Recurse=Yes"));
+		csURL.Append(_T("&ItemCount=32"));
 
 		if (pDoc->m_LogFile.is_open())
 			pDoc->m_LogFile << "[                   ] XML_Parse_TiVoNowPlaying: " << CStringA(csURL).GetString() << std::endl;

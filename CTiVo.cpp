@@ -1115,7 +1115,16 @@ bool XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, const CString & csMAK,
 									#endif
 									cTiVoFile MyFile;
 									MyFile.SetFromTiVoItem(csTitle, csEpisodeTitle, csDescription, csSourceStation, csContentURL, ctCaptureDate, ctsDuration, csMAK, llSourceSize);
-									TiVoFileList.push_back(MyFile);
+									// Quickly scan list to make sure I'm not adding duplicates into list
+									bool bNotInList = true;
+									for (auto TiVoFile = TiVoFileList.begin(); TiVoFile != TiVoFileList.end(); TiVoFile++)
+										if (MyFile == *TiVoFile)
+										{
+											bNotInList = false;
+											break;
+										}
+									if (bNotInList)
+										TiVoFileList.push_back(MyFile);
 									rval = true;
 								}
 								else if (bIsItemVideoContainer)
@@ -1161,149 +1170,170 @@ bool XML_Parse_TiVoNowPlaying(const CString & Source, std::vector<cTiVoFile> & T
 	std::cout << "[" << getTimeISO8601() << "] Attempting: " << CStringA(Source).GetString() << endl;
 	DWORD dwServiceType;
 	CString strServer;
-	CString strObject; 
-	INTERNET_PORT nPort; 
-	CString strUsername; 
-	CString strPassword; 
+	CString strObject;
+	INTERNET_PORT nPort;
+	CString strUsername;
+	CString strPassword;
 	AfxParseURLEx(Source.GetString(), dwServiceType, strServer, strObject, nPort, strUsername, strPassword);
-	std::unique_ptr<CHttpConnection> serverConnection(serverSession.GetHttpConnection(strServer,nPort,strUsername,strPassword));
+	std::unique_ptr<CHttpConnection> serverConnection(serverSession.GetHttpConnection(strServer, nPort, strUsername, strPassword));
 	if (NULL != serverConnection)
 	{
 		DWORD dwFlags = INTERNET_FLAG_TRANSFER_BINARY | SECURITY_IGNORE_ERROR_MASK;
 		if (dwServiceType == AFX_INET_SERVICE_HTTPS)
 			dwFlags |= INTERNET_FLAG_SECURE;
-		std::unique_ptr<CHttpFile> serverFile(serverConnection->OpenRequest(1, strObject, NULL, 1, NULL, NULL, dwFlags));
-		if (serverFile != NULL)
-		{
-			int BadCertErrorCount = 0;
-			TiVoNowPlayingAGAIN:
-			try 
+		auto FileListSizeBefore = TiVoFileList.size();
+		do {
+			FileListSizeBefore = TiVoFileList.size();
+			std::unique_ptr<CHttpFile> serverFile(serverConnection->OpenRequest(1, strObject, NULL, 1, NULL, NULL, dwFlags));
+			if (serverFile != NULL)
 			{
-				//std::unique_ptr<CHttpFile> serverFile((CHttpFile*) serverSession.OpenURL(*Source, 1, INTERNET_FLAG_TRANSFER_BINARY));
-				serverFile->SendRequest();
-				DWORD dwRet;
-				serverFile->QueryInfoStatusCode(dwRet);
-				#ifdef _DEBUG
-				//std::wcout << L"[                   ] Server Status Code: " << dwRet << endl;
-				CString headers;
-				serverFile->QueryInfo(HTTP_QUERY_RAW_HEADERS_CRLF,headers);
-				headers.Trim();
-				headers.Replace(_T("\r\n"),_T("\r\n[                   ] HTTP_QUERY_RAW_HEADERS_CRLF: "));
-				std::wcout << L"[                   ] HTTP_QUERY_RAW_HEADERS_CRLF: " << headers.GetString() << endl;
-				#endif
-				if(dwRet == HTTP_STATUS_OK)
+				int BadCertErrorCount = 0;
+			TiVoNowPlayingAGAIN:
+				try
 				{
-					CString csCookie;
-					serverFile->QueryInfo(HTTP_QUERY_SET_COOKIE, csCookie);
-					if (!csCookie.IsEmpty())
+					//std::unique_ptr<CHttpFile> serverFile((CHttpFile*) serverSession.OpenURL(*Source, 1, INTERNET_FLAG_TRANSFER_BINARY));
+					serverFile->SendRequest();
+					DWORD dwRet;
+					serverFile->QueryInfoStatusCode(dwRet);
+#ifdef _DEBUG
+					//std::wcout << L"[                   ] Server Status Code: " << dwRet << endl;
+					CString headers;
+					serverFile->QueryInfo(HTTP_QUERY_RAW_HEADERS_CRLF, headers);
+					headers.Trim();
+					headers.Replace(_T("\r\n"), _T("\r\n[                   ] HTTP_QUERY_RAW_HEADERS_CRLF: "));
+					std::wcout << L"[                   ] HTTP_QUERY_RAW_HEADERS_CRLF: " << headers.GetString() << endl;
+#endif
+					if (dwRet == HTTP_STATUS_OK)
 					{
-						std::wcout << L"[                   ] HTTP_QUERY_SET_COOKIE: " << csCookie.GetString() << endl;
-						// sid=1BFA53E13BDF178B; path=/; expires="Saturday, 16-Feb-2013 00:00:00 GMT";
-						CString csCookieName(csCookie.Left(csCookie.Find(_T("="))));
-						CString csCookieData(csCookie.Left(csCookie.Find(_T(";"))));;
-						csCookieData.Delete(0,csCookieData.Find(_T("="))+1);
-						CString csCookiePath(csCookie);
-						csCookiePath.Delete(0,csCookiePath.Find(_T("path="))+5);
-						csCookiePath.Delete(csCookiePath.Find(_T(";")),csCookiePath.GetLength());
-						CString csCookieURL;
-						if (dwServiceType == AFX_INET_SERVICE_HTTPS)
-							csCookieURL = _T("https://");
-						else
-							csCookieURL = _T("https://");
-						csCookieURL.Append(strServer);
-						csCookieURL.AppendFormat(_T(":%d"), nPort);
-						csCookieURL.Append(csCookiePath);
-						std::wcout << L"[                   ] csCookieURL: " << csCookieURL.GetString() << endl;
-						std::wcout << L"[                   ] csCookieName: " << csCookieName.GetString() << endl;
-						std::wcout << L"[                   ] csCookieData: " << csCookieData.GetString() << endl;
-						serverSession.SetCookie(csCookieURL,csCookieName,csCookieData);
-					}									
-					CString csContentType;
-					serverFile->QueryInfo(HTTP_QUERY_CONTENT_TYPE, csContentType);
-					if (0 < csContentType.Find(_T(";"))) // Fix issue of text/xml; charset=UTF-8
-						csContentType.Delete(csContentType.Find(_T(";")),csContentType.GetLength());									
-					if (!csContentType.CompareNoCase(_T("text/xml")))
-					{								
-						CComPtr<IStream> spMemoryStreamOne(::SHCreateMemStream(NULL, 0));
-						if (spMemoryStreamOne != NULL)
+						CString csCookie;
+						serverFile->QueryInfo(HTTP_QUERY_SET_COOKIE, csCookie);
+						if (!csCookie.IsEmpty())
 						{
-							char ittybittybuffer;
-							ULONG cbWritten;
-							while (0 < serverFile->Read(&ittybittybuffer, sizeof(ittybittybuffer)))
-								spMemoryStreamOne->Write(&ittybittybuffer, 1, &cbWritten);
+							std::wcout << L"[                   ] HTTP_QUERY_SET_COOKIE: " << csCookie.GetString() << endl;
+							// sid=1BFA53E13BDF178B; path=/; expires="Saturday, 16-Feb-2013 00:00:00 GMT";
+							CString csCookieName(csCookie.Left(csCookie.Find(_T("="))));
+							CString csCookieData(csCookie.Left(csCookie.Find(_T(";"))));;
+							csCookieData.Delete(0, csCookieData.Find(_T("=")) + 1);
+							CString csCookiePath(csCookie);
+							csCookiePath.Delete(0, csCookiePath.Find(_T("path=")) + 5);
+							csCookiePath.Delete(csCookiePath.Find(_T(";")), csCookiePath.GetLength());
+							CString csCookieURL;
+							if (dwServiceType == AFX_INET_SERVICE_HTTPS)
+								csCookieURL = _T("https://");
+							else
+								csCookieURL = _T("https://");
+							csCookieURL.Append(strServer);
+							csCookieURL.AppendFormat(_T(":%d"), nPort);
+							csCookieURL.Append(csCookiePath);
+							std::wcout << L"[                   ] csCookieURL: " << csCookieURL.GetString() << endl;
+							std::wcout << L"[                   ] csCookieName: " << csCookieName.GetString() << endl;
+							std::wcout << L"[                   ] csCookieData: " << csCookieData.GetString() << endl;
+							serverSession.SetCookie(csCookieURL, csCookieName, csCookieData);
+						}
+						CString csContentType;
+						serverFile->QueryInfo(HTTP_QUERY_CONTENT_TYPE, csContentType);
+						if (0 < csContentType.Find(_T(";"))) // Fix issue of text/xml; charset=UTF-8
+							csContentType.Delete(csContentType.Find(_T(";")), csContentType.GetLength());
+						if (!csContentType.CompareNoCase(_T("text/xml")))
+						{
+							CComPtr<IStream> spMemoryStreamOne(::SHCreateMemStream(NULL, 0));
+							if (spMemoryStreamOne != NULL)
+							{
+								char ittybittybuffer;
+								ULONG cbWritten;
+								while (0 < serverFile->Read(&ittybittybuffer, sizeof(ittybittybuffer)))
+									spMemoryStreamOne->Write(&ittybittybuffer, 1, &cbWritten);
 
-							// reposition back to beginning of stream
-							LARGE_INTEGER position;
-							position.QuadPart = 0;
-							spMemoryStreamOne->Seek(position, STREAM_SEEK_SET, NULL);
-							rval = XML_Parse_TiVoNowPlaying(spMemoryStreamOne, strPassword, TiVoFileList, TiVoTiVoContainers);
-							//#ifdef _DEBUG
-							//CComPtr<IStream> spMemoryStreamTwo;
-							//static int iFileCount = 0;
-							//CString csFileName(AfxGetAppName());
-							//csFileName.AppendFormat(_T(".%d.xml"), iFileCount++);
-							//if (SUCCEEDED(SHCreateStreamOnFile(csFileName.GetString(), STGM_CREATE | STGM_WRITE, &spMemoryStreamTwo))) 
-							//{
-							//	STATSTG statstg;
-							//	spMemoryStreamOne->Stat(&statstg, STATFLAG_NONAME);
-							//	spMemoryStreamOne->Seek(position, STREAM_SEEK_SET, NULL);
-							//	spMemoryStreamOne->CopyTo(spMemoryStreamTwo, statstg.cbSize, NULL, NULL);
-							//}
-							//#endif
+								// reposition back to beginning of stream
+								LARGE_INTEGER position;
+								position.QuadPart = 0;
+								spMemoryStreamOne->Seek(position, STREAM_SEEK_SET, NULL);
+								rval = XML_Parse_TiVoNowPlaying(spMemoryStreamOne, strPassword, TiVoFileList, TiVoTiVoContainers);
+								//#ifdef _DEBUG
+								//CComPtr<IStream> spMemoryStreamTwo;
+								//static int iFileCount = 0;
+								//CString csFileName(AfxGetAppName());
+								//csFileName.AppendFormat(_T(".%d.xml"), iFileCount++);
+								//if (SUCCEEDED(SHCreateStreamOnFile(csFileName.GetString(), STGM_CREATE | STGM_WRITE, &spMemoryStreamTwo))) 
+								//{
+								//	STATSTG statstg;
+								//	spMemoryStreamOne->Stat(&statstg, STATFLAG_NONAME);
+								//	spMemoryStreamOne->Seek(position, STREAM_SEEK_SET, NULL);
+								//	spMemoryStreamOne->CopyTo(spMemoryStreamTwo, statstg.cbSize, NULL, NULL);
+								//}
+								//#endif
+							}
+						}
+						else
+						{
+							std::cout << "[                   ] not text/xml" << endl;
+							char ittybittybuffer;
+							while (0 < serverFile->Read(&ittybittybuffer, sizeof(ittybittybuffer)))
+								std::cout << ittybittybuffer;
+							std::cout << endl;
 						}
 					}
-					else
+					else if (dwRet == HTTP_STATUS_SERVICE_UNAVAIL)
 					{
-						std::cout << "[                   ] not text/xml" << endl;
+						CString csRetry;
+						if (0 < serverFile->QueryInfo(HTTP_QUERY_RETRY_AFTER, csRetry))
+						{
+							int iRetry = _ttoi(csRetry.GetString());
+							std::cout << "[" << getTimeISO8601() << "] Sleeping for " << iRetry << " Seconds" << endl;
+							Sleep(iRetry * 1000);
+							rval = false;
+						}
+					}
+					else if (serverFile->GetLength() > 0)
+					{
 						char ittybittybuffer;
+						std::string ss;
 						while (0 < serverFile->Read(&ittybittybuffer, sizeof(ittybittybuffer)))
-							std::cout << ittybittybuffer;
-						std::cout << endl;
+							ss += ittybittybuffer;
+						std::cout << "[                   ] Returned File: " << ss << endl;
+						TRACE("[                   ] Returned File: %s\n", ss.c_str());
 					}
 				}
-				else if (dwRet == HTTP_STATUS_SERVICE_UNAVAIL)
+				catch (CInternetException *e)
 				{
-					CString csRetry;
-					if (0 < serverFile->QueryInfo(HTTP_QUERY_RETRY_AFTER, csRetry))
+					TCHAR   szCause[255];
+					e->GetErrorMessage(szCause, sizeof(szCause) / sizeof(TCHAR));
+					CStringA csErrorMessage(szCause);
+					csErrorMessage.Trim();
+					std::stringstream ss;
+					ss << "[                   ] InternetException: " << csErrorMessage.GetString() << " (" << e->m_dwError << ") " << std::endl;
+					std::cout << ss.str();
+					TRACE(ss.str().c_str());
+					if ((e->m_dwError == ERROR_INTERNET_INVALID_CA) ||
+						(e->m_dwError == ERROR_INTERNET_SEC_CERT_CN_INVALID) ||
+						(e->m_dwError == ERROR_INTERNET_SEC_CERT_DATE_INVALID) ||
+						(e->m_dwError == ERROR_INTERNET_SEC_INVALID_CERT))
 					{
-						int iRetry = _ttoi(csRetry.GetString());
-						std::cout << "[" << getTimeISO8601() << "] Sleeping for " << iRetry << " Seconds" << endl;
-						Sleep(iRetry * 1000);
-						rval = false;
+						serverFile->SetOption(INTERNET_OPTION_SECURITY_FLAGS, SECURITY_SET_MASK);
+						if (BadCertErrorCount++ < 2)
+							goto TiVoNowPlayingAGAIN;
 					}
-				}
-				else if (serverFile->GetLength() > 0)
-				{
-					char ittybittybuffer;
-					std::string ss;
-					while (0 < serverFile->Read(&ittybittybuffer, sizeof(ittybittybuffer)))
-						ss += ittybittybuffer;
-					std::cout << "[                   ] Returned File: " << ss << endl;
-					TRACE("[                   ] Returned File: %s\n", ss.c_str());
 				}
 				serverFile->Close();
-			}
-			catch(CInternetException *e)
-			{
-				TCHAR   szCause[255];
-				e->GetErrorMessage(szCause,sizeof(szCause)/sizeof(TCHAR));
-				CStringA csErrorMessage(szCause);
-				csErrorMessage.Trim();
-				std::stringstream ss;
-				ss << "[                   ] InternetException: " <<  csErrorMessage.GetString() << " (" << e->m_dwError << ") " << std::endl;
-				std::cout << ss.str(); 
-				TRACE(ss.str().c_str());
-				if ((e->m_dwError == ERROR_INTERNET_INVALID_CA) || 
-					(e->m_dwError == ERROR_INTERNET_SEC_CERT_CN_INVALID) ||
-					(e->m_dwError == ERROR_INTERNET_SEC_CERT_DATE_INVALID) ||
-					(e->m_dwError == ERROR_INTERNET_SEC_INVALID_CERT) )
+				//TODO: This is where I need to update strObject with the AnchorItem= of the last element in our current file list.
+				if (strObject.Find(_T("&AnchorItem=")) > 0)
+					strObject.Truncate(strObject.Find(_T("&AnchorItem=")));
+				if (!TiVoFileList.empty())
 				{
-					serverFile->SetOption(INTERNET_OPTION_SECURITY_FLAGS, SECURITY_SET_MASK);
-					if (BadCertErrorCount++ < 2)
-						goto TiVoNowPlayingAGAIN;
+					TCHAR lpszBuffer[_MAX_PATH];
+					DWORD dwBufferLength = sizeof(lpszBuffer) / sizeof(TCHAR);
+					InternetCanonicalizeUrl(TiVoFileList.back().GetURL().GetString(), lpszBuffer, &dwBufferLength, ICU_ENCODE_PERCENT);
+					CString csAnchorItem(lpszBuffer, dwBufferLength);
+					csAnchorItem.Replace(_T(":"), _T("%3A"));
+					csAnchorItem.Replace(_T("/"), _T("%2F"));
+					csAnchorItem.Replace(_T("&"), _T("%26"));
+					csAnchorItem.Replace(_T("?"), _T("%3F"));
+					strObject.Append(_T("&AnchorItem="));
+					strObject.Append(csAnchorItem);
+					strObject.Append(_T("&AnchorOffset=-1"));
 				}
 			}
-		}
+		} while (FileListSizeBefore != TiVoFileList.size());
 		serverConnection->Close();
 	}
 	return(rval);
