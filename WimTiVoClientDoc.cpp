@@ -991,6 +991,8 @@ UINT CWimTiVoClientDoc::TiVoConvertFileThread(LPVOID lvp)
 										pDoc->m_LogFile << " -metadata " << CStringA(csEpisodeID).GetString();
 										//pDoc->m_LogFile << " -vcodec copy";
 										//pDoc->m_LogFile << " -acodec copy ";
+										pDoc->m_LogFile << " -profile:v high";
+										pDoc->m_LogFile << " -level 4.1";
 										pDoc->m_LogFile << "-y " << CStringA(QuoteFileName(csMP4PathName)).GetString() << std::endl;
 									}
 									if (-1 == _tspawnlp(_P_WAIT, pDoc->m_csFFMPEGPath.GetString(), pDoc->m_csFFMPEGPath.GetString(), _T("-i"), QuoteFileName(csMPEGPathName).GetString(), 
@@ -1000,6 +1002,8 @@ UINT CWimTiVoClientDoc::TiVoConvertFileThread(LPVOID lvp)
 										_T("-metadata"), csEpisodeID.GetString(),
 										//_T("-vcodec"), _T("copy"),
 										//_T("-acodec"), _T("copy"),
+										_T("-profile:v"), _T("high"), // This came from https://trac.ffmpeg.org/wiki/Encode/H.264 settings for iPad 2 and above.
+										_T("-level"), _T("4.1"),
 										_T("-y"), // Cause it to overwrite exiting output files
 										QuoteFileName(csMP4PathName).GetString(), NULL))
 										if (pDoc->m_LogFile.is_open())
