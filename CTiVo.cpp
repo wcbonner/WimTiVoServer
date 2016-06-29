@@ -544,7 +544,7 @@ void cTiVoFile::PopulateFromFFProbe(void)
  
 				//static const CString csFFMPEGPath(FindEXEFromPath(_T("ffmpeg.exe")));
 				CString csCommandLine(QuoteFileName(csFFProbePath));
-				csCommandLine.Append(_T(" -show_streams -show_format -print_format xml "));
+				csCommandLine.Append(_T(" -hide_banner -show_streams -show_format -print_format xml "));
 				csCommandLine.Append(QuoteFileName(m_csPathName));
 
 				std::cout << "[" << getTimeISO8601() << "] CreateProcess: ";
@@ -925,7 +925,7 @@ void cTiVoFile::GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const
 const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath) const
 {
 	CString rval(QuoteFileName(csFFMPEGPath));
-	rval.Append(_T(" -i "));
+	rval.Append(_T(" -hide_banner -i "));
 	rval.Append(QuoteFileName(m_csPathName));
 	if (m_VideoCompatible)
 		rval.Append(_T(" -vcodec copy"));
