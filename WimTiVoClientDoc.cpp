@@ -709,6 +709,22 @@ bool CWimTiVoClientDoc::GetTiVoFile(const cTiVoFile & TiVoFile) //, CInternetSes
 						csContentType.Delete(csContentType.Find(_T(";")),csContentType.GetLength());									
 					if (!csContentType.CompareNoCase(_T("video/x-tivo-mpeg")))
 					{
+						// How can I preallocate disk space for a file without it being reported as readable?
+						// https://blogs.msdn.microsoft.com/oldnewthing/20160714-00/?p=93875
+						//auto h = CreateFile(L"test.txt", GENERIC_ALL,
+						//	FILE_SHARE_READ, nullptr, CREATE_ALWAYS,
+						//	FILE_ATTRIBUTE_NORMAL, nullptr);
+						//FILE_ALLOCATION_INFO info;
+						//info.AllocationSize.QuadPart =
+						//	1024LL * 1024LL * 1024LL * 100; // 100GB
+						//SetFileInformationByHandle(h, FileAllocationInfo,
+						//	&info, sizeof(info));
+						//for (int i = 0; i < 10; i++) {
+						//	DWORD written;
+						//	WriteFile(h, "hello\r\n", 7, &written, nullptr);
+						//	Sleep(5000);
+						//}
+						//CloseHandle(h);
 						//std::wcout << L"[                   ] Duration: " << TiVoFile
 						if (m_LogFile.is_open())
 							m_LogFile << "[" << getTimeISO8601() << "] Writing File: " << CStringA(QuoteFileName(TiVoFile.GetPathName())).GetString() << std::endl;

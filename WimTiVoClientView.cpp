@@ -538,8 +538,10 @@ void CWimTiVoClientView::OnTivoGetFiles()
 		}
 		m_csOriginalTitle = ((CFrameWndEx*) GetTopLevelFrame())->GetTitle();
 		pDoc->m_TiVoTransferFileThreadStopRequested = false;
-		AfxBeginThread(pDoc->TiVoTransferFileThread, (LPVOID) GetSafeHwnd());
-		AfxBeginThread(pDoc->TiVoConvertFileThread, (LPVOID) GetSafeHwnd());
+		if (!pDoc->m_TiVoTransferFileThreadRunning)
+			AfxBeginThread(pDoc->TiVoTransferFileThread, (LPVOID) GetSafeHwnd());
+		if (!pDoc->m_TiVoConvertFileThreadRunning)
+			AfxBeginThread(pDoc->TiVoConvertFileThread, (LPVOID) GetSafeHwnd());
 		m_nWindowTimer = SetTimer(m_nWindowTimer, 1000, NULL);
 	}
 	TRACE(__FUNCTION__ " Exiting\n");
