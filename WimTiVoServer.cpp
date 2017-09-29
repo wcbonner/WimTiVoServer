@@ -136,6 +136,7 @@ CString GetFileVersion(const CString & filename, const int digits = 4)
 string timeToISO8601(const time_t & TheTime)
 {
 	ostringstream ISOTime;
+	//ISOTime.imbue(std::locale::classic());
 	time_t timer = TheTime;
 	struct tm * UTC = gmtime(&timer);
 	if (UTC != NULL)
@@ -485,6 +486,7 @@ UINT PopulateTiVoFileList(LPVOID lvp)
 			csToken = csLocalContainers.Tokenize(_T(";"), iPos);
 		}
 		std::stringstream ss;
+		ss.imbue(std::locale(""));
 		ccTiVoFileListCritSec.Lock();
 		auto TiVoFileListSizeAfter = TiVoFileList.size();
 		ss << "[" << getTimeISO8601() << "] " __FUNCTION__ " TiVoFileListSizeBefore: " << TiVoFileListSizeBefore << " TiVoFileListSizeAfter: " << TiVoFileListSizeAfter << std::endl;
@@ -1268,6 +1270,7 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 						CloseHandle(piProcInfo.hThread);
 						auto TotalSeconds = ctsTotal.GetTotalSeconds();
 						std::stringstream ss;
+						ss.imbue(std::locale(""));
 						if (TotalSeconds > 0)
 							ss << "[" << getTimeISO8601() << "] Finished Sending File, BytesSent(" << bytessent << ")" << " Speed: " << (CurrentFileSize / TotalSeconds) << " B/s, " << CStringA(ctsTotal.Format(_T("%H:%M:%S"))).GetString() << std::endl;
 						else
@@ -1296,6 +1299,8 @@ UINT HTTPChild(LPVOID lvp)
 	SOCKET remoteSocket = (SOCKET) lvp;
 	if (SUCCEEDED(CoInitializeEx(0, COINIT_MULTITHREADED))) // COINIT_APARTMENTTHREADED
 	{
+		std::cout.imbue(std::locale(""));  // imbue global locale
+		std::wcout.imbue(std::locale(""));  // imbue global locale
 		char InBuff[1024];
 		int count = recv(remoteSocket,InBuff,sizeof(InBuff),0);
 		InBuff[count] = '\0';
@@ -1875,6 +1880,14 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 			// This error is returned if the program is being run as a console application rather than as a service. If the program will be run as a console application for debugging purposes, structure it such that service-specific code is not called when this error is returned. According to http://msdn.microsoft.com/en-us/library/windows/desktop/ms686324(v=vs.85).aspx ERROR_FAILED_SERVICE_CONTROLLER_CONNECT
 			std::cout << "[" << getTimeISO8601() << "] Running Application from the command line." << endl;
 			std::cout << "[" << getTimeISO8601() << "] Built on " << __DATE__ << " at " <<  __TIME__ << endl;
+			std::cout << "[" << getTimeISO8601() << "] Current locale setting is \"" << std::cout.getloc().name().c_str() << "\"\n";
+			std::cout << "[                   ] 1000.010 == " << 1000.010 << "\n";
+			std::cout.imbue(std::locale(""));  // imbue global locale
+			std::wcout.imbue(std::locale(""));  // imbue global locale
+			//std::locale::global(std::locale("")); // replace the C++ global locale as well as the C locale with the user-preferred locale			
+			//std::cout.imbue(std::locale()); // use the new global locale for future wide character output
+			std::cout << "[" << getTimeISO8601() << "] Current locale setting is \"" << std::cout.getloc().name().c_str() << "\"\n";
+			std::cout << "[                   ] 1000.010 == " << 1000.010 << "\n";
 			CString Parameters(theApp.m_lpCmdLine);
 			if (argc > 1)
 				Parameters = argv[1];
