@@ -34,6 +34,7 @@ public:
 	CString m_csFFMPEGPath;		// Location of the FFMPEG.exe program
 	CString m_csTiVoDecodePath;	// Location of the TiVoDecode.exe program
 	CString m_csTDCatPath;	// Location of the TiVoDecode.exe program
+	CString m_csCCExtractorPath; // Location of CCExtractor program to create Subtitle Files
 	bool m_bFFMPEG;	// Do we want to convert mpg to an MP4 container file with metadata?
 	bool m_bTiVoDecode;	// Do we want to convert from a .TiVo file to an mpg file with no metadata?
 	CString m_csTiVoFileDestination;	// Location that we will download tivo files

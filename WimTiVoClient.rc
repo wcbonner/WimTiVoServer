@@ -73,7 +73,9 @@ END
 // Icon with lowest ID value placed first to ensure application icon
 // remains consistent on all systems.
 IDR_MAINFRAME           ICON                    "res\\WimTiVoClient.ico"
+
 IDR_WimTiVoClientTYPE   ICON                    "res\\WimTiVoClientDoc.ico"
+
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -81,13 +83,21 @@ IDR_WimTiVoClientTYPE   ICON                    "res\\WimTiVoClientDoc.ico"
 //
 
 IDR_MAINFRAME           BITMAP                  "res\\Toolbar.bmp"
+
 IDR_MAINFRAME_256       BITMAP                  "res\\Toolbar256.bmp"
+
 IDB_MAIN                BITMAP                  "res\\main.bmp"
+
 IDB_FILELARGE           BITMAP                  "res\\filelarge.bmp"
+
 IDB_FILESMALL           BITMAP                  "res\\filesmall.bmp"
+
 IDB_WRITELARGE          BITMAP                  "res\\writelarge.bmp"
+
 IDB_WRITESMALL          BITMAP                  "res\\writesmall.bmp"
+
 IDB_BUTTONS             BITMAP                  "res\\buttons.bmp"
+
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -237,8 +247,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,1,1,429
- PRODUCTVERSION 1,1,1,429
+ FILEVERSION 1,2,0,109
+ PRODUCTVERSION 1,2,0,109
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -255,12 +265,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "WimsWorld"
             VALUE "FileDescription", "WimTiVoClient"
-            VALUE "FileVersion", "1.1.1.429"
+            VALUE "FileVersion", "1.2.0.109"
             VALUE "InternalName", "WimTiVoClient.exe"
-            VALUE "LegalCopyright", "Copyright © 2016 William C Bonner.  All rights reserved."
+            VALUE "LegalCopyright", "Copyright © 2017 William C Bonner.  All rights reserved."
             VALUE "OriginalFilename", "WimTiVoClient.exe"
             VALUE "ProductName", "WimTiVoClient"
-            VALUE "ProductVersion", "1.1.1.429"
+            VALUE "ProductVersion", "1.2.0.109"
         END
     END
     BLOCK "VarFileInfo"

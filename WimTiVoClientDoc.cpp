@@ -152,6 +152,8 @@ CWimTiVoClientDoc::CWimTiVoClientDoc()
 
 	m_csTDCatPath = FindEXEFromPath(_T("tdcat.exe"));
 
+	m_csCCExtractorPath = FindEXEFromPath(_T("ccextractorwinfull.exe"));
+
 	for (auto index = 0; index < 16; index++)
 	{
 		std::stringstream ssKey;
@@ -990,6 +992,17 @@ UINT CWimTiVoClientDoc::TiVoConvertFileThread(LPVOID lvp)
 							{
 								status.m_ctime = status.m_mtime = TiVoFile.GetCaptureDate();
 								CFile::SetStatus(csMPEGPathName, status);
+								if (!pDoc->m_csCCExtractorPath.IsEmpty())
+								{
+									_tspawnl(_P_WAIT, pDoc->m_csCCExtractorPath.GetString(), pDoc->m_csCCExtractorPath.GetString(), QuoteFileName(csTiVoFileName).GetString(), NULL);
+									CString csSRTPathName(csTiVoFileName);
+									csSRTPathName.Replace(_T(".TiVo"), _T(".srt"));
+									if (TRUE == CFile::GetStatus(csSRTPathName, status))
+									{
+										status.m_ctime = status.m_mtime = TiVoFile.GetCaptureDate();
+										CFile::SetStatus(csSRTPathName, status);
+									}
+								}
 								DeleteFile(csTiVoFileName);
 								if ((pDoc->m_bFFMPEG) && (TRUE != CFile::GetStatus(csMP4PathName, status)))
 								{
