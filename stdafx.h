@@ -45,6 +45,8 @@
 #include <memory> // for smart pointers
 #include <xmllite.h>
 #pragma comment(lib, "xmllite")
+#include <iphlpapi.h>
+#pragma comment(lib, "IPHLPAPI.lib")
 
 // FFMPEG Libraries
 //extern "C" {
