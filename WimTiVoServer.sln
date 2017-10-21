@@ -1,9 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.26403.3
+VisualStudioVersion = 15.0.26730.16
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "WimTiVoServer", "WimTiVoServer.vcxproj", "{0F0FCDD1-0C7F-48F0-846A-20384EBF9AFB}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "WimTiVoClient", "..\WimTiVoClient\WimTiVoClient.vcxproj", "{6CA84EE4-0ADE-4B71-B104-3E3A2245A52A}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "WimTivoBeaconListener", "..\WimTivoBeaconListener\WimTivoBeaconListener.vcxproj", "{6D527625-7F4D-4057-9EE3-79DBA767D15C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,8 +25,27 @@ Global
 		{0F0FCDD1-0C7F-48F0-846A-20384EBF9AFB}.Release|x64.Build.0 = Release|x64
 		{0F0FCDD1-0C7F-48F0-846A-20384EBF9AFB}.Release|x86.ActiveCfg = Release|Win32
 		{0F0FCDD1-0C7F-48F0-846A-20384EBF9AFB}.Release|x86.Build.0 = Release|Win32
+		{6CA84EE4-0ADE-4B71-B104-3E3A2245A52A}.Debug|x64.ActiveCfg = Debug|x64
+		{6CA84EE4-0ADE-4B71-B104-3E3A2245A52A}.Debug|x64.Build.0 = Debug|x64
+		{6CA84EE4-0ADE-4B71-B104-3E3A2245A52A}.Debug|x86.ActiveCfg = Debug|Win32
+		{6CA84EE4-0ADE-4B71-B104-3E3A2245A52A}.Debug|x86.Build.0 = Debug|Win32
+		{6CA84EE4-0ADE-4B71-B104-3E3A2245A52A}.Release|x64.ActiveCfg = Release|x64
+		{6CA84EE4-0ADE-4B71-B104-3E3A2245A52A}.Release|x64.Build.0 = Release|x64
+		{6CA84EE4-0ADE-4B71-B104-3E3A2245A52A}.Release|x86.ActiveCfg = Release|Win32
+		{6CA84EE4-0ADE-4B71-B104-3E3A2245A52A}.Release|x86.Build.0 = Release|Win32
+		{6D527625-7F4D-4057-9EE3-79DBA767D15C}.Debug|x64.ActiveCfg = Debug|x64
+		{6D527625-7F4D-4057-9EE3-79DBA767D15C}.Debug|x64.Build.0 = Debug|x64
+		{6D527625-7F4D-4057-9EE3-79DBA767D15C}.Debug|x86.ActiveCfg = Debug|Win32
+		{6D527625-7F4D-4057-9EE3-79DBA767D15C}.Debug|x86.Build.0 = Debug|Win32
+		{6D527625-7F4D-4057-9EE3-79DBA767D15C}.Release|x64.ActiveCfg = Release|x64
+		{6D527625-7F4D-4057-9EE3-79DBA767D15C}.Release|x64.Build.0 = Release|x64
+		{6D527625-7F4D-4057-9EE3-79DBA767D15C}.Release|x86.ActiveCfg = Release|Win32
+		{6D527625-7F4D-4057-9EE3-79DBA767D15C}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {7E92E728-FCA8-44CE-87EF-570A8FFDC8F5}
 	EndGlobalSection
 EndGlobal

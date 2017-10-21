@@ -1473,6 +1473,11 @@ UINT HTTPMain(LPVOID lvp)
 						TRACE(ss.str().c_str());
 						std::cout << ss.str().c_str();
 					}
+					if (bConsoleExists)
+					{
+						std::cout << "[                   ] Server Address: " << inet_ntoa(saServer->sin_addr) << std::endl;
+						std::cout << "[                   ] Server Port: " << ntohs(saServer->sin_port) << std::endl;
+					}
 				}
 				/* Set the socket to listen */
 				nRet = listen(ControlSocket, SOMAXCONN);
@@ -1507,38 +1512,99 @@ UINT HTTPMain(LPVOID lvp)
 bool TiVoBeaconSend(const std::string csServerBroadcast)
 {
 	bool rval = false;
-	// Create a UDP/IP datagram socket
-	SOCKET theSocket = socket(AF_INET,		// Address family
-						SOCK_DGRAM,			// Socket type
-						IPPROTO_UDP);		// Protocol
-	if (theSocket == INVALID_SOCKET)
+
+	static vector<in_addr> BroadcastAddresses;
+	if (BroadcastAddresses.empty())
 	{
-		TRACE("%s: %d\n","socket()",WSAGetLastError());
+		// Adapted from example code at http://msdn2.microsoft.com/en-us/library/aa365917.aspx
+		// Get Windows' IPv4 addresses table. Call GetIpAddrTable() multiple times in order to deal with potential race conditions properly.
+		MIB_IPADDRTABLE * ipTable = NULL;
+		{
+			ULONG bufLen = 0;
+			for (auto i = 0; i < 5; i++)
+			{
+				DWORD ipRet = GetIpAddrTable(ipTable, &bufLen, false);
+				if (ipRet == ERROR_INSUFFICIENT_BUFFER)
+				{
+					free(ipTable);  // in case we had previously allocated it
+					ipTable = (MIB_IPADDRTABLE *)malloc(bufLen);
+				}
+				else if (ipRet == NO_ERROR) break;
+				else
+				{
+					free(ipTable);
+					ipTable = NULL;
+					break;
+				}
+			}
+		}
+		if (ipTable)
+		{
+			for (auto i = 0; i < ipTable->dwNumEntries; i++)
+			{
+				const MIB_IPADDRROW & row = ipTable->table[i];
+				in_addr ipAddr, netmask, baddr;
+				ipAddr.S_un.S_addr = row.dwAddr;
+				netmask.S_un.S_addr = row.dwMask;
+				baddr.S_un.S_addr = ipAddr.S_un.S_addr & netmask.S_un.S_addr;
+				if (row.dwBCastAddr)
+					baddr.S_un.S_addr |= ~netmask.S_un.S_addr;
+				#ifdef DEBUG
+				if (bConsoleExists)
+				{
+					std::cout << "[                   ] Interface:";
+					std::cout << " address=[" << inet_ntoa(ipAddr) << "]";
+					std::cout << " netmask=[" << inet_ntoa(netmask) << "]";
+					std::cout << " broadcastAddr=[" << inet_ntoa(baddr) << "]";
+				}
+				#endif
+				std::cout << std::endl;
+				BroadcastAddresses.push_back(baddr);
+			}
+			free(ipTable);
+		}
+		if (BroadcastAddresses.empty())
+		{
+			in_addr LocalBroadcastAddress;
+			LocalBroadcastAddress.S_un.S_addr = INADDR_BROADCAST;
+			BroadcastAddresses.push_back(LocalBroadcastAddress);
+		}
 	}
-	else
+	for each (in_addr Address in BroadcastAddresses)
 	{
-		BOOL bBroadcastSocket = TRUE;
-		int nRet = setsockopt(theSocket, SOL_SOCKET, SO_BROADCAST, (const char *)&bBroadcastSocket, sizeof(bBroadcastSocket));
-		if (nRet == SOCKET_ERROR) 
-			TRACE("%s: %d\n","socket()",WSAGetLastError());
+		// Create a UDP/IP datagram socket
+		SOCKET theSocket = socket(AF_INET,		// Address family
+			SOCK_DGRAM,			// Socket type
+			IPPROTO_UDP);		// Protocol
+		if (theSocket == INVALID_SOCKET)
+		{
+			TRACE("%s: %d\n", "socket()", WSAGetLastError());
+		}
 		else
 		{
-			SOCKADDR_IN saBroadCast;
-			saBroadCast.sin_family = AF_INET;
-			saBroadCast.sin_addr.S_un.S_addr = INADDR_BROADCAST;
-			saBroadCast.sin_port = htons(2190);	// Port number
-			nRet = sendto(theSocket,			// Socket
-				csServerBroadcast.c_str(),		// Data buffer
-				csServerBroadcast.length(),		// Length of data
-				0,								// Flags
-				(LPSOCKADDR)&saBroadCast,		// Server address
-				sizeof(struct sockaddr));		// Length of address
-			if (nRet == SOCKET_ERROR) 
-				TRACE("%s: %d\n","socket()",WSAGetLastError());
+			BOOL bBroadcastSocket = TRUE;
+			int nRet = setsockopt(theSocket, SOL_SOCKET, SO_BROADCAST, (const char *)&bBroadcastSocket, sizeof(bBroadcastSocket));
+			if (nRet == SOCKET_ERROR)
+				TRACE("%s: %d\n", "socket()", WSAGetLastError());
 			else
-				rval = true;
+			{
+				SOCKADDR_IN saBroadCast;
+				saBroadCast.sin_family = AF_INET;
+				saBroadCast.sin_addr = Address;
+				saBroadCast.sin_port = htons(2190);	// Port number
+				nRet = sendto(theSocket,			// Socket
+					csServerBroadcast.c_str(),		// Data buffer
+					csServerBroadcast.length(),		// Length of data
+					0,								// Flags
+					(LPSOCKADDR)&saBroadCast,		// Server address
+					sizeof(struct sockaddr));		// Length of address
+				if (nRet == SOCKET_ERROR)
+					TRACE("%s: %d\n", "socket()", WSAGetLastError());
+				else
+					rval = true;
+			}
+			closesocket(theSocket);
 		}
-		closesocket(theSocket);
 	}
 	return(rval);
 }
@@ -1552,6 +1618,55 @@ UINT TiVoBeaconSendThread(LPVOID lvp)
 		LPCTSTR lpStrings[] = { csSubstitutionText.GetString(), NULL };
 		ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
 	}
+
+	#ifdef DEBUG
+	if (bConsoleExists)
+	{
+		// I'm going to do a quick list of interfaces and IP addresses here, then repeat this process to generate a list of broadcast addresses in the beaconsend routine
+		// Adapted from example code at http://msdn2.microsoft.com/en-us/library/aa365917.aspx
+		// Get Windows' IPv4 addresses table. Call GetIpAddrTable() multiple times in order to deal with potential race conditions properly.
+		MIB_IPADDRTABLE * ipTable = NULL;
+		{
+			ULONG bufLen = 0;
+			for (auto i = 0; i < 5; i++)
+			{
+				DWORD ipRet = GetIpAddrTable(ipTable, &bufLen, false);
+				if (ipRet == ERROR_INSUFFICIENT_BUFFER)
+				{
+					free(ipTable);  // in case we had previously allocated it
+					ipTable = (MIB_IPADDRTABLE *)malloc(bufLen);
+				}
+				else if (ipRet == NO_ERROR) break;
+				else
+				{
+					free(ipTable);
+					ipTable = NULL;
+					break;
+				}
+			}
+		}
+		if (ipTable)
+		{
+			for (auto i = 0; i < ipTable->dwNumEntries; i++)
+			{
+				std::cout << "[                   ] Interface:";
+				const MIB_IPADDRROW & row = ipTable->table[i];
+				in_addr ipAddr, netmask, baddr;
+				ipAddr.S_un.S_addr = row.dwAddr;
+				std::cout << " address=[" << inet_ntoa(ipAddr) << "]";
+				netmask.S_un.S_addr = row.dwMask;
+				std::cout << " netmask=[" << inet_ntoa(netmask) << "]";
+				baddr.S_un.S_addr = ipAddr.S_un.S_addr & netmask.S_un.S_addr;
+				if (row.dwBCastAddr)
+					baddr.S_un.S_addr |= ~netmask.S_un.S_addr;
+				std::cout << " broadcastAddr=[" << inet_ntoa(baddr) << "]";
+				std::cout << std::endl;
+			}
+			free(ipTable);
+		}
+	}
+	#endif // DEBUG
+
 	DWORD dwVersion = GetVersion();
 	int dwMajorVersion = (int)(LOBYTE(LOWORD(dwVersion)));
 	int dwMinorVersion = (int)(HIBYTE(LOWORD(dwVersion)));
@@ -1678,6 +1793,13 @@ UINT TiVoBeaconSendThread(LPVOID lvp)
 
 	do {
 		TiVoBeaconSend(myServer.WriteTXT('\n'));
+		#ifdef DEBUG
+		if (bConsoleExists)
+		{
+			//std::cout << "[                   ] " << myServer.WriteTXT(' ') << "\r";
+			std::cout << "[" << getTimeISO8601() << "] " << myServer.WriteTXT(' ') << "\r";
+		}
+		#endif // DEBUG
 	} while (WAIT_TIMEOUT == WaitForSingleObject(LocalTerminationEventHandle, 60*1000));
 	if (ApplicationLogHandle != NULL) 
 	{
@@ -1860,11 +1982,11 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 
 	HMODULE hModule = ::GetModuleHandle(NULL);
 	if (hModule == NULL)
-		std::cout << "[" << getTimeISO8601() << "] Fatal Error: GetModuleHandle failed " << ++nRetCode << endl;
+		std::cout << "[" << getTimeISO8601() << "] Fatal Error: GetModuleHandle failed " << ++nRetCode << std::endl;
 	else if (!AfxWinInit(hModule, NULL, ::GetCommandLine(), 0)) // initialize MFC and print and error on failure
-		std::cout << "[" << getTimeISO8601() << "] Fatal Error: MFC initialization failed " << ++nRetCode << endl;
+		std::cout << "[" << getTimeISO8601() << "] Fatal Error: MFC initialization failed " << ++nRetCode << std::endl;
 	else if (!AfxSocketInit())
-		std::cout << "[" << getTimeISO8601() << "] Fatal Error: Sockets initialization failed " << ++nRetCode << endl;
+		std::cout << "[" << getTimeISO8601() << "] Fatal Error: Sockets initialization failed " << ++nRetCode << std::endl;
 	else
 	{
 		SERVICE_TABLE_ENTRY serviceTable[] =
@@ -1878,16 +2000,16 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 			if (GetLastError() == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT)
 		{
 			// This error is returned if the program is being run as a console application rather than as a service. If the program will be run as a console application for debugging purposes, structure it such that service-specific code is not called when this error is returned. According to http://msdn.microsoft.com/en-us/library/windows/desktop/ms686324(v=vs.85).aspx ERROR_FAILED_SERVICE_CONTROLLER_CONNECT
-			std::cout << "[" << getTimeISO8601() << "] Running Application from the command line." << endl;
-			std::cout << "[" << getTimeISO8601() << "] Built on " << __DATE__ << " at " <<  __TIME__ << endl;
-			std::cout << "[" << getTimeISO8601() << "] Current locale setting is \"" << std::cout.getloc().name().c_str() << "\"\n";
-			std::cout << "[                   ] 1000.010 == " << 1000.010 << "\n";
+			std::cout << "[" << getTimeISO8601() << "] Running Application from the command line." << std::endl;
+			std::cout << "[" << getTimeISO8601() << "] Built on " << __DATE__ << " at " <<  __TIME__ << std::endl;
+			std::cout << "[" << getTimeISO8601() << "] Current locale setting is \"" << std::cout.getloc().name().c_str() << "\"" << std::endl;
+			std::cout << "[                   ] 1000.010 == " << 1000.010 << std::endl;
 			std::cout.imbue(std::locale(""));  // imbue global locale
 			std::wcout.imbue(std::locale(""));  // imbue global locale
 			//std::locale::global(std::locale("")); // replace the C++ global locale as well as the C locale with the user-preferred locale			
 			//std::cout.imbue(std::locale()); // use the new global locale for future wide character output
-			std::cout << "[" << getTimeISO8601() << "] Current locale setting is \"" << std::cout.getloc().name().c_str() << "\"\n";
-			std::cout << "[                   ] 1000.010 == " << 1000.010 << "\n";
+			std::cout << "[" << getTimeISO8601() << "] Current locale setting is \"" << std::cout.getloc().name().c_str() << "\"" << std::endl;
+			std::cout << "[                   ] 1000.010 == " << 1000.010 << std::endl;
 			CString Parameters(theApp.m_lpCmdLine);
 			if (argc > 1)
 				Parameters = argv[1];
@@ -2081,7 +2203,7 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 
 				ccTiVoFileListCritSec.Lock();
 				std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate);
-				std::cout << "[" << getTimeISO8601() << "] TiVoFileList Size: " << TiVoFileList.size() << endl;
+				std::cout << "[" << getTimeISO8601() << "] TiVoFileList Size: " << TiVoFileList.size() << std::endl;
 				ccTiVoFileListCritSec.Unlock();
 
 				terminateEvent_http = CreateEvent(0,TRUE,FALSE,0);
