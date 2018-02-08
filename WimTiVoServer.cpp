@@ -216,6 +216,15 @@ time_t ISO8601totime(const string & ISOTime)
 	return(timer);
 }
 /////////////////////////////////////////////////////////////////////////////
+std::wstring getwTimeISO8601(void)
+{
+	std::string isostring(getTimeISO8601());
+	std::wstring rval;
+	rval.assign(isostring.begin(), isostring.end());
+
+	return(rval);
+}
+/////////////////////////////////////////////////////////////////////////////
 CString FindEXEFromPath(const CString & csEXE)
 {
 	CString csFullPath;
@@ -1153,8 +1162,23 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
  
 					static const CString csFFMPEGPath(FindEXEFromPath(_T("ffmpeg.exe")));
 					CString csCommandLine(TiVoFileToSend.GetFFMPEGCommandLine(csFFMPEGPath));
-					std::cout << "[" << getTimeISO8601() << "] CreateProcess: ";
-					std::wcout << csCommandLine.GetString() << std::endl;
+					if (bConsoleExists)
+					{
+						std::wcout << "[" << getwTimeISO8601() << "] CreateProcess: " << csCommandLine.GetString() << std::endl;
+						// Open LogFile, write transfer details, and close it again.
+						std::wofstream m_LogFile;
+						TCHAR szLogFilePath[MAX_PATH] = _T("");
+						SHGetFolderPath(NULL, CSIDL_PERSONAL, NULL, 0, szLogFilePath);
+						CString csLogFileName(AfxGetAppName());
+						PathAppend(szLogFilePath, csLogFileName.GetString());
+						PathAddExtension(szLogFilePath, _T(".txt"));
+						m_LogFile.open(szLogFilePath, std::ios_base::out | std::ios_base::app | std::ios_base::ate);
+						if (m_LogFile.is_open())
+						{
+							m_LogFile << "[" << getwTimeISO8601() << "] CreateProcess: " << csCommandLine.GetString() << std::endl;
+							m_LogFile.close();
+						}
+					}
 					TRACE(_T("CreateProcess: %s\n"), csCommandLine.GetString());
 					if (ApplicationLogHandle != NULL) 
 					{
@@ -1163,6 +1187,7 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 						LPCTSTR lpStrings[] = { csSubstitutionText.GetString(), NULL };
 						ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
 					}
+
 					// Create the child process.
 					BOOL bSuccess = CreateProcess(NULL, 
 						(LPTSTR) csCommandLine.GetString(),     // command line 
@@ -1269,16 +1294,33 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 						CloseHandle(piProcInfo.hProcess);
 						CloseHandle(piProcInfo.hThread);
 						auto TotalSeconds = ctsTotal.GetTotalSeconds();
-						std::stringstream ss;
+						std::wstringstream ss;
 						ss.imbue(std::locale(""));
 						if (TotalSeconds > 0)
-							ss << "[" << getTimeISO8601() << "] Finished Sending File, BytesSent(" << bytessent << ")" << " Speed: " << (CurrentFileSize / TotalSeconds) << " B/s, " << CStringA(ctsTotal.Format(_T("%H:%M:%S"))).GetString() << std::endl;
+							ss << "[" << getwTimeISO8601() << "] Finished Sending File, BytesSent(" << bytessent << ")" << " Speed: " << (CurrentFileSize / TotalSeconds) << " B/s, " << CStringA(ctsTotal.Format(_T("%H:%M:%S"))).GetString() << std::endl;
 						else
-							ss << "[" << getTimeISO8601() << "] Finished Sending File, BytesSent(" << bytessent << ")" << std::endl;
+							ss << "[" << getwTimeISO8601() << "] Finished Sending File, BytesSent(" << bytessent << ")" << std::endl;
+						ss << "[                   ] PathName: " << TiVoFileToSend.GetPathName().GetString() << std::endl;
 						ss << "[                   ] ChunkCount: " << ChunkCount << " AvgChunkSize: " << (CurrentFileSize / ChunkCount) << std::endl;
 						ss << "[                   ] MaxChunkSize: " << MaxChunkSize << " MinChunkSize: " << MinChunkSize << std::endl;
-						std::cout << ss.str().c_str();
-						if (ApplicationLogHandle != NULL) 
+						if (bConsoleExists)
+						{
+							std::wcout << ss.str().c_str();
+							// Open LogFile, write transfer details, and close it again.
+							std::wofstream m_LogFile;
+							TCHAR szLogFilePath[MAX_PATH] = _T("");
+							SHGetFolderPath(NULL, CSIDL_PERSONAL, NULL, 0, szLogFilePath);
+							CString csLogFileName(AfxGetAppName());
+							PathAppend(szLogFilePath, csLogFileName.GetString());
+							PathAddExtension(szLogFilePath, _T(".txt"));
+							m_LogFile.open(szLogFilePath, std::ios_base::out | std::ios_base::app | std::ios_base::ate);
+							if (m_LogFile.is_open())
+							{
+								m_LogFile << ss.str().c_str();
+								m_LogFile.close();
+							}
+						}
+						if (ApplicationLogHandle != NULL)
 						{
 							CString csSubstitutionText(__FUNCTION__);
 							csSubstitutionText.AppendFormat(_T("\nCreateProcess: %s\n"), csCommandLine.GetString());
@@ -2000,6 +2042,7 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 			if (GetLastError() == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT)
 		{
 			// This error is returned if the program is being run as a console application rather than as a service. If the program will be run as a console application for debugging purposes, structure it such that service-specific code is not called when this error is returned. According to http://msdn.microsoft.com/en-us/library/windows/desktop/ms686324(v=vs.85).aspx ERROR_FAILED_SERVICE_CONTROLLER_CONNECT
+			bConsoleExists = true;
 			std::cout << "[" << getTimeISO8601() << "] Running Application from the command line." << std::endl;
 			std::cout << "[" << getTimeISO8601() << "] Built on " << __DATE__ << " at " <<  __TIME__ << std::endl;
 			std::cout << "[" << getTimeISO8601() << "] Current locale setting is \"" << std::cout.getloc().name().c_str() << "\"" << std::endl;
@@ -2010,6 +2053,34 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 			//std::cout.imbue(std::locale()); // use the new global locale for future wide character output
 			std::cout << "[" << getTimeISO8601() << "] Current locale setting is \"" << std::cout.getloc().name().c_str() << "\"" << std::endl;
 			std::cout << "[                   ] 1000.010 == " << 1000.010 << std::endl;
+
+			// Open LogFile, write basic program details, and close it again.
+			std::wofstream m_LogFile;
+			TCHAR szLogFilePath[MAX_PATH] = _T("");
+			SHGetFolderPath(NULL, CSIDL_PERSONAL, NULL, 0, szLogFilePath);
+			CString csLogFileName(AfxGetAppName());
+			PathAppend(szLogFilePath, csLogFileName.GetString());
+			PathAddExtension(szLogFilePath, _T(".txt"));
+			m_LogFile.open(szLogFilePath, std::ios_base::out | std::ios_base::app | std::ios_base::ate);
+			if (m_LogFile.is_open())
+			{
+				TCHAR tcHostName[256] = TEXT("");
+				DWORD dwSize = sizeof(tcHostName);
+				GetComputerNameEx(ComputerNameDnsHostname, tcHostName, &dwSize);
+				std::locale mylocale("");   // get global locale
+				m_LogFile.imbue(mylocale);  // imbue global locale
+				m_LogFile << "[" << getwTimeISO8601() << "] LogFile Opened (" << tcHostName  << ")" << std::endl;
+				TCHAR filename[1024];
+				unsigned long buffersize = sizeof(filename) / sizeof(TCHAR);
+				// Get the file name that we are running from.
+				GetModuleFileName(AfxGetResourceHandle(), filename, buffersize);
+				m_LogFile << "[                   ] Program: " << CStringA(filename).GetString() << std::endl;
+				m_LogFile << "[                   ] Version: " << CStringA(GetFileVersion(filename)).GetString() << " Built: " __DATE__ " at " __TIME__ << std::endl;
+				m_LogFile << "[                   ] Command: ";
+				for (auto index = 0; index < argc; index++) m_LogFile << QuoteFileName(argv[index]).GetString() << " "; m_LogFile << std::endl;
+				m_LogFile.close();
+			}
+
 			CString Parameters(theApp.m_lpCmdLine);
 			if (argc > 1)
 				Parameters = argv[1];
@@ -2193,7 +2264,6 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 			}
 			else
 			{			
-				bConsoleExists = true;
 				#ifdef AVCODEC_AVCODEC_H
 				av_register_all(); // FFMPEG initialization
 				#endif
