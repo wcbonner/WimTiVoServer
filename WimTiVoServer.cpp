@@ -1296,11 +1296,11 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 						auto TotalSeconds = ctsTotal.GetTotalSeconds();
 						std::wstringstream ss;
 						ss.imbue(std::locale(""));
+						ss << "[" << getwTimeISO8601() << "] Finished Sending: " << TiVoFileToSend.GetPathName().GetString() << std::endl;
 						if (TotalSeconds > 0)
-							ss << "[" << getwTimeISO8601() << "] Finished Sending File, BytesSent(" << bytessent << ")" << " Speed: " << (CurrentFileSize / TotalSeconds) << " B/s, " << CStringA(ctsTotal.Format(_T("%H:%M:%S"))).GetString() << std::endl;
+							ss << "[                   ] BytesSent: " << bytessent << " Speed: " << (CurrentFileSize / TotalSeconds) << " B/s, " << CStringA(ctsTotal.Format(_T("%H:%M:%S"))).GetString() << std::endl;
 						else
-							ss << "[" << getwTimeISO8601() << "] Finished Sending File, BytesSent(" << bytessent << ")" << std::endl;
-						ss << "[                   ] PathName: " << TiVoFileToSend.GetPathName().GetString() << std::endl;
+							ss << "[                   ] BytesSent: " << bytessent << std::endl;
 						ss << "[                   ] ChunkCount: " << ChunkCount << " AvgChunkSize: " << (CurrentFileSize / ChunkCount) << std::endl;
 						ss << "[                   ] MaxChunkSize: " << MaxChunkSize << " MinChunkSize: " << MinChunkSize << std::endl;
 						if (bConsoleExists)
