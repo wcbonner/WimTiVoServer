@@ -294,6 +294,33 @@ const CString QuoteFileName(const CString & Original)
 	return(csQuotedString);
 }
 /////////////////////////////////////////////////////////////////////////////
+const CString GetLogFileName()
+{
+	static CString csLogFileName;
+	if (csLogFileName.IsEmpty())
+	{
+		TCHAR szLogFilePath[MAX_PATH] = _T("");
+		SHGetFolderPath(NULL, CSIDL_PERSONAL, NULL, 0, szLogFilePath);
+		std::wostringstream woss;
+		woss << AfxGetAppName();
+		time_t timer;
+		time(&timer);
+		struct tm UTC;
+		if (!gmtime_s(&UTC, &timer))
+		{
+			woss << "-";
+			woss.fill('0');
+			woss << UTC.tm_year + 1900 << "-";
+			woss.width(2);
+			woss << UTC.tm_mon + 1;
+		}
+		PathAppend(szLogFilePath, woss.str().c_str());
+		PathAddExtension(szLogFilePath, _T(".txt"));
+		csLogFileName = CString(szLogFilePath);
+	}
+	return(csLogFileName);
+}
+/////////////////////////////////////////////////////////////////////////////
 void PopulateTiVoFileList(std::vector<cTiVoFile> & TiVoFileList, CCriticalSection & ccTiVoFileListCritSec, std::string FileSpec, bool Recurse = false)
 {
 	#ifdef _DEBUG
@@ -1162,23 +1189,6 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
  
 					static const CString csFFMPEGPath(FindEXEFromPath(_T("ffmpeg.exe")));
 					CString csCommandLine(TiVoFileToSend.GetFFMPEGCommandLine(csFFMPEGPath));
-					if (bConsoleExists)
-					{
-						std::wcout << "[" << getwTimeISO8601() << "] CreateProcess: " << csCommandLine.GetString() << std::endl;
-						// Open LogFile, write transfer details, and close it again.
-						std::wofstream m_LogFile;
-						TCHAR szLogFilePath[MAX_PATH] = _T("");
-						SHGetFolderPath(NULL, CSIDL_PERSONAL, NULL, 0, szLogFilePath);
-						CString csLogFileName(AfxGetAppName());
-						PathAppend(szLogFilePath, csLogFileName.GetString());
-						PathAddExtension(szLogFilePath, _T(".txt"));
-						m_LogFile.open(szLogFilePath, std::ios_base::out | std::ios_base::app | std::ios_base::ate);
-						if (m_LogFile.is_open())
-						{
-							m_LogFile << "[" << getwTimeISO8601() << "] CreateProcess: " << csCommandLine.GetString() << std::endl;
-							m_LogFile.close();
-						}
-					}
 					TRACE(_T("CreateProcess: %s\n"), csCommandLine.GetString());
 					if (ApplicationLogHandle != NULL) 
 					{
@@ -1200,6 +1210,18 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 						&siStartInfo,  // STARTUPINFO pointer 
 						&piProcInfo);  // receives PROCESS_INFORMATION 
    
+					if (bConsoleExists)
+					{
+						std::wcout << "[" << getwTimeISO8601() << "][" << piProcInfo.dwProcessId << "." << piProcInfo.dwThreadId << "] CreateProcess: " << csCommandLine.GetString() << std::endl;
+						// Open LogFile, write transfer details, and close it again.
+						std::wofstream m_LogFile(GetLogFileName().GetString(), std::ios_base::out | std::ios_base::app | std::ios_base::ate);
+						if (m_LogFile.is_open())
+						{
+							m_LogFile << "[" << getwTimeISO8601() << "][" << piProcInfo.dwProcessId << "." << piProcInfo.dwThreadId << "] CreateProcess: " << csCommandLine.GetString() << std::endl;
+							m_LogFile.close();
+						}
+					}
+
 					// If an error occurs, exit the application. 
 					if ( bSuccess ) 
 					{
@@ -1295,8 +1317,8 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 						CloseHandle(piProcInfo.hThread);
 						auto TotalSeconds = ctsTotal.GetTotalSeconds();
 						std::wstringstream ss;
+						ss << "[" << getwTimeISO8601() << "][" << piProcInfo.dwProcessId << "." << piProcInfo.dwThreadId << "] Finished Sending: " << TiVoFileToSend.GetPathName().GetString() << std::endl;
 						ss.imbue(std::locale(""));
-						ss << "[" << getwTimeISO8601() << "] Finished Sending: " << TiVoFileToSend.GetPathName().GetString() << std::endl;
 						if (TotalSeconds > 0)
 							ss << "[                   ] BytesSent: " << bytessent << " Speed: " << (CurrentFileSize / TotalSeconds) << " B/s, " << CStringA(ctsTotal.Format(_T("%H:%M:%S"))).GetString() << std::endl;
 						else
@@ -1307,13 +1329,7 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 						{
 							std::wcout << ss.str().c_str();
 							// Open LogFile, write transfer details, and close it again.
-							std::wofstream m_LogFile;
-							TCHAR szLogFilePath[MAX_PATH] = _T("");
-							SHGetFolderPath(NULL, CSIDL_PERSONAL, NULL, 0, szLogFilePath);
-							CString csLogFileName(AfxGetAppName());
-							PathAppend(szLogFilePath, csLogFileName.GetString());
-							PathAddExtension(szLogFilePath, _T(".txt"));
-							m_LogFile.open(szLogFilePath, std::ios_base::out | std::ios_base::app | std::ios_base::ate);
+							std::wofstream m_LogFile(GetLogFileName().GetString(), std::ios_base::out | std::ios_base::app | std::ios_base::ate);
 							if (m_LogFile.is_open())
 							{
 								m_LogFile << ss.str().c_str();
@@ -1519,6 +1535,15 @@ UINT HTTPMain(LPVOID lvp)
 					{
 						std::cout << "[                   ] Server Address: " << inet_ntoa(saServer->sin_addr) << std::endl;
 						std::cout << "[                   ] Server Port: " << ntohs(saServer->sin_port) << std::endl;
+						// Open LogFile, write basic program details, and close it again.
+						std::wofstream m_LogFile(GetLogFileName().GetString(), std::ios_base::out | std::ios_base::app | std::ios_base::ate);
+						if (m_LogFile.is_open())
+						{
+							m_LogFile << "[                   ] Server Address: " << inet_ntoa(saServer->sin_addr) << std::endl;
+							m_LogFile << "[                   ] Server Port: " << ntohs(saServer->sin_port) << std::endl;
+							m_LogFile << "[                   ] Server URL: http://" << inet_ntoa(saServer->sin_addr) << ":" << ntohs(saServer->sin_port) << "/TiVoConnect?Command=QueryContainer&Container=%2FTiVoNowPlaying" << std::endl;
+							m_LogFile.close();
+						}
 					}
 				}
 				/* Set the socket to listen */
@@ -2055,13 +2080,7 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 			std::cout << "[                   ] 1000.010 == " << 1000.010 << std::endl;
 
 			// Open LogFile, write basic program details, and close it again.
-			std::wofstream m_LogFile;
-			TCHAR szLogFilePath[MAX_PATH] = _T("");
-			SHGetFolderPath(NULL, CSIDL_PERSONAL, NULL, 0, szLogFilePath);
-			CString csLogFileName(AfxGetAppName());
-			PathAppend(szLogFilePath, csLogFileName.GetString());
-			PathAddExtension(szLogFilePath, _T(".txt"));
-			m_LogFile.open(szLogFilePath, std::ios_base::out | std::ios_base::app | std::ios_base::ate);
+			std::wofstream m_LogFile(GetLogFileName().GetString(), std::ios_base::out | std::ios_base::app | std::ios_base::ate);
 			if (m_LogFile.is_open())
 			{
 				TCHAR tcHostName[256] = TEXT("");
