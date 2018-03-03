@@ -278,14 +278,37 @@ CWimTiVoClientDoc::~CWimTiVoClientDoc()
 	if (!m_csTiVoFileDestination.IsEmpty()) AfxGetApp()->WriteProfileString(_T("TiVo"),_T("TiVoFileDestination"),m_csTiVoFileDestination);
 	AfxGetApp()->WriteProfileInt(_T("TiVo"), _T("LogFile"), LogFileClose());
 }
+/////////////////////////////////////////////////////////////////////////////
+const CString GetLogFileName()
+{
+	static CString csLogFileName;
+	if (csLogFileName.IsEmpty())
+	{
+		TCHAR szLogFilePath[MAX_PATH] = _T("");
+		SHGetFolderPath(NULL, CSIDL_PERSONAL, NULL, 0, szLogFilePath);
+		std::wostringstream woss;
+		woss << AfxGetAppName();
+		time_t timer;
+		time(&timer);
+		struct tm UTC;
+		if (!gmtime_s(&UTC, &timer))
+		{
+			woss << "-";
+			woss.fill('0');
+			woss << UTC.tm_year + 1900 << "-";
+			woss.width(2);
+			woss << UTC.tm_mon + 1;
+		}
+		PathAppend(szLogFilePath, woss.str().c_str());
+		PathAddExtension(szLogFilePath, _T(".txt"));
+		csLogFileName = CString(szLogFilePath);
+	}
+	return(csLogFileName);
+}
+/////////////////////////////////////////////////////////////////////////////
 bool CWimTiVoClientDoc::LogFileOpen(void)
 {
-	TCHAR szLogFilePath[MAX_PATH] = _T("");
-	SHGetFolderPath(NULL, CSIDL_PERSONAL, NULL, 0, szLogFilePath);
-	CString csLogFileName(AfxGetAppName());
-	PathAppend(szLogFilePath, csLogFileName.GetString());
-	PathAddExtension(szLogFilePath, _T(".txt"));
-	m_LogFile.open(szLogFilePath, std::ios_base::out | std::ios_base::app | std::ios_base::ate);
+	m_LogFile.open(GetLogFileName().GetString(), std::ios_base::out | std::ios_base::app | std::ios_base::ate);
 	if (m_LogFile.is_open())
 	{
 		std::locale mylocale("");   // get global locale
