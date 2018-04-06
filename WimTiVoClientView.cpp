@@ -39,6 +39,7 @@ BEGIN_MESSAGE_MAP(CWimTiVoClientView, CListView)
 	ON_COMMAND(ID_TIVO_BEACON, &CWimTiVoClientView::OnTivoBeacon)
 	ON_UPDATE_COMMAND_UI(ID_TIVO_BEACON, &CWimTiVoClientView::OnUpdateTivoBeacon)
 	ON_COMMAND(ID_TIVO_LIST, &CWimTiVoClientView::OnTivoList)
+	ON_UPDATE_COMMAND_UI(ID_TIVO_LIST, &CWimTiVoClientView::OnUpdateTivoList)
 	ON_NOTIFY_REFLECT(LVN_COLUMNCLICK, &CWimTiVoClientView::OnLvnColumnclick)
 	ON_UPDATE_COMMAND_UI(ID_TIVODECODE, &CWimTiVoClientView::OnUpdateTiVoDecode)
 	ON_COMMAND(ID_TIVODECODE, &CWimTiVoClientView::OnTiVoDecode)
@@ -379,6 +380,32 @@ void CWimTiVoClientView::OnTivoList()
 		}
 	}
 }
+
+void CWimTiVoClientView::OnUpdateTivoList(CCmdUI *pCmdUI)
+{
+	//CWimTiVoClientDoc * pDoc = GetDocument();
+	//if (pDoc)
+	//{
+	//	CMFCRibbonComboBox * TiVoList = STATIC_CAST(CMFCRibbonComboBox *) pCmdUI;
+	//	if (TiVoList)
+	//	{
+	//		pDoc->m_ccTiVoContainers.Lock();
+	//		for (auto TiVo = pDoc->m_TiVoContainers.begin(); TiVo != pDoc->m_TiVoContainers.end(); TiVo++)
+	//			TiVoList->AddItem(CString(TiVo->m_title.c_str()));
+	//		TiVoList->SelectItem(CString(pDoc->m_TiVoContainer.m_title.c_str()));
+	//		// Make sure that something is selected, in case that we didn't match anything in the list.
+	//		if (TiVoList->GetCurSel() == LB_ERR)
+	//			if (TiVoList->GetCount() > 0)
+	//				TiVoList->SelectItem(0);
+	//		pDoc->m_TiVoContainer.m_title = CStringA(TiVoList->GetItem(TiVoList->GetCurSel())).GetString();
+	//		auto pServer = std::find(pDoc->m_TiVoContainers.begin(), pDoc->m_TiVoContainers.end(), pDoc->m_TiVoContainer);
+	//		if (pServer != pDoc->m_TiVoContainers.end())
+	//			pDoc->m_TiVoContainer = *pServer;
+	//		pDoc->m_ccTiVoContainers.Unlock();
+	//	}
+	//}
+}
+
 void CWimTiVoClientView::OnLvnColumnclick(NMHDR *pNMHDR, LRESULT *pResult)
 {
 	TRACE(__FUNCTION__ "\n");
@@ -724,3 +751,4 @@ void CWimTiVoClientView::OnTivoFileLocation()
 	//myDlg.DoModal();
 	// TODO: Add your command handler code here
 }
+

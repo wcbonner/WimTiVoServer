@@ -71,6 +71,7 @@ public:
 	afx_msg void OnTransferLog();
 	afx_msg void OnUpdateTransferLog(CCmdUI *pCmdUI);
 	afx_msg void OnTivoFileLocation();
+	afx_msg void OnUpdateTivoList(CCmdUI *pCmdUI);
 };
 
 #ifndef _DEBUG  // debug version in WimTiVoClientView.cpp
