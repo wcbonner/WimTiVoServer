@@ -527,7 +527,19 @@ UINT PopulateTiVoFileList(LPVOID lvp)
 		auto TiVoFileListSizeAfter = TiVoFileList.size();
 		ss << "[" << getTimeISO8601() << "] " __FUNCTION__ " TiVoFileListSizeBefore: " << TiVoFileListSizeBefore << " TiVoFileListSizeAfter: " << TiVoFileListSizeAfter << std::endl;
 		ccTiVoFileListCritSec.Unlock();
-		std::cout << ss.str().c_str();
+		if (bConsoleExists)
+		{
+			std::cout << ss.str().c_str();
+			if (TiVoFileListSizeBefore != TiVoFileListSizeAfter)
+			{
+				std::wofstream m_LogFile(GetLogFileName().GetString(), std::ios_base::out | std::ios_base::app | std::ios_base::ate);
+				if (m_LogFile.is_open())
+				{
+					m_LogFile << ss.str().c_str();
+					m_LogFile.close();
+				}
+			}
+		}
 		TRACE(ss.str().c_str());
 		if ((ApplicationLogHandle != NULL) && (TiVoFileListSizeBefore != TiVoFileListSizeAfter))
 		{
