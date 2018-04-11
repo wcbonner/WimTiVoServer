@@ -1545,6 +1545,115 @@ UINT HTTPMain(LPVOID lvp)
 					}
 					if (bConsoleExists)
 					{
+						// Adapted from example code at http://msdn2.microsoft.com/en-us/library/aa365917.aspx
+						// Now get Windows' IPv4 addresses table.  Once again, we gotta call GetIpAddrTable()
+						// multiple times in order to deal with potential race conditions properly.
+						MIB_IPADDRTABLE * ipTable = NULL;
+						{
+							ULONG bufLen = 0;
+							for (auto i = 0; i<5; i++)
+							{
+								DWORD ipRet = GetIpAddrTable(ipTable, &bufLen, false);
+								if (ipRet == ERROR_INSUFFICIENT_BUFFER)
+								{
+									free(ipTable);  // in case we had previously allocated it
+									ipTable = (MIB_IPADDRTABLE *)malloc(bufLen);
+								}
+								else if (ipRet == NO_ERROR) break;
+								else
+								{
+									free(ipTable);
+									ipTable = NULL;
+									break;
+								}
+							}
+						}
+						if (ipTable)
+						{
+							// Try to get the Adapters-info table, so we can given useful names to the IP
+							// addresses we are returning.  Gotta call GetAdaptersInfo() up to 5 times to handle
+							// the potential race condition between the size-query call and the get-data call.
+							// I love a well-designed API :^P
+							IP_ADAPTER_INFO * pAdapterInfo = NULL;
+							{
+								ULONG bufLen = 0;
+								for (auto i = 0; i<5; i++)
+								{
+									DWORD apRet = GetAdaptersInfo(pAdapterInfo, &bufLen);
+									if (apRet == ERROR_BUFFER_OVERFLOW)
+									{
+										free(pAdapterInfo);  // in case we had previously allocated it
+										pAdapterInfo = (IP_ADAPTER_INFO *)malloc(bufLen);
+									}
+									else if (apRet == ERROR_SUCCESS) break;
+									else
+									{
+										free(pAdapterInfo);
+										pAdapterInfo = NULL;
+										break;
+									}
+								}
+							}
+							for (auto i = 0; i<ipTable->dwNumEntries; i++)
+							{
+								std::stringstream ss;
+								ss << "[                   ] Interface:";
+								const MIB_IPADDRROW & row = ipTable->table[i];
+
+								// Now lookup the appropriate adaptor-name in the pAdaptorInfos, if we can find it
+								std::string name;
+								std::string desc;
+								if (pAdapterInfo)
+								{
+									IP_ADAPTER_INFO * next = pAdapterInfo;
+									while ((next) && (name.empty()))
+									{
+										IP_ADDR_STRING * ipAddr = &next->IpAddressList;
+										while (ipAddr)
+										{
+											auto check1 = ntohl(inet_addr(ipAddr->IpAddress.String));
+											auto check2 = ntohl(row.dwAddr);
+											if (ntohl(inet_addr(ipAddr->IpAddress.String)) == ntohl(row.dwAddr))
+											{
+												name = next->AdapterName;
+												desc = next->Description;
+												break;
+											}
+											ipAddr = ipAddr->Next;
+										}
+										next = next->Next;
+									}
+								}
+								if (name.empty())
+								{
+									std::stringstream out;
+									out << "unnamed-" << i;
+									name = out.str();
+								}
+								in_addr ipAddr, netmask, baddr;
+								ipAddr.S_un.S_addr = row.dwAddr;
+								netmask.S_un.S_addr = row.dwMask;
+								baddr.S_un.S_addr = ipAddr.S_un.S_addr & netmask.S_un.S_addr;
+								if (row.dwBCastAddr)
+									baddr.S_un.S_addr |= ~netmask.S_un.S_addr;
+								ss << " address=[" << inet_ntoa(ipAddr) << "]";
+								ss << " netmask=[" << inet_ntoa(netmask) << "]";
+								ss << " broadcastAddr=[" << inet_ntoa(baddr) << "]";
+								ss << " name=[" << name << "]";
+								ss << " desc=[" << (desc.empty() ? "unavailable" : desc) << "]";
+								ss << std::endl;
+								std::cout << ss.str().c_str();
+								std::wofstream m_LogFile(GetLogFileName().GetString(), std::ios_base::out | std::ios_base::app | std::ios_base::ate);
+								if (m_LogFile.is_open())
+								{
+									m_LogFile << ss.str().c_str();
+									m_LogFile.close();
+								}
+							}
+							free(pAdapterInfo);
+							free(ipTable);
+						}
+
 						std::cout << "[                   ] Server Address: " << inet_ntoa(saServer->sin_addr) << std::endl;
 						std::cout << "[                   ] Server Port: " << ntohs(saServer->sin_port) << std::endl;
 						// Open LogFile, write basic program details, and close it again.
