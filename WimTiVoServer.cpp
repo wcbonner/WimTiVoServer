@@ -1677,17 +1677,45 @@ UINT HTTPMain(LPVOID lvp)
 				}
 				else 
 				{
+					std::queue<CWinThread *> ThreadList; // set of pointers to 
 					while (ControlSocket != INVALID_SOCKET)
 					{
 						SOCKET remoteSocket = accept(ControlSocket,NULL,NULL);
 						if (remoteSocket != INVALID_SOCKET)
-							AfxBeginThread(HTTPChild, (LPVOID)remoteSocket);
+						{
+							CWinThread * ChildThread = AfxBeginThread(HTTPChild, (LPVOID)remoteSocket, 0, CREATE_SUSPENDED);
+							ThreadList.push(ChildThread);
+							ChildThread->m_bAutoDelete = false;
+							ChildThread->ResumeThread();
+						}
+						DWORD exitcode = 0;
+						GetExitCodeThread(ThreadList.front()->m_hThread, &exitcode);
+						while (exitcode != STILL_ACTIVE)
+						{
+							delete ThreadList.front();
+							ThreadList.pop();
+							if (ThreadList.empty())
+								break;
+							else
+								GetExitCodeThread(ThreadList.front()->m_hThread, &exitcode);
+						}
+					}
+					while (!ThreadList.empty()) // this loop happens after the control socket has been closed, waiting on child threads to exit
+					{
+						DWORD exitcode = 0;
+						GetExitCodeThread(ThreadList.front()->m_hThread, &exitcode);
+						if (exitcode == STILL_ACTIVE)
+							Sleep(1); // I'm sleeping so that I'm not in a pure race condition
+						else
+						{
+							delete ThreadList.front();
+							ThreadList.pop();
+						}
 					}
 				}
 			}
 		}
 	}
-	SetEvent(LocalTerminationEventHandle);
 	if (ApplicationLogHandle != NULL) 
 	{
 		CString csSubstitutionText(__FUNCTION__);
@@ -1695,6 +1723,7 @@ UINT HTTPMain(LPVOID lvp)
 		LPCTSTR lpStrings[] = { csSubstitutionText.GetString(), NULL };
 		ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
 	}
+	SetEvent(LocalTerminationEventHandle); // this signals any waiting function that HTTPMain function is ending.
 	return(0);
 }
 bool TiVoBeaconSend(const std::string csServerBroadcast)
@@ -2426,17 +2455,17 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 						AfxBeginThread(TiVoBeaconSendThread, terminateEvent_beacon);
 						#ifdef _DEBUG
 						std::cout << "[" << getTimeISO8601() << "] Running for 30 minutes" << std::endl;
-						Sleep(90 * 60 * 1000); // Sleep 30 minutes
+						Sleep(30 * 60 * 1000); // Sleep 30 minutes
 						#else
 						std::cout << "[" << getTimeISO8601() << "] Running for 12 hours" << std::endl;
 						Sleep(12 * 60 * 60 * 1000); // Sleep 12 hours
 						#endif
 						SetEvent(terminateEvent_beacon);
 						SetEvent(terminateEvent_populate);
-						closesocket(ControlSocket);
-						ControlSocket = INVALID_SOCKET;
+						closesocket(ControlSocket);		// This is how I tell the HTTPMain function to end.
+						ControlSocket = INVALID_SOCKET;	// This is how I tell the HTTPMain function to end.
 						TRACE(__FUNCTION__ " Waiting for Thread to end\n");
-						WaitForSingleObject(terminateEvent_http,INFINITE);
+						WaitForSingleObject(terminateEvent_http,INFINITE);	// This is waiting for the HTTPMain function to end.
 						if (terminateEvent_beacon)
 							CloseHandle(terminateEvent_beacon);
 					}
