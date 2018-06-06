@@ -1660,9 +1660,10 @@ UINT HTTPMain(LPVOID lvp)
 						std::wofstream m_LogFile(GetLogFileName().GetString(), std::ios_base::out | std::ios_base::app | std::ios_base::ate);
 						if (m_LogFile.is_open())
 						{
-							m_LogFile << "[                   ] Server Address: " << inet_ntoa(saServer->sin_addr) << std::endl;
+							//m_LogFile << "[                   ] Server Address: " << inet_ntoa(saServer->sin_addr) << std::endl;
 							m_LogFile << "[                   ] Server Port: " << ntohs(saServer->sin_port) << std::endl;
-							m_LogFile << "[                   ] Server URL: http://" << inet_ntoa(saServer->sin_addr) << ":" << ntohs(saServer->sin_port) << "/TiVoConnect?Command=QueryContainer&Container=%2FTiVoNowPlaying" << std::endl;
+							//m_LogFile << "[                   ] Server URL: http://" << inet_ntoa(saServer->sin_addr) << ":" << ntohs(saServer->sin_port) << "/TiVoConnect?Command=QueryContainer&Container=%2FTiVoNowPlaying" << std::endl;
+							m_LogFile << "[                   ] Server URL: http://localhost:" << ntohs(saServer->sin_port) << "/TiVoConnect?Command=QueryContainer&Container=%2FTiVoNowPlaying" << std::endl;
 							m_LogFile.close();
 						}
 					}
@@ -1677,41 +1678,39 @@ UINT HTTPMain(LPVOID lvp)
 				}
 				else 
 				{
-					std::queue<CWinThread *> ThreadList; // set of pointers to 
+					std::queue<CWinThread *> ThreadPtrList; // set of pointers to 
 					while (ControlSocket != INVALID_SOCKET)
 					{
 						SOCKET remoteSocket = accept(ControlSocket,NULL,NULL);
 						if (remoteSocket != INVALID_SOCKET)
+#define THREADTRACKING
+#ifndef THREADTRACKING
+							AfxBeginThread(HTTPChild, (LPVOID)remoteSocket);
+#else // THREADTRACKING
 						{
-							CWinThread * ChildThread = AfxBeginThread(HTTPChild, (LPVOID)remoteSocket, 0, CREATE_SUSPENDED);
-							ThreadList.push(ChildThread);
-							ChildThread->m_bAutoDelete = false;
+							CWinThread * ChildThread = AfxBeginThread(HTTPChild, (LPVOID)remoteSocket, THREAD_PRIORITY_ABOVE_NORMAL, 0, CREATE_SUSPENDED);
+							ChildThread->m_bAutoDelete = FALSE;
+							ThreadPtrList.push(ChildThread);
+							std::wcout << "[" << getwTimeISO8601() << "] ThreadList Size: " << ThreadPtrList.size() << std::endl;
 							ChildThread->ResumeThread();
 						}
-						DWORD exitcode = 0;
-						GetExitCodeThread(ThreadList.front()->m_hThread, &exitcode);
-						while (exitcode != STILL_ACTIVE)
-						{
-							delete ThreadList.front();
-							ThreadList.pop();
-							if (ThreadList.empty())
-								break;
-							else
-								GetExitCodeThread(ThreadList.front()->m_hThread, &exitcode);
-						}
+#endif // THREADTRACKING
 					}
-					while (!ThreadList.empty()) // this loop happens after the control socket has been closed, waiting on child threads to exit
+#ifdef THREADTRACKING
+					while (!ThreadPtrList.empty()) // this loop happens after the control socket has been closed, waiting on child threads to exit
 					{
 						DWORD exitcode = 0;
-						GetExitCodeThread(ThreadList.front()->m_hThread, &exitcode);
+						GetExitCodeThread(ThreadPtrList.front()->m_hThread, &exitcode);
 						if (exitcode == STILL_ACTIVE)
 							Sleep(1); // I'm sleeping so that I'm not in a pure race condition
 						else
 						{
-							delete ThreadList.front();
-							ThreadList.pop();
+							std::wcout << "[" << getwTimeISO8601() << "] ThreadPtrList Size: " << ThreadPtrList.size() << std::endl;
+							delete ThreadPtrList.front();
+							ThreadPtrList.pop();
 						}
 					}
+#endif // THREADTRACKING
 				}
 			}
 		}
