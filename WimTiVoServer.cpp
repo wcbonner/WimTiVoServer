@@ -1292,7 +1292,17 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 													// http://msdn.microsoft.com/en-us/library/ms679351(VS.85).aspx
 										0,			// min size for buffer
 										NULL );		// 0, since getting message from system tables
-									std::cout << "\n\r[                   ] Error code: " << errCode << " " << CStringA(errString, size).Trim().GetString() << std::endl;
+									if (bConsoleExists)
+									{
+										std::cout << "\n\r[                   ] Error code: " << errCode << " " << CStringA(errString, size).Trim().GetString() << std::endl;
+										// Open LogFile, write error details, and close it again.
+										std::wofstream m_LogFile(GetLogFileName().GetString(), std::ios_base::out | std::ios_base::app | std::ios_base::ate);
+										if (m_LogFile.is_open())
+										{
+											m_LogFile << "[                   ] Error code : " << errCode << " " << CStringA(errString, size).Trim().GetString() << std::endl;
+											m_LogFile.close();
+										}
+									}
 									LocalFree(errString);	// if you don't do this, you will get an
 															// ever so slight memory leak, since we asked
 															// FormatMessage to FORMAT_MESSAGE_ALLOCATE_BUFFER,
