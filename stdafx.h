@@ -65,3 +65,4 @@
 //#pragma comment(lib, "swscale")
 
 #include "WimTiVoServerEventLog.h"
+#include "Dtwinver.h"

@@ -1900,6 +1900,17 @@ UINT TiVoBeaconSendThread(LPVOID lvp)
 	if (dwVersion < 0x80000000)              
 		dwBuild = (int)(HIWORD(dwVersion));
 
+	// Trying to use PJ Naughter's dtWinVer routines here... www.naughter.com
+	COSVersion::OS_VERSION_INFO osvi;
+	memset(&osvi, 0, sizeof(osvi));
+	COSVersion os;
+	if (os.GetVersion(&osvi))
+	{
+		dwMajorVersion = osvi.dwUnderlyingMajorVersion;
+		dwMinorVersion = osvi.dwUnderlyingMinorVersion;
+		dwBuild = osvi.dwUnderlyingBuildNumber;
+	}
+
 	TCHAR buffer[256] = TEXT("");
 	DWORD dwSize = sizeof(buffer);
 	GetComputerNameEx(ComputerNameDnsHostname, buffer, &dwSize);
