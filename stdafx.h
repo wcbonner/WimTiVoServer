@@ -41,6 +41,7 @@
 //#include <deque>
 //#include <map>
 #include <algorithm>
+#include <chrono>
 #include <signal.h>
 #include <memory> // for smart pointers
 #include <xmllite.h>

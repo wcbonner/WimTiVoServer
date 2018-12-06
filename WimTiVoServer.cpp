@@ -2496,6 +2496,7 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 					CloseHandle(terminateEvent_populate);
 			}
 			std::cout << "[" << getTimeISO8601() << "] Exiting" << std::endl;
+			//std::cout << "[" << getTimeISO8601() << "] Exiting" << ctime(std::chrono::system_clock::now()) << std::endl;
 		}
 	}
 	TRACE("%s %s Exiting\n", CStringA(CTime::GetCurrentTime().Format(_T("[%Y-%m-%dT%H:%M:%S]"))).GetString(), __FUNCTION__);
