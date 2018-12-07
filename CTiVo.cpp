@@ -243,27 +243,18 @@ void cTiVoFile::SetPathName(const CString csNewPath)
 		PopulateFromFFMPEG();
 		#endif
 		PopulateFromFFProbe();
-		TCHAR path_buffer[_MAX_PATH];
-		TCHAR drive[_MAX_DRIVE];
-		TCHAR dir[_MAX_DIR];
-		TCHAR fname[_MAX_FNAME];
-		TCHAR ext[_MAX_EXT];
-		_tsplitpath_s(m_csPathName.GetString(), drive, _MAX_DRIVE, dir, _MAX_DIR, fname, _MAX_FNAME, ext, _MAX_EXT);
-		//wcout << L"[                   ] " << setw(20) << right << L"Drive" << L" : " << drive << endl;
-		//wcout << L"[                   ] " << setw(20) << right << L"dir" << L" : " << dir << endl;
-		//wcout << L"[                   ] " << setw(20) << right << L"fname" << L" : " << fname << endl;
-		//wcout << L"[                   ] " << setw(20) << right << L"ext" << L" : " << ext << endl;
-		m_csURL = csUrlPrefix;
-		_tmakepath_s(path_buffer, _MAX_PATH, drive, dir, fname, ext);
-		m_csURL.Append(path_buffer);
-		m_csURL.Replace(_T("\\"), _T("/"));
-		// see WinHttpCreateUrl for useful info http://msdn.microsoft.com/en-us/library/windows/desktop/aa384093(v=vs.85).aspx
-		TCHAR lpszBuffer[_MAX_PATH];
-		DWORD dwBufferLength = sizeof(lpszBuffer) / sizeof(TCHAR);
-		InternetCanonicalizeUrl(m_csURL.GetString(), lpszBuffer, &dwBufferLength, 0);
-		m_csURL = CString(lpszBuffer, dwBufferLength);
+		SetURL(csNewPath);
+
 		if (m_Title.IsEmpty())
+		{
+			TCHAR path_buffer[_MAX_PATH];
+			TCHAR drive[_MAX_DRIVE];
+			TCHAR dir[_MAX_DIR];
+			TCHAR fname[_MAX_FNAME];
+			TCHAR ext[_MAX_EXT];
+			_tsplitpath_s(m_csPathName.GetString(), drive, _MAX_DRIVE, dir, _MAX_DIR, fname, _MAX_FNAME, ext, _MAX_EXT);
 			m_Title = fname;
+		}
 	}
 	m_ContentType = _T("video/x-tivo-mpeg");
 	// Final Output of object values
@@ -276,7 +267,7 @@ void cTiVoFile::SetPathName(const CString csNewPath)
 	wcout << L"[                   ] " << setw(20) << right << L"m_SourceSize" << L" : " << m_SourceSize << endl;
 	wcout << L"[                   ] " << setw(20) << right << L"m_Duration" << L" : " << m_Duration << endl;
 	wcout << L"[                   ] " << setw(20) << right << L"m_CaptureDate" << L" : " << m_CaptureDate.Format(_T("%c")).GetString() << endl;
-	wcout << L"[                   ] " << setw(20) << right << L"URL" << L" : " << m_csURL.GetString() << endl;
+	wcout << L"[                   ] " << setw(20) << right << L"URL" << L" : " << GetURL().GetString() << endl;
 }	
 void cTiVoFile::SetPathName(const CFileFind & csNewPath)
 {
@@ -300,15 +291,7 @@ void cTiVoFile::SetPathName(const CFileFind & csNewPath)
 		XMLFile.Close();
 	}
 
-	//m_csURL = csNewPath.GetFileURL();
-	m_csURL = csUrlPrefix;
-	m_csURL.Append(m_csPathName);
-	m_csURL.Replace(_T("\\"), _T("/"));
-	TCHAR lpszBuffer[_MAX_PATH];
-	DWORD dwBufferLength = sizeof(lpszBuffer) / sizeof(TCHAR);
-	InternetCanonicalizeUrl(m_csURL.GetString(), lpszBuffer, &dwBufferLength, 0);
-	m_csURL = CString(lpszBuffer, dwBufferLength);
-	m_csURL.Replace(_T(":"), _T("%3A"));
+	SetURL(csNewPath.GetFilePath());
 	if (!csNewPath.GetFileName().Right(5).CompareNoCase(_T(".tivo")))
 		m_SourceFormat = _T("video/x-tivo-mpeg");
 	else
@@ -342,7 +325,7 @@ void cTiVoFile::SetFromTiVoItem(const CString &csTitle, const CString &csEpisode
 	m_Description.Replace(_T("Copyright Tribune Media Services, Inc."), _T("")); // Hack to get rid of copyright notice in the descriptive text.
 	m_Description.Replace(_T("Copyright Rovi, Inc."), _T("")); // Hack to get rid of copyright notice in the descriptive text.
 	m_Description.Trim();
-	m_csURL = csContentURL;
+	SetURL(csContentURL);
 	m_CaptureDate = ctCaptureDate;
 	m_Duration = 1000 * ctsDuration.GetTotalSeconds();
 	m_csMAK = csMAK;
@@ -546,7 +529,7 @@ void cTiVoFile::PopulateFromFFProbe(void)
  
 				//static const CString csFFMPEGPath(FindEXEFromPath(_T("ffmpeg.exe")));
 				CString csCommandLine(QuoteFileName(csFFProbePath));
-				csCommandLine.Append(_T(" -show_streams -show_format -print_format xml "));
+				csCommandLine.Append(_T(" -hide_banner -show_streams -show_format -print_format xml "));
 				csCommandLine.Append(QuoteFileName(m_csPathName));
 
 				std::cout << "[" << getTimeISO8601() << "] CreateProcess: ";
@@ -646,8 +629,16 @@ void cTiVoFile::PopulateFromFFProbe(void)
 														std::wstringstream ss;
 														ss << cs_width.GetString();
 														ss >> width;
+														if (width > m_VideoWidth)
+															m_VideoWidth = width;
 														if (width >= 1280)
 															m_VideoHighDefinition = true;
+														int hieght = 0;
+														ss = std::wstringstream();
+														ss << cs_height.GetString();
+														ss >> hieght;
+														if (hieght > m_VideoHeight)
+															m_VideoHeight = hieght;
 														double duration = 0;
 														ss = std::wstringstream();
 														ss << cs_duration.GetString();
@@ -762,8 +753,21 @@ void cTiVoFile::PopulateFromFFProbe(void)
 }
 const CString & cTiVoFile::SetURL(const CString & csURL)
 {
+	const CString tocompare(_T("http://"));
 	CString csrVal(m_csURL);
-	m_csURL = csURL;
+	if (!tocompare.Compare(csURL.Left(tocompare.GetLength())))
+		m_csURL = csURL;
+	else
+	{
+		m_csURL = csUrlPrefix;
+		m_csURL.Append(csURL);
+		m_csURL.Replace(_T("\\"), _T("/"));
+		TCHAR lpszBuffer[_MAX_PATH];
+		DWORD dwBufferLength = sizeof(lpszBuffer) / sizeof(TCHAR);
+		InternetCanonicalizeUrl(m_csURL.GetString(), lpszBuffer, &dwBufferLength, 0);
+		m_csURL = CString(lpszBuffer, dwBufferLength);
+		m_csURL.Replace(_T(":"), _T("%3A"));
+	}
 	return(csrVal);
 }
 const CString & cTiVoFile::SetMAK(const CString & csMAK)
@@ -818,7 +822,7 @@ void cTiVoFile::GetTiVoItem(CComPtr<IXmlWriter> & pWriter) const
 			pWriter->WriteStartElement(NULL, L"Links", NULL);
 				pWriter->WriteStartElement(NULL, L"Content", NULL);
 					pWriter->WriteElementString(NULL, L"ContentType", NULL, m_ContentType.GetString());
-					pWriter->WriteElementString(NULL, L"Url", NULL, m_csURL.GetString());
+					pWriter->WriteElementString(NULL, L"Url", NULL, GetURL().GetString());
 				pWriter->WriteEndElement();
 				pWriter->WriteStartElement(NULL, L"CustomIcon", NULL);
 					pWriter->WriteElementString(NULL, L"ContentType", NULL, L"image/*");
@@ -829,7 +833,7 @@ void cTiVoFile::GetTiVoItem(CComPtr<IXmlWriter> & pWriter) const
 					pWriter->WriteElementString(NULL, L"ContentType", NULL, L"text/xml");
 					pWriter->WriteElementString(NULL, L"AcceptsParams", NULL, L"No");
 					CString DetailsURL(_T("/TiVoConnect?Command=TVBusQuery&Url="));
-					DetailsURL.Append(m_csURL);
+					DetailsURL.Append(GetURL());
 					pWriter->WriteElementString(NULL, L"Url", NULL, DetailsURL.GetString());
 				pWriter->WriteEndElement();
 			pWriter->WriteEndElement();
@@ -920,12 +924,16 @@ void cTiVoFile::GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const
 const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath) const
 {
 	CString rval(QuoteFileName(csFFMPEGPath));
-	rval.Append(_T(" -i "));
+	rval.Append(_T(" -hide_banner -i "));
 	rval.Append(QuoteFileName(m_csPathName));
 	if (m_VideoCompatible)
 		rval.Append(_T(" -vcodec copy"));
-	else 
+	else
+	{
 		rval.Append(_T(" -vcodec mpeg2video"));
+		if ((m_VideoWidth > 1920) || (m_VideoHeight > 1080))
+			rval.Append(_T(" -s 1920x1080"));
+	}
 	rval.Append(_T(" -b:v 16384k -maxrate 30000k -bufsize 4096k -ab 448k -ar 48000"));
 	if (m_AudioCompatible)
 		rval.Append(_T(" -acodec copy"));
@@ -939,12 +947,14 @@ const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath) cons
 }
 /////////////////////////////////////////////////////////////////////////////
 // Simple Sorting Routines
-bool cTiVoFileCompareDate(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_CaptureDate > b.m_CaptureDate); }
-bool cTiVoFileCompareDateReverse(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_CaptureDate < b.m_CaptureDate); }
-bool cTiVoFileComparePath(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_csPathName >b.m_csPathName); }
+bool cTiVoFileCompareDate(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_CaptureDate < b.m_CaptureDate); }
+bool cTiVoFileCompareDateReverse(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_CaptureDate > b.m_CaptureDate); }
+bool cTiVoFileComparePath(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_csPathName > b.m_csPathName); }
 bool cTiVoFileComparePathReverse(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_csPathName < b.m_csPathName); }
 bool cTiVoFileCompareSize(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_SourceSize > b.m_SourceSize); }
 bool cTiVoFileCompareSizeReverse(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_SourceSize < b.m_SourceSize); }
+bool cTiVoFileCompareTitle(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_Title < b.m_Title); }
+bool cTiVoFileCompareTitleReverse(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_Title > b.m_Title); }
 /////////////////////////////////////////////////////////////////////////////
 bool XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, const CString & csMAK, std::vector<cTiVoFile> & TiVoFileList, std::vector<CTiVoContainer> & TiVoTiVoContainers)
 {
