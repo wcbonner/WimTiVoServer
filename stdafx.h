@@ -48,6 +48,10 @@
 #pragma comment(lib, "xmllite")
 #include <iphlpapi.h>
 #pragma comment(lib, "IPHLPAPI.lib")
+#include <bcrypt.h>
+#pragma comment(lib, "bcrypt")
+#include <wincrypt.h>
+#pragma comment(lib, "crypt32.lib")
 
 // FFMPEG Libraries
 //extern "C" {

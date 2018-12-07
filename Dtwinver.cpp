@@ -48,7 +48,7 @@ History: PJN / 24-02-1997 A number of updates including support for NT 3.1,
                           13. Provided a 64 bit test binary and make batch file (make64.bat) for 
                           those lucky enough to have an Itanium processor and a beta of 64 bit Windows XP (Whistler).
                           14. Provided a Embedded C++ workspace and X86 Release binary.
-                          15. Updated copyright information           
+                          15. Updated copyright information
          PJN / 10-02-2001 1. Updated function names etc following MS decision to call Whistler "Windows XP"
          PJN / 10-10-2001 1. Added code to 32 bit code path to detect if we are being run under 64 bit Windows. Also
                           updated the sample app to distinguish between emulated 64 bit and underlying 
@@ -194,12 +194,12 @@ History: PJN / 24-02-1997 A number of updates including support for NT 3.1,
                           12. Added support for Windows Storage Server Enterprise Edition
                           13. Added support for Windows Storage Server Express Edition
                           14. Added support for Windows Storage Server Standard Edition
-                          15. Added support for Windows Storage Server Workgroup Edition     
-                          16. Added support for Windows Cluster Server Edition                     
+                          15. Added support for Windows Storage Server Workgroup Edition
+                          16. Added support for Windows Cluster Server Edition
                           17. Added support for Windows Business Server Premium Edition
          PJN / 15-12-2008 1. Added support for detecting Windows 7
          PJN / 05-07-2010 1. Updated copyright details
-                          2. Added a IsWindowsVistaOrWindowsServer2008 method        
+                          2. Added a IsWindowsVistaOrWindowsServer2008 method
                           3. Added a IsWindows7OrWindowsServer2008R2 method
                           4. Reworked the logic in all the Windows 2008 methods to use IsWindowsVistaOrWindowsServer2008 instead of 
                           IsWindowsServer2008. Thanks to Matt Fox for reporting this issue.
@@ -400,6 +400,16 @@ History: PJN / 24-02-1997 A number of updates including support for NT 3.1,
          PJN / 26-07-2018 1. Added support for PRODUCT_CLOUDEN
                           2. Provided a new IsWindows10Codename19H1 method.
                           3. Changed IsWindows10Redstone5 to IsWindows10CodenameRedstone5.
+         PJN / 23-09-2018 1. Renamed PRODUCT_LEAN define to PRODUCT_CLOUDE
+                          2. Removed defunct IsLean method
+                          3. Fixed a number of compiler warnings when using VS 2017 15.8.5
+                          4. Renamed IsWindows10Redstone5 method to IsWindows10Version1809.
+         PJN / 12-10-2018 1. Added a new IsWindowsServerVersion1809 method.
+                          2. Reimplemented the IsWindowsServerVersion1709 & IsWindowsServerVersion1803 methods to explicitly check 
+                          for these semi-annual Windows server editions
+         PJN / 14-11-2018 1. Added support for PRODUCT_IOTEDGEOS & PRODUCT_IOTENTERPRISE
+         PJN / 29-11-2018 1. Added a new IsWindowsServerCodename19H1 method.
+                          2. Added support for PRODUCT_LITE
 
 Copyright (c) 1997 - 2018 by PJ Naughter (Web: www.naughter.com, Email: pjna@naughter.com)
 
@@ -411,7 +421,7 @@ You are allowed to include the source code in any product (commercial, shareware
 when your product is released in binary form. You are allowed to modify the source code in any way you want 
 except you cannot modify the copyright details at the top of each module. If you want to distribute source 
 code with your application, then you are only allowed to distribute versions released by the author. This is 
-to maintain a single distribution point for the source code. 
+to maintain a single distribution point for the source code.
 */
 
 
@@ -1173,9 +1183,9 @@ to maintain a single distribution point for the source code.
 #define PRODUCT_ONECOREUPDATEOS 0x000000B6
 #endif //#ifndef PRODUCT_ONECOREUPDATEOS
 
-#ifndef PRODUCT_LEAN
-#define PRODUCT_LEAN 0x000000B7
-#endif //#ifndef PRODUCT_LEAN
+#ifndef PRODUCT_CLOUDE
+#define PRODUCT_CLOUDE 0x000000B7
+#endif //#ifndef PRODUCT_CLOUDE
 
 #ifndef PRODUCT_ANDROMEDA
 #define PRODUCT_ANDROMEDA 0x000000B8
@@ -1188,6 +1198,18 @@ to maintain a single distribution point for the source code.
 #ifndef PRODUCT_CLOUDEN
 #define PRODUCT_CLOUDEN 0x000000BA
 #endif //#ifndef PRODUCT_CLOUDEN
+
+#ifndef PRODUCT_IOTEDGEOS
+#define PRODUCT_IOTEDGEOS 0x000000BB
+#endif //#ifndef PRODUCT_IOTEDGEOS
+
+#ifndef PRODUCT_IOTENTERPRISE
+#define PRODUCT_IOTENTERPRISE 0x000000BC
+#endif //#ifndef PRODUCT_IOTENTERPRISE
+
+#ifndef PRODUCT_LITE
+#define PRODUCT_LITE 0x000000BD
+#endif //#ifndef PRODUCT_LITE
 
 #ifndef VER_PLATFORM_WIN32_CE
 #define VER_PLATFORM_WIN32_CE 3
@@ -1220,6 +1242,8 @@ to maintain a single distribution point for the source code.
 #pragma warning(disable: 26490)
 #pragma warning(disable: 26493)
 #pragma warning(disable: 26497)
+#pragma warning(disable: 26455)
+#pragma warning(disable: 26477)
 
 
 ////////////////////////////////// Implementation /////////////////////////////
@@ -1455,7 +1479,6 @@ _Success_(return != FALSE) BOOL COSVersion::GetProcessorType(_Inout_ LPOS_VERSIO
   {
     bSuccess = TRUE;
 
-#pragma warning(suppress: 26486)
     lpfnGetNativeSystemInfo pGetNativeSystemInfo = (lpfnGetNativeSystemInfo) GetProcAddress(hKernel32, "GetNativeSystemInfo"); 
     if (pGetNativeSystemInfo)
     {
@@ -1617,7 +1640,7 @@ _Success_(return != FALSE) BOOL COSVersion::GetVersion(_Inout_ LPOS_VERSION_INFO
 {
   //Zero out everything in the structure
   memset(lpVersionInformation, 0, sizeof(OS_VERSION_INFO));
-                
+
 #if defined(COSVERSION_CE)
   OSVERSIONINFO osvi;
   memset(&osvi, 0, sizeof(OSVERSIONINFO));
@@ -1821,6 +1844,9 @@ _Success_(return != FALSE) BOOL COSVersion::GetVersion(_Inout_ LPOS_VERSION_INFO
 
       //Get the UBR details
       GetUBRFromRegistry(lpVersionInformation);
+
+      //Get the Semi-Annual details
+      GetSemiAnnualFromRegistry(lpVersionInformation);
 
       //Get the Product Suites installed
       GetProductSuiteDetailsFromRegistry(lpVersionInformation);
@@ -2027,7 +2053,7 @@ BOOL COSVersion::GetInfoBySpawingWriteVer(COSVersion::LPOS_VERSION_INFO lpVersio
                             {
                               lpVersionInformation->UnderlyingProcessorType = (COSVersion::PROCESSOR_TYPE) atoi(pszToken);
 
-                              //CSDVersion string, UBR and ProductType are optional so consider it successful if we got as far as here
+                              //CSDVersion string, UBR and ProductType and SemiAnnual are optional so consider it successful if we got as far as here
                               bSuccess = TRUE;
 
                               pszToken = strtok(NULL, pszSeparators);
@@ -2040,7 +2066,12 @@ BOOL COSVersion::GetInfoBySpawingWriteVer(COSVersion::LPOS_VERSION_INFO lpVersio
                                   lpVersionInformation->dwUBR = atoi(pszToken);
                                   pszToken = strtok(NULL, pszSeparators);
                                   if (pszToken)
+                                  {
                                     lpVersionInformation->dwProductType = atoi(pszToken);
+                                    pszToken = strtok(NULL, pszSeparators);
+                                    if (pszToken)
+                                      lpVersionInformation->bSemiAnnual = (atoi(pszToken) != 0);
+                                  }
                                 }
                               }
                             }
@@ -2169,13 +2200,13 @@ void COSVersion::GetNTSP6aDetailsFromRegistry(_Inout_ LPOS_VERSION_INFO lpVersio
 #if !defined(COSVERSION_CE)
   if ((lpVersionInformation->dwUnderlyingMajorVersion == 4) && (lpVersionInformation->wUnderlyingServicePackMajor == 6))
   {
-    //Test for SP6 versus SP6a.
+    //Test for SP6 versus SP6a
     HKEY hKey = NULL;
 #if !defined(COSVERSION_WIN16)
     if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, _T("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Hotfix\\Q246009"), 0, KEY_QUERY_VALUE | KEY_WOW64_64KEY, &hKey) == ERROR_SUCCESS)
 #else                                  
     if (RegOpenKey(HKEY_LOCAL_MACHINE, _T("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Hotfix\\Q246009"), &hKey) == ERROR_SUCCESS)
-#endif //#if !defined(COSVERSION_WIN16)   
+#endif //#if !defined(COSVERSION_WIN16)
     {
       lpVersionInformation->wUnderlyingServicePackMinor = 1;
       if (bUpdateEmulatedAlso)
@@ -2197,7 +2228,7 @@ void COSVersion::GetXPSP1aDetailsFromRegistry(_Inout_ LPOS_VERSION_INFO lpVersio
     HKEY hKey = NULL;
 #if !defined(COSVERSION_WIN16)
     if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, _T("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion"), 0, KEY_QUERY_VALUE | KEY_WOW64_64KEY, &hKey) == ERROR_SUCCESS)
-#else                                  
+#else
     if (RegOpenKey(HKEY_LOCAL_MACHINE, _T("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion"), &hKey) == ERROR_SUCCESS)
 #endif //#if !defined(COSVERSION_WIN16)
     {
@@ -2245,6 +2276,38 @@ void COSVersion::GetUBRFromRegistry(_Inout_ LPOS_VERSION_INFO lpVersionInformati
 #else
     RegQueryValueEx(hKey, _T("UBR"), NULL, NULL, (LPBYTE)&lpVersionInformation->dwUBR, &dwBufLen);
 #endif //#if !defined(COSVERSION_WIN16)
+
+    //Don't forget to close the registry key we were using
+    RegCloseKey(hKey);
+  }
+#endif //#if !defined(COSVERSION_CE)
+}
+
+void COSVersion::GetSemiAnnualFromRegistry(_Inout_ LPOS_VERSION_INFO lpVersionInformation)
+{
+  lpVersionInformation->bSemiAnnual = FALSE;
+
+#if !defined(COSVERSION_CE)
+  HKEY hKey = NULL;
+#if (defined(COSVERSION_WIN32) || defined(COSVERSION_WIN64))
+  if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, _T("Software\\Microsoft\\Windows NT\\CurrentVersion"), 0, KEY_READ | KEY_WOW64_64KEY, &hKey) == ERROR_SUCCESS)
+#else
+  if (RegOpenKey(HKEY_LOCAL_MACHINE, _T("Software\\Microsoft\\Windows NT\\CurrentVersion"), &hKey) == ERROR_SUCCESS)
+#endif //#if (defined(COSVERSION_WIN32) || defined(COSVERSION_WIN64))
+  {
+    TCHAR sTemp[1024];
+    sTemp[0] = _T('\0');
+    DWORD dwBufLen = 1024 * sizeof(TCHAR);
+
+#if !defined(COSVERSION_WIN16)
+    if (::RegQueryValueEx(hKey, _T("EditionID"), NULL, NULL, (LPBYTE)sTemp, &dwBufLen) == ERROR_SUCCESS)
+#else
+    if (RegQueryValueEx(hKey, _T("EditionID"), NULL, NULL, (LPBYTE)sTemp, &dwBufLen) == ERROR_SUCCESS)
+#endif //#if !defined(COSVERSION_WIN16)
+    {
+      if (_tcsstr(sTemp, _T("ACor")) != NULL)
+          lpVersionInformation->bSemiAnnual = TRUE;
+    }
 
     //Don't forget to close the registry key we were using
     RegCloseKey(hKey);
@@ -3211,11 +3274,6 @@ void COSVersion::GetProductInfo(_Inout_ LPOS_VERSION_INFO lpVersionInformation)
       lpVersionInformation->dwSuiteMask2 |= COSVERSION_SUITE2_EDUCATION;
       break;
     }
-    case PRODUCT_IOTUAP:
-    {
-      lpVersionInformation->dwSuiteMask2 |= COSVERSION_SUITE2_IOT;
-      break;
-    }
     case PRODUCT_CLOUD_HOST_INFRASTRUCTURE_SERVER:
     {
       lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_CLOUD_HOST_INFRASTRUCTURE_SERVER;
@@ -3260,12 +3318,6 @@ void COSVersion::GetProductInfo(_Inout_ LPOS_VERSION_INFO lpVersionInformation)
       lpVersionInformation->dwSuiteMask |= COSVERSION_SUITE_ENTERPRISE;
       lpVersionInformation->dwSuiteMask2 |= COSVERSION_SUITE2_EVALUATION;
       lpVersionInformation->dwSuiteMask2 |= COSVERSION_SUITE2_LTSB;
-      break;
-    }
-    case PRODUCT_IOTUAPCOMMERCIAL:
-    {
-      lpVersionInformation->dwSuiteMask2 |= COSVERSION_SUITE2_IOT;
-      lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_IOTCOMMERCIAL;
       break;
     }
     case PRODUCT_MOBILE_ENTERPRISE:
@@ -3434,19 +3486,15 @@ void COSVersion::GetProductInfo(_Inout_ LPOS_VERSION_INFO lpVersionInformation)
       lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_ONECOREUPDATEOS;
       break;
     }
-    case PRODUCT_LEAN:
+    case PRODUCT_CLOUDE:
     {
-        lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_LEAN;
-        break;
+      lpVersionInformation->dwSuiteMask2 |= COSVERSION_SUITE2_E;
+      lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_S;
+      break;
     }
     case PRODUCT_ANDROMEDA:
     {
       lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_ANDROMEDA;
-      break;
-    }
-    case PRODUCT_IOTOS:
-    {
-      lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_IOTOS;
       break;
     }
     case PRODUCT_CLOUDEN:
@@ -3454,6 +3502,36 @@ void COSVersion::GetProductInfo(_Inout_ LPOS_VERSION_INFO lpVersionInformation)
       lpVersionInformation->dwSuiteMask2 |= COSVERSION_SUITE2_E;
       lpVersionInformation->dwSuiteMask |= COSVERSION_SUITE_N;
       lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_S;
+      break;
+    }
+    case PRODUCT_IOTUAP:
+    {
+      lpVersionInformation->dwSuiteMask2 |= COSVERSION_SUITE2_IOTUAP;
+      break;
+    }
+    case PRODUCT_IOTOS:
+    {
+        lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_IOTOS;
+        break;
+    }
+    case PRODUCT_IOTUAPCOMMERCIAL:
+    {
+        lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_IOTCOMMERCIAL;
+        break;
+    }
+    case PRODUCT_IOTEDGEOS:
+    {
+      lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_IOTEDGEOS;
+      break;
+    }
+    case PRODUCT_IOTENTERPRISE:
+    {
+      lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_IOTENTERPRISE;
+      break;
+    }
+    case PRODUCT_LITE:
+    {
+      lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_LITE;
       break;
     }
     default:
@@ -3743,6 +3821,9 @@ void COSVersion::_GetVersion(_In_ DWORD dwMajorVersion, _In_ DWORD dwMinorVersio
 
   //Get the UBR details
   GetUBRFromRegistry(lpVersionInformation);
+
+  //Get the Semi-Annual details
+  GetSemiAnnualFromRegistry(lpVersionInformation);
 
   //Handle the special case of the Platform Id being Win32s
   if (dwPlatformId == VER_PLATFORM_WIN32s)
@@ -4059,29 +4140,42 @@ _Success_(return != FALSE) BOOL COSVersion::IsWindows10OrWindowsServer2016(_In_ 
   if (bCheckUnderlying)
     return ((lpVersionInformation->UnderlyingPlatform == WindowsNT) &&
             ((lpVersionInformation->dwUnderlyingMajorVersion > 6) ||
-             ((lpVersionInformation->dwUnderlyingMajorVersion == 6) && lpVersionInformation->dwUnderlyingMinorVersion >= 4))) && 
+             ((lpVersionInformation->dwUnderlyingMajorVersion == 6) && lpVersionInformation->dwUnderlyingMinorVersion >= 4))) &&
             !IsWindowsServer2019(lpVersionInformation, bCheckUnderlying);
   else
     return ((lpVersionInformation->EmulatedPlatform == WindowsNT) &&
             ((lpVersionInformation->dwEmulatedMajorVersion > 6) ||
-             ((lpVersionInformation->dwEmulatedMajorVersion == 6) && lpVersionInformation->dwEmulatedMinorVersion >= 4))) && 
+             ((lpVersionInformation->dwEmulatedMajorVersion == 6) && lpVersionInformation->dwEmulatedMinorVersion >= 4))) &&
             !IsWindowsServer2019(lpVersionInformation, bCheckUnderlying);
 }
 
 _Success_(return != FALSE) BOOL COSVersion::IsWindowsServer2019(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
 {
-    if (bCheckUnderlying)
-        return ((lpVersionInformation->UnderlyingPlatform == WindowsNT) &&
-                ((lpVersionInformation->dwUnderlyingMajorVersion > 6) ||
-                 ((lpVersionInformation->dwUnderlyingMajorVersion == 6) && lpVersionInformation->dwUnderlyingMinorVersion >= 4)) &&
-                (lpVersionInformation->dwUnderlyingBuildNumber >= 17600) &&
-                ((lpVersionInformation->OSType == Server) || ((lpVersionInformation->OSType == DomainController))));
-    else
-        return ((lpVersionInformation->EmulatedPlatform == WindowsNT) &&
-                ((lpVersionInformation->dwEmulatedMajorVersion > 6) ||
-                 ((lpVersionInformation->dwEmulatedMajorVersion == 6) && lpVersionInformation->dwEmulatedMinorVersion >= 4)) &&
-                (lpVersionInformation->dwUnderlyingBuildNumber >= 17600) && 
-                ((lpVersionInformation->OSType == Server) || ((lpVersionInformation->OSType == DomainController))));
+  if (bCheckUnderlying)
+    return ((lpVersionInformation->UnderlyingPlatform == WindowsNT) &&
+            ((lpVersionInformation->dwUnderlyingMajorVersion > 6) ||
+            ((lpVersionInformation->dwUnderlyingMajorVersion == 6) && lpVersionInformation->dwUnderlyingMinorVersion >= 4)) &&
+            (lpVersionInformation->dwUnderlyingBuildNumber >= 17600) &&
+            ((lpVersionInformation->OSType == Server) || ((lpVersionInformation->OSType == DomainController))));
+  else
+    return ((lpVersionInformation->EmulatedPlatform == WindowsNT) &&
+            ((lpVersionInformation->dwEmulatedMajorVersion > 6) ||
+            ((lpVersionInformation->dwEmulatedMajorVersion == 6) && lpVersionInformation->dwEmulatedMinorVersion >= 4)) &&
+            (lpVersionInformation->dwUnderlyingBuildNumber >= 17600) && 
+            ((lpVersionInformation->OSType == Server) || ((lpVersionInformation->OSType == DomainController))));
+}
+
+_Success_(return != FALSE) BOOL COSVersion::IsWindowsServerVersion1809(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
+{
+  return IsWindowsServer2019(lpVersionInformation, bCheckUnderlying) && lpVersionInformation->bSemiAnnual;
+}
+
+_Success_(return != FALSE) BOOL COSVersion::IsWindowsServerCodename19H1(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
+{
+  if (bCheckUnderlying)
+    return IsWindowsServer2019(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber >= 18204);
+  else
+    return IsWindowsServer2019(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber >= 18204);
 }
 
 _Success_(return != FALSE) BOOL COSVersion::IsWindows10(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
@@ -4137,7 +4231,7 @@ _Success_(return != FALSE) BOOL COSVersion::IsWindows10Version1803(_In_ LPCOS_VE
     return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber > 16299) && (lpVersionInformation->dwEmulatedBuildNumber < 17600);
 }
 
-_Success_(return != FALSE) BOOL COSVersion::IsWindows10CodenameRedstone5(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
+_Success_(return != FALSE) BOOL COSVersion::IsWindows10Version1809(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
 {
   if (bCheckUnderlying)
     return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber >= 17600) && (lpVersionInformation->dwUnderlyingBuildNumber < 18204);
@@ -4542,17 +4636,17 @@ _Success_(return != FALSE) BOOL COSVersion::IsWindowsServer2016(_In_ LPCOS_VERSI
 _Success_(return != FALSE) BOOL COSVersion::IsWindowsServerVersion1709(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
 {
   if (bCheckUnderlying)
-    return IsWindowsServer2016(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber > 14393) && (lpVersionInformation->dwUnderlyingBuildNumber <= 16299);
+    return IsWindowsServer2016(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber > 14393) && (lpVersionInformation->dwUnderlyingBuildNumber <= 16299) && lpVersionInformation->bSemiAnnual;
   else
-    return IsWindowsServer2016(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber > 14393) && (lpVersionInformation->dwEmulatedBuildNumber <= 16299);
+    return IsWindowsServer2016(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber > 14393) && (lpVersionInformation->dwEmulatedBuildNumber <= 16299) && lpVersionInformation->bSemiAnnual;
 }
 
 _Success_(return != FALSE) BOOL COSVersion::IsWindowsServerVersion1803(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
 {
   if (bCheckUnderlying)
-    return IsWindowsServer2016(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber > 16299) && (lpVersionInformation->dwUnderlyingBuildNumber < 17600);
+    return IsWindowsServer2016(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber > 16299) && (lpVersionInformation->dwUnderlyingBuildNumber < 17600) && lpVersionInformation->bSemiAnnual;
   else
-    return IsWindowsServer2016(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber > 16299) && (lpVersionInformation->dwEmulatedBuildNumber < 17600);
+    return IsWindowsServer2016(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber > 16299) && (lpVersionInformation->dwEmulatedBuildNumber < 17600) && lpVersionInformation->bSemiAnnual;
 }
 
 _Success_(return != FALSE) BOOL COSVersion::IsEnterpriseWindowsServer2016(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
@@ -4860,11 +4954,6 @@ _Success_(return != FALSE) BOOL COSVersion::IsMobile(_In_ LPCOS_VERSION_INFO lpV
   return ((lpVersionInformation->dwSuiteMask2 & COSVERSION_SUITE2_MOBILE) != 0);
 }
 
-_Success_(return != FALSE) BOOL COSVersion::IsIoT(_In_ LPCOS_VERSION_INFO lpVersionInformation)
-{
-  return ((lpVersionInformation->dwSuiteMask2 & COSVERSION_SUITE2_IOT) != 0);
-}
-
 _Success_(return != FALSE) BOOL COSVersion::IsCloudHostInfrastructureServer(_In_ LPCOS_VERSION_INFO lpVersionInformation)
 {
   return ((lpVersionInformation->dwSuiteMask3 & COSVERSION_SUITE3_CLOUD_HOST_INFRASTRUCTURE_SERVER) != 0);
@@ -4930,11 +5019,6 @@ _Success_(return != FALSE) BOOL COSVersion::IsAzure(_In_ LPCOS_VERSION_INFO lpVe
   return ((lpVersionInformation->dwSuiteMask3 & COSVERSION_SUITE3_AZURE) != 0);
 }
 
-_Success_(return != FALSE) BOOL COSVersion::IsIoTCommercial(_In_ LPCOS_VERSION_INFO lpVersionInformation)
-{
-  return ((lpVersionInformation->dwSuiteMask3 & COSVERSION_SUITE3_IOTCOMMERCIAL) != 0);
-}
-
 _Success_(return != FALSE) BOOL COSVersion::IsSEdition(_In_ LPCOS_VERSION_INFO lpVersionInformation)
 {
   return ((lpVersionInformation->dwSuiteMask3 & COSVERSION_SUITE3_S) != 0);
@@ -4960,11 +5044,6 @@ _Success_(return != FALSE) BOOL COSVersion::IsOneCoreUpdateOS(_In_ LPCOS_VERSION
   return ((lpVersionInformation->dwSuiteMask3 & COSVERSION_SUITE3_ONECOREUPDATEOS) != 0);
 }
 
-_Success_(return != FALSE) BOOL COSVersion::IsLean(_In_ LPCOS_VERSION_INFO lpVersionInformation)
-{
-  return ((lpVersionInformation->dwSuiteMask3 & COSVERSION_SUITE3_LEAN) != 0);
-}
-
 _Success_(return != FALSE) BOOL COSVersion::IsAndromeda(_In_ LPCOS_VERSION_INFO lpVersionInformation)
 {
   return ((lpVersionInformation->dwSuiteMask3 & COSVERSION_SUITE3_ANDROMEDA) != 0);
@@ -4975,9 +5054,34 @@ _Success_(return != FALSE) BOOL COSVersion::IsCommunicationsServer(_In_ LPCOS_VE
   return ((lpVersionInformation->dwSuiteMask3 & COSVERSION_SUITE3_COMMUNICATIONS_SERVER) != 0);
 }
 
-_Success_(return != FALSE) BOOL COSVersion::IsIOTOS(_In_ LPCOS_VERSION_INFO lpVersionInformation)
+_Success_(return != FALSE) BOOL COSVersion::IsIoTCore(_In_ LPCOS_VERSION_INFO lpVersionInformation)
+{
+  return ((lpVersionInformation->dwSuiteMask2 & COSVERSION_SUITE2_IOTUAP) != 0);
+}
+
+_Success_(return != FALSE) BOOL COSVersion::IsIoTCommercial(_In_ LPCOS_VERSION_INFO lpVersionInformation)
+{
+  return ((lpVersionInformation->dwSuiteMask3 & COSVERSION_SUITE3_IOTCOMMERCIAL) != 0);
+}
+
+_Success_(return != FALSE) BOOL COSVersion::IsIoTOS(_In_ LPCOS_VERSION_INFO lpVersionInformation)
 {
   return ((lpVersionInformation->dwSuiteMask3 & COSVERSION_SUITE3_IOTOS) != 0);
+}
+
+_Success_(return != FALSE) BOOL COSVersion::IsIoTEdgeOS(_In_ LPCOS_VERSION_INFO lpVersionInformation)
+{
+  return ((lpVersionInformation->dwSuiteMask3 & COSVERSION_SUITE3_IOTEDGEOS) != 0);
+}
+
+_Success_(return != FALSE) BOOL COSVersion::IsIoTEnterprise(_In_ LPCOS_VERSION_INFO lpVersionInformation)
+{
+  return ((lpVersionInformation->dwSuiteMask3 & COSVERSION_SUITE3_IOTENTERPRISE) != 0);
+}
+
+_Success_(return != FALSE) BOOL COSVersion::IsLite(_In_ LPCOS_VERSION_INFO lpVersionInformation)
+{
+  return ((lpVersionInformation->dwSuiteMask3 & COSVERSION_SUITE3_LITE) != 0);
 }
 
 _Success_(return != FALSE) BOOL COSVersion::Is64Bit(_In_ LPCOS_VERSION_INFO /*lpVersionInformation*/, _In_ BOOL bCheckUnderlying)
@@ -5065,7 +5169,6 @@ _Success_(return != FALSE) BOOL COSVersion::GetVersion(_Out_ DWORD& dwVersion)
 _Success_(return != FALSE) BOOL COSVersion::GetVersionEx(_Inout_ LPOSVERSIONINFO lpVersionInfo)
 {
   //Delegate to the other version
-#pragma warning(suppress: 6385)
   return GetVersionEx((LPOSVERSIONINFOEX)lpVersionInfo);
 }
 

@@ -775,7 +775,11 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 				pWriter->WriteEndElement();
 				while ((pItem != TiVoFileList.end()) && (iItemCount > 0))
 				{
+					#ifdef DEBUG
+					std::wcout << L"[                   ] Item: " << pItem->GetURL().GetString() << L" " << pItem->GetPathName().GetString() << L" Duration: " << pItem->GetDuration() << std::endl;
+					#else
 					std::wcout << L"[                   ] Item: " << pItem->GetPathName().GetString() << L" Duration: " << pItem->GetDuration() << std::endl;
+					#endif // DEBUG
 					if (pItem->GetDuration() > 1000) // This might not work for .TiVo files, needs further checking
 					{
 						pItem->GetTiVoItem(pWriter);
@@ -786,7 +790,7 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 				ccTiVoFileListCritSec.Unlock();
 			}
 			pWriter->WriteEndElement();	// TiVoContainer
-		pWriter->WriteComment(L" Copyright © 2013 William C Bonner ");
+		pWriter->WriteComment(L" Copyright © 2018 William C Bonner ");
 		pWriter->WriteEndDocument();
 		pWriter->Flush();
 

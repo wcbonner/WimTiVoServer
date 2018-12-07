@@ -40,7 +40,7 @@ to maintain a single distribution point for the source code.
   #endif
 #endif
 
-#if defined(COSVERSION_DOS) || defined(COSVERSION_WIN16)  
+#if defined(COSVERSION_DOS) || defined(COSVERSION_WIN16)
   #define COSVERSION_WIN16_OR_DOS 1
 #endif
 
@@ -124,7 +124,7 @@ to maintain a single distribution point for the source code.
 #define COSVERSION_SUITE2_CORE                                0x04000000
 #define COSVERSION_SUITE2_STUDENT                             0x08000000
 #define COSVERSION_SUITE2_MOBILE                              0x10000000
-#define COSVERSION_SUITE2_IOT                                 0x20000000
+#define COSVERSION_SUITE2_IOTUAP                              0x20000000
 #define COSVERSION_SUITE2_LTSB                                0x40000000
 #define COSVERSION_SUITE2_NANO_SERVER                         0x80000000
 
@@ -148,8 +148,10 @@ to maintain a single distribution point for the source code.
 #define COSVERSION_SUITE3_RESTRICTED                          0x00020000
 #define COSVERSION_SUITE3_ONECOREUPDATEOS                     0x00040000
 #define COSVERSION_SUITE3_ANDROMEDA                           0x00080000
-#define COSVERSION_SUITE3_LEAN                                0x00100000
 #define COSVERSION_SUITE3_IOTOS                               0x00200000
+#define COSVERSION_SUITE3_IOTEDGEOS                           0x00400000
+#define COSVERSION_SUITE3_IOTENTERPRISE                       0x00800000
+#define COSVERSION_SUITE3_LITE                                0x01000000
 
 #ifndef _Success_
 #define _Success_(expr)
@@ -260,6 +262,7 @@ public:
     OS_TYPE        OSType;                      //The basic OS type
     DWORD          dwUBR;                       //"Updated Build Revision" value. Only applicable for Windows 10 / Server 2016+
     DWORD          dwProductType;               //The value as returned from GetProductInfo
+    BOOL           bSemiAnnual;                 //Is this version of Windows from a Semi-annual server release
 
   #if defined(COSVERSION_CE)
     TCHAR szOEMInfo[256];
@@ -339,7 +342,7 @@ public:
   _Success_(return != FALSE) BOOL IsWindows10Version1703(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
   _Success_(return != FALSE) BOOL IsWindows10Version1709(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
   _Success_(return != FALSE) BOOL IsWindows10Version1803(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
-  _Success_(return != FALSE) BOOL IsWindows10CodenameRedstone5(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
+  _Success_(return != FALSE) BOOL IsWindows10Version1809(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
   _Success_(return != FALSE) BOOL IsWindows10Codename19H1(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
 
   _Success_(return != FALSE) BOOL IsWebWindowsServer2003(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
@@ -386,6 +389,8 @@ public:
   _Success_(return != FALSE) BOOL IsDomainControllerWindowsServer2016(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
   _Success_(return != FALSE) BOOL IsWindowsServerVersion1709(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
   _Success_(return != FALSE) BOOL IsWindowsServerVersion1803(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
+  _Success_(return != FALSE) BOOL IsWindowsServerVersion1809(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
+  _Success_(return != FALSE) BOOL IsWindowsServerCodename19H1(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
 
   _Success_(return != FALSE) BOOL IsWebWindowsServer2019(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
   _Success_(return != FALSE) BOOL IsStandardWindowsServer2019(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
@@ -462,7 +467,6 @@ public:
   _Success_(return != FALSE) BOOL IsCore(_In_ LPCOS_VERSION_INFO lpVersionInformation);
   _Success_(return != FALSE) BOOL IsStudent(_In_ LPCOS_VERSION_INFO lpVersionInformation);
   _Success_(return != FALSE) BOOL IsMobile(_In_ LPCOS_VERSION_INFO lpVersionInformation);
-  _Success_(return != FALSE) BOOL IsIoT(_In_ LPCOS_VERSION_INFO lpVersionInformation);
   _Success_(return != FALSE) BOOL IsCloudHostInfrastructureServer(_In_ LPCOS_VERSION_INFO lpVersionInformation);
   _Success_(return != FALSE) BOOL IsLTSB(_In_ LPCOS_VERSION_INFO lpVersionInformation);
   _Success_(return != FALSE) BOOL IsNanoServer(_In_ LPCOS_VERSION_INFO lpVersionInformation);
@@ -476,16 +480,19 @@ public:
   _Success_(return != FALSE) BOOL IsUtilityVM(_In_ LPCOS_VERSION_INFO lpVersionInformation);
   _Success_(return != FALSE) BOOL IsProWorkstations(_In_ LPCOS_VERSION_INFO lpVersionInformation);
   _Success_(return != FALSE) BOOL IsAzure(_In_ LPCOS_VERSION_INFO lpVersionInformation);
-  _Success_(return != FALSE) BOOL IsIoTCommercial(_In_ LPCOS_VERSION_INFO lpVersionInformation);
   _Success_(return != FALSE) BOOL IsSEdition(_In_ LPCOS_VERSION_INFO lpVersionInformation);
   _Success_(return != FALSE) BOOL IsEnterpriseG(_In_ LPCOS_VERSION_INFO lpVersionInformation);
   _Success_(return != FALSE) BOOL IsServerRDSH(_In_ LPCOS_VERSION_INFO lpVersionInformation);
   _Success_(return != FALSE) BOOL IsHubOS(_In_ LPCOS_VERSION_INFO lpVersionInformation);
   _Success_(return != FALSE) BOOL IsCommunicationsServer(_In_ LPCOS_VERSION_INFO lpVersionInformation);
   _Success_(return != FALSE) BOOL IsOneCoreUpdateOS(_In_ LPCOS_VERSION_INFO lpVersionInformation);
-  _Success_(return != FALSE) BOOL IsLean(_In_ LPCOS_VERSION_INFO lpVersionInformation);
   _Success_(return != FALSE) BOOL IsAndromeda(_In_ LPCOS_VERSION_INFO lpVersionInformation);
-  _Success_(return != FALSE) BOOL IsIOTOS(_In_ LPCOS_VERSION_INFO lpVersionInformation);
+  _Success_(return != FALSE) BOOL IsIoTCore(_In_ LPCOS_VERSION_INFO lpVersionInformation);
+  _Success_(return != FALSE) BOOL IsIoTCommercial(_In_ LPCOS_VERSION_INFO lpVersionInformation);
+  _Success_(return != FALSE) BOOL IsIoTOS(_In_ LPCOS_VERSION_INFO lpVersionInformation);
+  _Success_(return != FALSE) BOOL IsIoTEdgeOS(_In_ LPCOS_VERSION_INFO lpVersionInformation);
+  _Success_(return != FALSE) BOOL IsIoTEnterprise(_In_ LPCOS_VERSION_INFO lpVersionInformation);
+  _Success_(return != FALSE) BOOL IsLite(_In_ LPCOS_VERSION_INFO lpVersionInformation);
 
 protected:
 //Defines / typedefs
@@ -504,6 +511,7 @@ protected:
   #define _tcsupr                  strupr
   #define _tcsstr                  strstr
   #define _stscanf                 sscanf
+  #define _tcsstr                  strstr
   #define LPCTSTR                  LPCSTR
   #define ERROR_CALL_NOT_IMPLEMENTED  120
   #define REG_DWORD                ( 4 )
@@ -641,6 +649,7 @@ protected:
   void GetNTSP6aDetailsFromRegistry(_Inout_ LPOS_VERSION_INFO lpVersionInformation, _In_ BOOL bUpdateEmulatedAlso);
   void GetXPSP1aDetailsFromRegistry(_Inout_ LPOS_VERSION_INFO lpVersionInformation, _In_ BOOL bUpdateEmulatedAlso);
   void GetUBRFromRegistry(_Inout_ LPOS_VERSION_INFO lpVersionInformation);
+  void GetSemiAnnualFromRegistry(_Inout_ LPOS_VERSION_INFO lpVersionInformation);
   OS_TYPE GetNTOSTypeFromRegistry();
   OS_TYPE GetNTOSTypeFromRegistry(_In_ HKEY hKeyProductOptions);
   void GetNTOSTypeFromRegistry(_Inout_ LPOS_VERSION_INFO lpVersionInformation, _In_ BOOL bOnlyUpdateDCDetails);
