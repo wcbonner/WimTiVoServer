@@ -1010,12 +1010,12 @@ const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath) cons
 // Simple Sorting Routines
 bool cTiVoFileCompareDate(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_CaptureDate < b.m_CaptureDate); }
 bool cTiVoFileCompareDateReverse(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_CaptureDate > b.m_CaptureDate); }
-bool cTiVoFileComparePath(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_csPathName > b.m_csPathName); }
-bool cTiVoFileComparePathReverse(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_csPathName < b.m_csPathName); }
+bool cTiVoFileComparePath(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_csPathName.CompareNoCase(b.m_csPathName) > 0); }
+bool cTiVoFileComparePathReverse(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_csPathName.CompareNoCase(b.m_csPathName) < 0); }
 bool cTiVoFileCompareSize(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_SourceSize > b.m_SourceSize); }
 bool cTiVoFileCompareSizeReverse(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_SourceSize < b.m_SourceSize); }
-bool cTiVoFileCompareTitle(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_Title < b.m_Title); }
-bool cTiVoFileCompareTitleReverse(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_Title > b.m_Title); }
+bool cTiVoFileCompareTitle(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_Title.CompareNoCase(b.m_Title) < 0); }
+bool cTiVoFileCompareTitleReverse(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_Title.CompareNoCase(b.m_Title) > 0); }
 /////////////////////////////////////////////////////////////////////////////
 bool XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, const CString & csMAK, std::vector<cTiVoFile> & TiVoFileList, std::vector<CTiVoContainer> & TiVoTiVoContainers)
 {
