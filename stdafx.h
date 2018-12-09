@@ -57,3 +57,7 @@
 #include <xmllite.h>
 #pragma comment(lib, "xmllite")
 #include "CTiVo.h"
+#include <bcrypt.h>
+#pragma comment(lib, "bcrypt")
+#include <wincrypt.h>
+#pragma comment(lib, "crypt32.lib")

@@ -751,6 +751,9 @@ void cTiVoFile::PopulateFromFFProbe(void)
 		}
 	}
 }
+#define NT_SUCCESS(Status)          (((NTSTATUS)(Status)) >= 0)
+#define STATUS_UNSUCCESSFUL         ((NTSTATUS)0xC0000001L)
+static const BYTE rgbMsg[] = { 0x61, 0x62, 0x63 }; 
 const CString & cTiVoFile::SetURL(const CString & csURL)
 {
 	const CString tocompare(_T("http://"));
@@ -767,6 +770,64 @@ const CString & cTiVoFile::SetURL(const CString & csURL)
 		InternetCanonicalizeUrl(m_csURL.GetString(), lpszBuffer, &dwBufferLength, 0);
 		m_csURL = CString(lpszBuffer, dwBufferLength);
 		m_csURL.Replace(_T(":"), _T("%3A"));
+
+		// https://docs.microsoft.com/en-us/windows/desktop/SecCNG/creating-a-hash-with-cng
+		//open an algorithm handle
+		BCRYPT_ALG_HANDLE hAlg = NULL;
+		NTSTATUS status = STATUS_UNSUCCESSFUL;
+		if (NT_SUCCESS(status = BCryptOpenAlgorithmProvider(&hAlg, BCRYPT_SHA256_ALGORITHM, NULL, 0)))
+		{
+			//calculate the size of the buffer to hold the hash object
+			DWORD cbData = 0;
+			DWORD cbHashObject = 0;
+			if (NT_SUCCESS(status = BCryptGetProperty(hAlg, BCRYPT_OBJECT_LENGTH, (PBYTE)&cbHashObject, sizeof(DWORD), &cbData, 0)))
+			{
+				//allocate the hash object on the heap
+				PBYTE pbHashObject = (PBYTE)HeapAlloc(GetProcessHeap(), 0, cbHashObject);
+				if (NULL != pbHashObject)
+				{
+					//calculate the length of the hash
+					DWORD cbHash = 0;
+					if (NT_SUCCESS(status = BCryptGetProperty(hAlg, BCRYPT_HASH_LENGTH, (PBYTE)&cbHash, sizeof(DWORD), &cbData, 0)))
+					{
+						//allocate the hash buffer on the heap
+						PBYTE pbHash = (PBYTE)HeapAlloc(GetProcessHeap(), 0, cbHash);
+						if (NULL != pbHash)
+						{
+							//create a hash
+							BCRYPT_HASH_HANDLE hHash = NULL;
+							if (NT_SUCCESS(status = BCryptCreateHash(hAlg, &hHash, pbHashObject, cbHashObject, NULL, 0, 0)))
+							{
+								//hash some data
+								//if (NT_SUCCESS(status = BCryptHashData(hHash, (PBYTE)rgbMsg, sizeof(rgbMsg), 0)))
+								if (NT_SUCCESS(status = BCryptHashData(hHash, (PBYTE)csURL.GetString(), csURL.GetLength()*sizeof(TCHAR), 0)))
+								{
+									//close the hash
+									if (NT_SUCCESS(status = BCryptFinishHash(hHash, pbHash, cbHash, 0)))
+									{
+										dwBufferLength = sizeof(lpszBuffer) / sizeof(TCHAR);
+										if (CryptBinaryToStringW(pbHash, cbHash, CRYPT_STRING_HEX | CRYPT_STRING_NOCRLF, lpszBuffer, &dwBufferLength))
+										{
+											m_csURL = csUrlPrefix;
+											m_csURL.Append(CString(lpszBuffer, dwBufferLength));
+											m_csURL.Replace(_T(" "), _T(""));
+										}
+									}
+								}
+							}
+							if (hHash)
+								BCryptDestroyHash(hHash);
+						}
+						if (pbHash)
+							HeapFree(GetProcessHeap(), 0, pbHash);
+					}
+				}
+				if (pbHashObject)
+					HeapFree(GetProcessHeap(), 0, pbHashObject);
+			}
+		}
+		if (hAlg)
+			BCryptCloseAlgorithmProvider(hAlg, 0);
 	}
 	return(csrVal);
 }
@@ -949,12 +1010,12 @@ const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath) cons
 // Simple Sorting Routines
 bool cTiVoFileCompareDate(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_CaptureDate < b.m_CaptureDate); }
 bool cTiVoFileCompareDateReverse(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_CaptureDate > b.m_CaptureDate); }
-bool cTiVoFileComparePath(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_csPathName > b.m_csPathName); }
-bool cTiVoFileComparePathReverse(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_csPathName < b.m_csPathName); }
+bool cTiVoFileComparePath(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_csPathName.CompareNoCase(b.m_csPathName) > 0); }
+bool cTiVoFileComparePathReverse(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_csPathName.CompareNoCase(b.m_csPathName) < 0); }
 bool cTiVoFileCompareSize(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_SourceSize > b.m_SourceSize); }
 bool cTiVoFileCompareSizeReverse(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_SourceSize < b.m_SourceSize); }
-bool cTiVoFileCompareTitle(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_Title < b.m_Title); }
-bool cTiVoFileCompareTitleReverse(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_Title > b.m_Title); }
+bool cTiVoFileCompareTitle(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_Title.CompareNoCase(b.m_Title) < 0); }
+bool cTiVoFileCompareTitleReverse(const cTiVoFile & a, const cTiVoFile & b) { return(a.m_Title.CompareNoCase(b.m_Title) > 0); }
 /////////////////////////////////////////////////////////////////////////////
 bool XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, const CString & csMAK, std::vector<cTiVoFile> & TiVoFileList, std::vector<CTiVoContainer> & TiVoTiVoContainers)
 {

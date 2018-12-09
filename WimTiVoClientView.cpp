@@ -304,7 +304,7 @@ void CWimTiVoClientView::OnTiviNowplaying()
 		}
 
 		if (pDoc->m_LogFile.is_open())
-			pDoc->m_LogFile << "[                   ] TiVoNowPlaying Details: Total Time: " << CStringA(pDoc->m_TiVoTotalTime.Format(_T("%D Days, %H:%M:%S"))).GetString() << " Total Size: " << pDoc->m_TiVoTotalSize << " ContainerCount: " << pDoc->m_TiVoContainers.size() << std::endl;
+			pDoc->m_LogFile << "[                   ] TiVoNowPlaying Details: Total Time: " << CStringA(pDoc->m_TiVoTotalTime.Format(_T("%D Days, %H:%M:%S"))).GetString() << " Total Size: " << pDoc->m_TiVoTotalSize << " ContainerCount: " << pDoc->m_TiVoContainers.size() << " FileCount: " << pDoc->m_TiVoFiles .size() << std::endl;
 			//pDoc->m_LogFile << "[" << getTimeISO8601() << "] TiVoNowPlaying Details: Total Time: " << CStringA(pDoc->m_TiVoTotalTime.Format(_T("%D Days, %H:%M:%S"))).GetString() << " Total Size: " << pDoc->m_TiVoTotalSize << " ContainerCount: " << pDoc->m_TiVoContainers.size() << std::endl;
 		pDoc->UpdateAllViews(NULL);
 	}
