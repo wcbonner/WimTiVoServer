@@ -996,6 +996,7 @@ const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath) cons
 			rval.Append(_T(" -s 1920x1080"));
 	}
 	rval.Append(_T(" -b:v 16384k -maxrate 30000k -bufsize 4096k -ab 448k -ar 48000"));
+	rval.Append(_T(" -map_metadata -1"));
 	if (m_AudioCompatible)
 		rval.Append(_T(" -acodec copy"));
 	else
