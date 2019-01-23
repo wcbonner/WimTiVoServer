@@ -1226,6 +1226,7 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 						&siStartInfo,  // STARTUPINFO pointer 
 						&piProcInfo);  // receives PROCESS_INFORMATION 
    
+					TCHAR szOldTitle[MAX_PATH] = _T("");
 					if (bConsoleExists)
 					{
 						std::wcout << "[" << getwTimeISO8601() << "][" << piProcInfo.dwProcessId << "." << piProcInfo.dwThreadId << "] CreateProcess: " << csCommandLine.GetString() << std::endl;
@@ -1236,6 +1237,8 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 							m_LogFile << "[" << getwTimeISO8601() << "][" << piProcInfo.dwProcessId << "." << piProcInfo.dwThreadId << "] CreateProcess: " << csCommandLine.GetString() << std::endl;
 							m_LogFile.close();
 						}
+						if (GetConsoleTitle(szOldTitle, MAX_PATH))
+							SetConsoleTitle(csCommandLine.GetString());
 					}
 
 					// If an error occurs, exit the application. 
@@ -1361,6 +1364,7 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 								m_LogFile << ss.str().c_str();
 								m_LogFile.close();
 							}
+							SetConsoleTitle(szOldTitle);
 						}
 						if (ApplicationLogHandle != NULL)
 						{
