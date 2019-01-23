@@ -2481,6 +2481,13 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 					{
 						terminateEvent_beacon = CreateEvent(0,TRUE,FALSE,0);
 						AfxBeginThread(TiVoBeaconSendThread, terminateEvent_beacon);
+						TCHAR szOldTitle[MAX_PATH] = _T("");
+						if (GetConsoleTitle(szOldTitle, MAX_PATH))
+						{
+							CString csNewTitle(szOldTitle);
+							csNewTitle.Append(CTime::GetCurrentTime().Format(_T(" [%Y-%m-%dT%H:%M:%S]")));
+							SetConsoleTitle(csNewTitle.GetString());
+						}
 						#ifdef _DEBUG
 						std::cout << "[" << getTimeISO8601() << "] Running for 30 minutes" << std::endl;
 						Sleep(30 * 60 * 1000); // Sleep 30 minutes
@@ -2496,6 +2503,7 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 						WaitForSingleObject(terminateEvent_http,INFINITE);	// This is waiting for the HTTPMain function to end.
 						if (terminateEvent_beacon)
 							CloseHandle(terminateEvent_beacon);
+						SetConsoleTitle(szOldTitle);
 					}
 					if (terminateEvent_http)
 						CloseHandle(terminateEvent_http);
