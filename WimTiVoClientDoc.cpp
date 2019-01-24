@@ -669,7 +669,8 @@ bool CWimTiVoClientDoc::GetTiVoFile(const cTiVoFile & TiVoFile) //, CInternetSes
 			dwFlags |= INTERNET_FLAG_SECURE;
 		if (m_LogFile.is_open())
 			m_LogFile << "[" << getTimeISO8601() << "] OpenRequest: " << CStringA(strObject).GetString() << std::endl;
-		std::unique_ptr<CHttpFile> serverFile(serverConnection->OpenRequest(1, strObject, NULL, 1, NULL, NULL, dwFlags));
+		LPCTSTR pstrVersion = _T("HTTP/1.1");
+		std::unique_ptr<CHttpFile> serverFile(serverConnection->OpenRequest(1, strObject, NULL, 1, NULL, pstrVersion, dwFlags));
 		if (serverFile != NULL)
 		{
 			//Host: 192.168.0.5:64321
@@ -677,7 +678,10 @@ bool CWimTiVoClientDoc::GetTiVoFile(const cTiVoFile & TiVoFile) //, CInternetSes
 			//User-Agent: TvHttpClient
 			//tsn: 6520001802E00C3
 			//Connection: close
-			serverFile->AddRequestHeaders(_T("Range: bytes=0-\r\n"));
+			m_CurrentFileSize = 0;
+			std::wstringstream ssRangeHeader;
+			ssRangeHeader << "Range: bytes=" << m_CurrentFileSize << "-\r\n";
+			serverFile->AddRequestHeaders(ssRangeHeader.str().c_str(), HTTP_ADDREQ_FLAG_ADD | HTTP_ADDREQ_FLAG_REPLACE);
 			serverFile->AddRequestHeaders(_T("User-Agent: TvHttpClient\r\n"));
 			serverFile->AddRequestHeaders(_T("tsn: 6520001802E00C3\r\n"));
 			int BadCertErrorCount = 0;
@@ -760,7 +764,6 @@ bool CWimTiVoClientDoc::GetTiVoFile(const cTiVoFile & TiVoFile) //, CInternetSes
 						{
 							const size_t ReadWriteBufferSize = 1024*100;
 							char ReadWriteBuffer[ReadWriteBufferSize];
-							m_CurrentFileSize = 0;
 							UINT uiRead;
 							CTime ctStart(CTime::GetCurrentTime());
 							CTimeSpan ctsTotal = CTime::GetCurrentTime() - ctStart;
