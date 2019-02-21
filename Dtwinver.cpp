@@ -352,7 +352,7 @@ History: PJN / 24-02-1997 A number of updates including support for NT 3.1,
                           2. Renamed IsWindows10Version1703 method to IsWindows10Version1704.
          PJN / 01-04-2017 1. Renamed IsWindows10Version1704 method to IsWindows10Version1703.
                           2. Tested the code on Windows 10 version 1703.
-                          3. Verified the code compiles cleanly on VC 2017. 
+                          3. Verified the code compiles cleanly on VC 2017.
          PJN / 17-04-2017 1. Provided a new IsWindows10Redstone3 method
          PJN / 18-04-2017 1. Removed unused COSVersion::GetNTCurrentVersionFromRegistry and COSVersion::GetNTCSDVersionFromRegistry methods 
                           from codebase.
@@ -410,8 +410,14 @@ History: PJN / 24-02-1997 A number of updates including support for NT 3.1,
          PJN / 14-11-2018 1. Added support for PRODUCT_IOTEDGEOS & PRODUCT_IOTENTERPRISE
          PJN / 29-11-2018 1. Added a new IsWindowsServerCodename19H1 method.
                           2. Added support for PRODUCT_LITE
+         PJN / 02-01-2019 1. Updated copyright details.
+                          2. Added support for PRODUCT_HOLOGRAPHIC_BUSINESS & PRODUCT_IOTENTERPRISES
+         PJN / 15-02-2019 1. Fixed a number of compiler warnings when using VS 2019 Preview
+                          2. Provided a new IsWindows10Codename20H1 method.
+         PJN / 19-02-2019 1. Updated the detection logic in IsWindowsServerVersion1809.
+                          2. Updated the detection login in IsWindowsServerCodename19H1.
 
-Copyright (c) 1997 - 2018 by PJ Naughter (Web: www.naughter.com, Email: pjna@naughter.com)
+Copyright (c) 1997 - 2019 by PJ Naughter (Web: www.naughter.com, Email: pjna@naughter.com)
 
 All rights reserved.
 
@@ -427,7 +433,6 @@ to maintain a single distribution point for the source code.
 
 ///////////////////////////////// Includes ////////////////////////////////////
 #include "stdafx.h"
-
 #include "Dtwinver.h"
 
 
@@ -1079,6 +1084,10 @@ to maintain a single distribution point for the source code.
 #define PRODUCT_HOLOGRAPHIC 0x00000087
 #endif //#ifndef PRODUCT_HOLOGRAPHIC
 
+#ifndef PRODUCT_HOLOGRAPHIC_BUSINESS
+#define PRODUCT_HOLOGRAPHIC_BUSINESS 0x00000088
+#endif //#ifndef PRODUCT_HOLOGRAPHIC_BUSINESS
+
 #ifndef PRODUCT_PRO_SINGLE_LANGUAGE
 #define PRODUCT_PRO_SINGLE_LANGUAGE 0x0000008A
 #endif //#ifndef PRODUCT_PRO_SINGLE_LANGUAGE
@@ -1211,6 +1220,10 @@ to maintain a single distribution point for the source code.
 #define PRODUCT_LITE 0x000000BD
 #endif //#ifndef PRODUCT_LITE
 
+#ifndef PRODUCT_IOTENTERPRISES
+#define PRODUCT_IOTENTERPRISES 0x000000BF
+#endif //#ifndef PRODUCT_IOTENTERPRISES
+
 #ifndef VER_PLATFORM_WIN32_CE
 #define VER_PLATFORM_WIN32_CE 3
 #endif //#ifndef VER_PLATFORM_WIN32_CE
@@ -1244,6 +1257,8 @@ to maintain a single distribution point for the source code.
 #pragma warning(disable: 26497)
 #pragma warning(disable: 26455)
 #pragma warning(disable: 26477)
+#pragma warning(disable: 26486)
+#pragma warning(disable: 26489)
 
 
 ////////////////////////////////// Implementation /////////////////////////////
@@ -3331,6 +3346,12 @@ void COSVersion::GetProductInfo(_Inout_ LPOS_VERSION_INFO lpVersionInformation)
       lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_HOLOGRAPHIC;
       break;
     }
+    case PRODUCT_HOLOGRAPHIC_BUSINESS:
+    {
+      lpVersionInformation->dwSuiteMask |= COSVERSION_SUITE_BUSINESS;
+      lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_HOLOGRAPHIC;
+      break;
+    }
     case PRODUCT_PRO_SINGLE_LANGUAGE:
     {
       lpVersionInformation->dwSuiteMask2 |= COSVERSION_SUITE2_SINGLE_LANGUAGE;
@@ -3462,8 +3483,8 @@ void COSVersion::GetProductInfo(_Inout_ LPOS_VERSION_INFO lpVersionInformation)
     }
     case PRODUCT_CLOUD:
     {
-        lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_S;
-        break;
+      lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_S;
+      break;
     }
     case PRODUCT_SERVERRDSH:
     {
@@ -3527,6 +3548,12 @@ void COSVersion::GetProductInfo(_Inout_ LPOS_VERSION_INFO lpVersionInformation)
     case PRODUCT_IOTENTERPRISE:
     {
       lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_IOTENTERPRISE;
+      break;
+    }
+    case PRODUCT_IOTENTERPRISES:
+    {
+      lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_IOTENTERPRISE;
+      lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_S;
       break;
     }
     case PRODUCT_LITE:
@@ -4167,15 +4194,18 @@ _Success_(return != FALSE) BOOL COSVersion::IsWindowsServer2019(_In_ LPCOS_VERSI
 
 _Success_(return != FALSE) BOOL COSVersion::IsWindowsServerVersion1809(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
 {
-  return IsWindowsServer2019(lpVersionInformation, bCheckUnderlying) && lpVersionInformation->bSemiAnnual;
+  if (bCheckUnderlying)
+    return IsWindowsServer2019(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber < 18204) && lpVersionInformation->bSemiAnnual;
+  else
+    return IsWindowsServer2019(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber < 18204) && lpVersionInformation->bSemiAnnual;
 }
 
 _Success_(return != FALSE) BOOL COSVersion::IsWindowsServerCodename19H1(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
 {
   if (bCheckUnderlying)
-    return IsWindowsServer2019(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber >= 18204);
+    return IsWindowsServer2019(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber >= 18204) && lpVersionInformation->bSemiAnnual;
   else
-    return IsWindowsServer2019(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber >= 18204);
+    return IsWindowsServer2019(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber >= 18204) && lpVersionInformation->bSemiAnnual;
 }
 
 _Success_(return != FALSE) BOOL COSVersion::IsWindows10(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
@@ -4242,9 +4272,17 @@ _Success_(return != FALSE) BOOL COSVersion::IsWindows10Version1809(_In_ LPCOS_VE
 _Success_(return != FALSE) BOOL COSVersion::IsWindows10Codename19H1(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
 {
   if (bCheckUnderlying)
-    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber >= 18204);
+    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber >= 18204) && (lpVersionInformation->dwUnderlyingBuildNumber < 18836);
   else
-    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber >= 18204);
+    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber >= 18204) && (lpVersionInformation->dwEmulatedBuildNumber < 18836);
+}
+
+_Success_(return != FALSE) BOOL COSVersion::IsWindows10Codename20H1(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
+{
+  if (bCheckUnderlying)
+    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber >= 18836);
+  else
+    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber >= 18836);
 }
 
 _Success_(return != FALSE) BOOL COSVersion::IsWindows8Point1(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)

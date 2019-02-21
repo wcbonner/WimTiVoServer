@@ -3,7 +3,7 @@ Module : Dtwinver.h
 Purpose: Declaration of a comprehensive class to perform OS version detection
 Created: PJN / 11-05-1996
 
-Copyright (c) 1997 - 2018 by PJ Naughter (Web: www.naughter.com, Email: pjna@naughter.com)
+Copyright (c) 1997 - 2019 by PJ Naughter (Web: www.naughter.com, Email: pjna@naughter.com)
 
 All rights reserved.
 
@@ -344,6 +344,7 @@ public:
   _Success_(return != FALSE) BOOL IsWindows10Version1803(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
   _Success_(return != FALSE) BOOL IsWindows10Version1809(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
   _Success_(return != FALSE) BOOL IsWindows10Codename19H1(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
+  _Success_(return != FALSE) BOOL IsWindows10Codename20H1(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
 
   _Success_(return != FALSE) BOOL IsWebWindowsServer2003(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
   _Success_(return != FALSE) BOOL IsWindowsServer2003(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
