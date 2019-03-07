@@ -102,6 +102,7 @@ static time_t ISO8601totime(const std::string & ISOTime)
 static const CString QuoteFileName(const CString & Original)
 {
 	CString csQuotedString(Original);
+	// csQuotedString.Replace(_T("\\"), _T("/"));
 	if (csQuotedString.Find(_T(" ")) >= 0)
 	{
 		csQuotedString.Insert(0,_T('"'));
@@ -992,6 +993,9 @@ const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath) cons
 		rval.Append(_T(" -vcodec copy"));
 	else
 	{
+		// quick and dirty addition to support subtitles
+		//rval.Append(_T(" -vf subtitles="));
+		//rval.Append(QuoteFileName(m_csPathName));
 		rval.Append(_T(" -vcodec mpeg2video"));
 		if ((m_VideoWidth > 1920) || (m_VideoHeight > 1080))
 			rval.Append(_T(" -s 1920x1080"));
