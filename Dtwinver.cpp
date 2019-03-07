@@ -415,7 +415,10 @@ History: PJN / 24-02-1997 A number of updates including support for NT 3.1,
          PJN / 15-02-2019 1. Fixed a number of compiler warnings when using VS 2019 Preview
                           2. Provided a new IsWindows10Codename20H1 method.
          PJN / 19-02-2019 1. Updated the detection logic in IsWindowsServerVersion1809.
-                          2. Updated the detection login in IsWindowsServerCodename19H1.
+                          2. Updated the detection logic in IsWindowsServerCodename19H1.
+         PJN / 05-03-2019 1. Updated the detection logic in IsWindows10Version1803, IsWindows10Version1809 and 
+                          IsWindows10Version19H1
+                          2. Renamed IsWindows10Codename19H1 method to IsWindows10Version1903.
 
 Copyright (c) 1997 - 2019 by PJ Naughter (Web: www.naughter.com, Email: pjna@naughter.com)
 
@@ -4256,25 +4259,25 @@ _Success_(return != FALSE) BOOL COSVersion::IsWindows10Version1709(_In_ LPCOS_VE
 _Success_(return != FALSE) BOOL COSVersion::IsWindows10Version1803(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
 {
   if (bCheckUnderlying)
-    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber > 16299) && (lpVersionInformation->dwUnderlyingBuildNumber < 17600);
+    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber > 16299) && (lpVersionInformation->dwUnderlyingBuildNumber <= 17134);
   else
-    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber > 16299) && (lpVersionInformation->dwEmulatedBuildNumber < 17600);
+    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber > 16299) && (lpVersionInformation->dwEmulatedBuildNumber <= 17134);
 }
 
 _Success_(return != FALSE) BOOL COSVersion::IsWindows10Version1809(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
 {
   if (bCheckUnderlying)
-    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber >= 17600) && (lpVersionInformation->dwUnderlyingBuildNumber < 18204);
+    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber > 17134) && (lpVersionInformation->dwUnderlyingBuildNumber <= 17763);
   else
-    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber >= 17600) && (lpVersionInformation->dwUnderlyingBuildNumber < 18204);
+    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber > 17134) && (lpVersionInformation->dwUnderlyingBuildNumber <= 17763);
 }
 
-_Success_(return != FALSE) BOOL COSVersion::IsWindows10Codename19H1(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
+_Success_(return != FALSE) BOOL COSVersion::IsWindows10Version1903(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
 {
   if (bCheckUnderlying)
-    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber >= 18204) && (lpVersionInformation->dwUnderlyingBuildNumber < 18836);
+    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber > 17763) && (lpVersionInformation->dwUnderlyingBuildNumber < 18836);
   else
-    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber >= 18204) && (lpVersionInformation->dwEmulatedBuildNumber < 18836);
+    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber > 17763) && (lpVersionInformation->dwEmulatedBuildNumber < 18836);
 }
 
 _Success_(return != FALSE) BOOL COSVersion::IsWindows10Codename20H1(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
