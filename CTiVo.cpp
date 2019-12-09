@@ -255,6 +255,8 @@ void cTiVoFile::SetPathName(const CString csNewPath)
 			TCHAR ext[_MAX_EXT];
 			_tsplitpath_s(m_csPathName.GetString(), drive, _MAX_DRIVE, dir, _MAX_DIR, fname, _MAX_FNAME, ext, _MAX_EXT);
 			m_Title = fname;
+			m_Title.Replace(_T("."), _T(" ")); // replace periods with spaces as on 2019-12-09
+			m_Title.Replace(_T("_"), _T(" ")); // replace underscore with spaces as on 2019-12-09
 		}
 	}
 	m_ContentType = _T("video/x-tivo-mpeg");
@@ -693,7 +695,11 @@ void cTiVoFile::PopulateFromFFProbe(void)
 														}
 													}
 													if (!csAttributeKey.CompareNoCase(_T("title")))
+													{
 														m_Title = csAttributeValue;
+														m_Title.Replace(_T("."), _T(" ")); // replace periods with spaces as on 2019-12-09
+														m_Title.Replace(_T("_"), _T(" ")); // replace underscore with spaces as on 2019-12-09
+													}
 													else if (!csAttributeKey.CompareNoCase(_T("episode_id")))
 														m_EpisodeTitle = csAttributeValue;
 													else if (!csAttributeKey.CompareNoCase(_T("description")))
