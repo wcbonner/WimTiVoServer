@@ -275,6 +275,8 @@ void cTiVoFile::SetPathName(const CFileFind & csNewPath)
 	m_csPathName = csNewPath.GetFilePath();
 	m_SourceSize = csNewPath.GetLength();
 	m_Title = csNewPath.GetFileTitle();
+	m_Title.Replace(_T("."), _T(" ")); // replace periods with spaces as on 2019-12-09
+	m_Title.Replace(_T("_"), _T(" ")); // replace underscore with spaces as on 2019-12-09
 	m_ContentType = _T("video/x-tivo-mpeg");
 	csNewPath.GetLastWriteTime(m_LastWriteTime);
 	csNewPath.GetLastWriteTime(m_CaptureDate);
