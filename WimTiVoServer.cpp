@@ -351,30 +351,33 @@ void PopulateTiVoFileList(std::vector<cTiVoFile> & TiVoFileList, CCriticalSectio
 			}
 			continue;
 		}
-		cTiVoFile myFile;
-		if (finder.GetLength() > 0)
+		if (finder.GetFileName().Right(4).CompareNoCase(_T(".txt")) != 0) // Added 2020-02-28 to ignore text files
 		{
-			bool bNotInList = true;
-			ccTiVoFileListCritSec.Lock();
-			for (auto TiVoFile = TiVoFileList.begin(); TiVoFile != TiVoFileList.end(); TiVoFile++)
-				if (!TiVoFile->GetPathName().CompareNoCase(finder.GetFilePath()))
-				{
-					CTime FinderTime;
-					if (finder.GetLastWriteTime(FinderTime))
-						if (FinderTime > TiVoFile->GetLastWriteTime())
-							TiVoFile->SetPathName(finder);
-					bNotInList = false;
-					break;
-				}
-			ccTiVoFileListCritSec.Unlock();
-			if (bNotInList)
+			cTiVoFile myFile;
+			if (finder.GetLength() > 0)
 			{
-				myFile.SetPathName(finder);
-				if (!myFile.GetSourceFormat().Left(6).CompareNoCase(_T("video/")))
+				bool bNotInList = true;
+				ccTiVoFileListCritSec.Lock();
+				for (auto TiVoFile = TiVoFileList.begin(); TiVoFile != TiVoFileList.end(); TiVoFile++)
+					if (!TiVoFile->GetPathName().CompareNoCase(finder.GetFilePath()))
+					{
+						CTime FinderTime;
+						if (finder.GetLastWriteTime(FinderTime))
+							if (FinderTime > TiVoFile->GetLastWriteTime())
+								TiVoFile->SetPathName(finder);
+						bNotInList = false;
+						break;
+					}
+				ccTiVoFileListCritSec.Unlock();
+				if (bNotInList)
 				{
-					ccTiVoFileListCritSec.Lock();
-					TiVoFileList.push_back(myFile);
-					ccTiVoFileListCritSec.Unlock();
+					myFile.SetPathName(finder);
+					if (!myFile.GetSourceFormat().Left(6).CompareNoCase(_T("video/")))
+					{
+						ccTiVoFileListCritSec.Lock();
+						TiVoFileList.push_back(myFile);
+						ccTiVoFileListCritSec.Unlock();
+					}
 				}
 			}
 		}
@@ -790,7 +793,7 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 				ccTiVoFileListCritSec.Unlock();
 			}
 			pWriter->WriteEndElement();	// TiVoContainer
-		pWriter->WriteComment(L" Copyright © 2018 William C Bonner ");
+		pWriter->WriteComment(L" Copyright © 2020 William C Bonner ");
 		pWriter->WriteEndDocument();
 		pWriter->Flush();
 
