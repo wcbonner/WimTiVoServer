@@ -327,6 +327,21 @@ void PopulateTiVoFileList(std::vector<cTiVoFile> & TiVoFileList, CCriticalSectio
 	TRACE("%s %s %s\n", CStringA(CTime::GetCurrentTime().Format(_T("[%Y-%m-%dT%H:%M:%S]"))).GetString(), __FUNCTION__, FileSpec.c_str());
 	std::cout << "[" << getTimeISO8601() << "] " << __FUNCTION__ << " " << FileSpec.c_str() << std::endl;
 	#endif
+
+	static CString csLocalSkipExtensions;
+	if (csLocalSkipExtensions.IsEmpty())
+	{
+		CString csRegKey(_T("Software\\WimsWorld\\"));
+		csRegKey.Append(theApp.m_pszAppName);
+		TCHAR vData[1024];
+		DWORD cbData = sizeof(vData);
+		if (ERROR_SUCCESS == RegGetValue(HKEY_LOCAL_MACHINE, csRegKey, _T("IgnoreExt"), RRF_RT_REG_SZ, NULL, vData, &cbData))
+			csLocalSkipExtensions = CString(vData);
+		if (csLocalSkipExtensions.IsEmpty())
+			csLocalSkipExtensions = _T("txt");
+		RegSetKeyValue(HKEY_LOCAL_MACHINE, csRegKey, _T("IgnoreExt"), REG_SZ, csLocalSkipExtensions.GetString(), csLocalSkipExtensions.GetLength()*sizeof(TCHAR)+1);
+	}
+
 	CFileFind finder;
 	
 	BOOL bWorking = finder.FindFile(CString(CStringA(FileSpec.c_str())));
@@ -351,33 +366,41 @@ void PopulateTiVoFileList(std::vector<cTiVoFile> & TiVoFileList, CCriticalSectio
 			}
 			continue;
 		}
-		if (finder.GetFileName().Right(4).CompareNoCase(_T(".txt")) != 0) // Added 2020-02-28 to ignore text files
+		bool SkipExtension = false;
+		int iPos = 0;
+		CString csToken(csLocalSkipExtensions.Tokenize(_T(";"), iPos));
+		while (!csToken.IsEmpty())
 		{
-			cTiVoFile myFile;
-			if (finder.GetLength() > 0)
-			{
-				bool bNotInList = true;
-				ccTiVoFileListCritSec.Lock();
-				for (auto TiVoFile = TiVoFileList.begin(); TiVoFile != TiVoFileList.end(); TiVoFile++)
-					if (!TiVoFile->GetPathName().CompareNoCase(finder.GetFilePath()))
-					{
-						CTime FinderTime;
-						if (finder.GetLastWriteTime(FinderTime))
-							if (FinderTime > TiVoFile->GetLastWriteTime())
-								TiVoFile->SetPathName(finder);
-						bNotInList = false;
-						break;
-					}
-				ccTiVoFileListCritSec.Unlock();
-				if (bNotInList)
+			if (finder.GetFileName().Right(csToken.GetLength()).CompareNoCase(csToken) == 0) // Added 2020-02-28 to ignore text files
+				SkipExtension = true;
+			csToken = csLocalSkipExtensions.Tokenize(_T(";"), iPos);
+		}
+		if (SkipExtension) // Added 2020-02-28 to ignore text files
+			continue;
+		cTiVoFile myFile;
+		if (finder.GetLength() > 0)
+		{
+			bool bNotInList = true;
+			ccTiVoFileListCritSec.Lock();
+			for (auto TiVoFile = TiVoFileList.begin(); TiVoFile != TiVoFileList.end(); TiVoFile++)
+				if (!TiVoFile->GetPathName().CompareNoCase(finder.GetFilePath()))
 				{
-					myFile.SetPathName(finder);
-					if (!myFile.GetSourceFormat().Left(6).CompareNoCase(_T("video/")))
-					{
-						ccTiVoFileListCritSec.Lock();
-						TiVoFileList.push_back(myFile);
-						ccTiVoFileListCritSec.Unlock();
-					}
+					CTime FinderTime;
+					if (finder.GetLastWriteTime(FinderTime))
+						if (FinderTime > TiVoFile->GetLastWriteTime())
+							TiVoFile->SetPathName(finder);
+					bNotInList = false;
+					break;
+				}
+			ccTiVoFileListCritSec.Unlock();
+			if (bNotInList)
+			{
+				myFile.SetPathName(finder);
+				if (!myFile.GetSourceFormat().Left(6).CompareNoCase(_T("video/")))
+				{
+					ccTiVoFileListCritSec.Lock();
+					TiVoFileList.push_back(myFile);
+					ccTiVoFileListCritSec.Unlock();
 				}
 			}
 		}
