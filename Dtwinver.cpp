@@ -2,12 +2,12 @@
 Module : Dtwinver.cpp
 Purpose: Implementation of a comprehensive class to perform OS version detection
 Created: PJN / 11-05-1996
-History: PJN / 24-02-1997 A number of updates including support for NT 3.1, 
+History: PJN / 24-02-1997 A number of updates including support for NT 3.1,
                           single mode dos in Windows 95 and better Windows
                           version detecion under real mode dos.
-         PJN / 13-09-1998 1.  Added explicit support for Windows 98 
-                          2.  Updated documentation to use HTML. 
-                          3.  Minor update to the web page describing it. 
+         PJN / 13-09-1998 1.  Added explicit support for Windows 98
+                          2.  Updated documentation to use HTML.
+                          3.  Minor update to the web page describing it.
          PJN / 22-06-1999 1.  UNICODE enabled the code.
                           2.  Removed need for the dwOSVersionInfoSize variable
                           3.  Added support for detecting Build Number of 95 and 98 from DOS code path.
@@ -419,6 +419,29 @@ History: PJN / 24-02-1997 A number of updates including support for NT 3.1,
          PJN / 05-03-2019 1. Updated the detection logic in IsWindows10Version1803, IsWindows10Version1809 and 
                           IsWindows10Version19H1
                           2. Renamed IsWindows10Codename19H1 method to IsWindows10Version1903.
+         PJN / 06-04-2019 1. Updated the detection logic in IsWindows10Version1903.
+                          2. Added a new IsWindows10Version19H2 method.
+                          3. Renamed IsWindowsServerCodename19H1 to IsWindowsServerVersion1903
+                          4. Added a new IsWindowsServerCodename19H2 method.
+         PJN / 20-04-2019 1. Fixed a small typo in the test app provided in the download
+         PJN / 21-05-2019 1. Added support for the following product types: PRODUCT_XBOX_SYSTEMOS, PRODUCT_XBOX_NATIVEOS,
+                          PRODUCT_XBOX_GAMEOS, PRODUCT_XBOX_ERAOS & PRODUCT_XBOX_HOSTOS
+         PJN / 03-07-2019 1. Updated the detection logic in IsWindows10Version19H2 & IsWindows10Version1903 in light
+                          of the details about 19H2 announced at 
+                          https://blogs.windows.com/windowsexperience/2019/07/01/announcing-windows-10-insider-preview-build-18362-10000-19h2/
+         PJN / 11-08-2019 1. Added support for PRODUCT_XBOX_SCARLETTHOSTOS product type.
+                          2. Renamed product type value PRODUCT_XBOX_HOSTOS to PRODUCT_XBOX_DURANGOHOSTOS.
+         PJN / 20-08-2019 1. Fixed some further compiler warnings when using VC 2019 Preview v16.3.0 Preview 2.0
+         PJN / 15-09-2018 1. Renamed IsWindows10Codename19H2 method to IsWindows10Version1909.
+         PJN / 25-09-2019 1. Updated the logic in IsWindowsServerCodename19H2 to be consistent with IsWindows10Version1909.
+                          2. Added a new IsWindowsServerCodename20H1 method.
+                          3. Updated the logic in IsWindowsServerVersion1903 to be consistent with IsWindows10Version1903.
+         PJN / 18-09-2018 1. Renamed IsWindowsServerCodename19H2 method to IsWindowsServerVersion1909.
+                          2. Renamed IsLite method to IsWindows10X.
+         PJN / 26-12-2019 1. Fixed various Clang-Tidy static code analysis warnings in the code.
+                          2. Added support for detecting Windows 10 "Active Development Branch" as announced at
+                          https://blogs.windows.com/windowsexperience/2019/12/16/announcing-windows-10-insider-preview-build-19536/
+                          3. Renamed IsWindowsServerCodename20H1 method to IsWindowsServerVersion2004
 
 Copyright (c) 1997 - 2019 by PJ Naughter (Web: www.naughter.com, Email: pjna@naughter.com)
 
@@ -1227,6 +1250,30 @@ to maintain a single distribution point for the source code.
 #define PRODUCT_IOTENTERPRISES 0x000000BF
 #endif //#ifndef PRODUCT_IOTENTERPRISES
 
+#ifndef PRODUCT_XBOX_SYSTEMOS
+#define PRODUCT_XBOX_SYSTEMOS 0x000000C0
+#endif //#ifdef PRODUCT_XBOX_SYSTEMOS
+
+#ifndef PRODUCT_XBOX_NATIVEOS
+#define PRODUCT_XBOX_NATIVEOS 0x000000C1
+#endif //#ifdef PRODUCT_XBOX_NATIVEOS
+
+#ifndef PRODUCT_XBOX_GAMEOS
+#define PRODUCT_XBOX_GAMEOS 0x000000C2
+#endif //#ifdef PRODUCT_XBOX_GAMEOS
+
+#ifndef PRODUCT_XBOX_ERAOS
+#define PRODUCT_XBOX_ERAOS 0x000000C3
+#endif //#ifdef PRODUCT_XBOX_ERAOS
+
+#ifndef PRODUCT_XBOX_DURANGOHOSTOS
+#define PRODUCT_XBOX_DURANGOHOSTOS 0x000000C4
+#endif //#ifdef PRODUCT_XBOX_DURANGOHOSTOS
+
+#ifndef PRODUCT_XBOX_SCARLETTHOSTOS
+#define PRODUCT_XBOX_SCARLETTHOSTOS 0x000000C5
+#endif //#ifdef PRODUCT_XBOX_SCARLETTHOSTOS
+
 #ifndef VER_PLATFORM_WIN32_CE
 #define VER_PLATFORM_WIN32_CE 3
 #endif //#ifndef VER_PLATFORM_WIN32_CE
@@ -1374,6 +1421,7 @@ LONG COSVersion::RegQueryValueEx(HKEY32 hKey, LPSTR lpszValueName, LPDWORD lpdwR
 COSVersion::PROCESSOR_TYPE COSVersion::MapProcessorArchitecture(_In_ WORD wProcessorArchitecture)
 {
   //What will be the return value from this method
+#pragma warning(suppress: 26812)
   PROCESSOR_TYPE ProcessorType = UNKNOWN_PROCESSOR;
 
   //Map from the SYTEM_INFO wProcessorArchitecture defines to our equivalents
@@ -1592,7 +1640,8 @@ void COSVersion::MapWin32SuiteMask(_In_ WORD wSuiteMask, _Inout_ LPOS_VERSION_IN
 
 COSVersion::OS_TYPE COSVersion::MapWin32ProductType(_In_ WORD wProductType)
 {
-  //what will be the return value from this method
+  //What will be the return value from this method
+#pragma warning(suppress: 26812)
   OS_TYPE ostype = UnknownOSType;
 
   switch (wProductType)
@@ -1624,6 +1673,7 @@ COSVersion::OS_TYPE COSVersion::MapWin32ProductType(_In_ WORD wProductType)
 COSVersion::OS_PLATFORM COSVersion::MapWin32PlatformId(_In_ DWORD dwPlatformId)
 {
   //What will be the return value from this method
+#pragma warning(suppress: 26812)
   OS_PLATFORM osPlatform = UnknownOSPlatform;
 
   //Explicitly map the win32 dwPlatformId to our own values
@@ -3564,6 +3614,36 @@ void COSVersion::GetProductInfo(_Inout_ LPOS_VERSION_INFO lpVersionInformation)
       lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_LITE;
       break;
     }
+    case PRODUCT_XBOX_SYSTEMOS:
+    {
+      lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_XBOX_SYSTEMOS;
+      break;
+    }
+    case PRODUCT_XBOX_NATIVEOS:
+    {
+      lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_XBOX_NATIVEOS;
+      break;
+    }
+    case PRODUCT_XBOX_GAMEOS:
+    {
+      lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_XBOX_GAMEOS;
+      break;
+    }
+    case PRODUCT_XBOX_ERAOS:
+    {
+      lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_XBOX_ERAOS;
+      break;
+    }
+    case PRODUCT_XBOX_DURANGOHOSTOS:
+    {
+      lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_XBOX_DURANGOHOSTOS;
+      break;
+    }
+    case PRODUCT_XBOX_SCARLETTHOSTOS:
+    {
+      lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_XBOX_SCARLETTHOSTOS;
+      break;
+    }
     default:
     {
       break;
@@ -4203,12 +4283,34 @@ _Success_(return != FALSE) BOOL COSVersion::IsWindowsServerVersion1809(_In_ LPCO
     return IsWindowsServer2019(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber < 18204) && lpVersionInformation->bSemiAnnual;
 }
 
-_Success_(return != FALSE) BOOL COSVersion::IsWindowsServerCodename19H1(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
+_Success_(return != FALSE) BOOL COSVersion::IsWindowsServerVersion1903(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
 {
   if (bCheckUnderlying)
-    return IsWindowsServer2019(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber >= 18204) && lpVersionInformation->bSemiAnnual;
+    return IsWindowsServer2019(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber >= 18204) && (lpVersionInformation->dwUnderlyingBuildNumber <= 18362) && (lpVersionInformation->dwUBR < 10000) && lpVersionInformation->bSemiAnnual;
   else
-    return IsWindowsServer2019(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber >= 18204) && lpVersionInformation->bSemiAnnual;
+    return IsWindowsServer2019(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber >= 18204) && (lpVersionInformation->dwEmulatedBuildNumber <= 18362) && (lpVersionInformation->dwUBR < 10000) && lpVersionInformation->bSemiAnnual;
+}
+
+_Success_(return != FALSE) BOOL COSVersion::IsWindowsServerVersion1909(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
+{
+  if (bCheckUnderlying)
+    return IsWindowsServer2019(lpVersionInformation, bCheckUnderlying) &&
+                               (((lpVersionInformation->dwUnderlyingBuildNumber == 18362) && (lpVersionInformation->dwUBR >= 10000)) ||
+                               ((lpVersionInformation->dwUnderlyingBuildNumber > 18362) && (lpVersionInformation->dwUnderlyingBuildNumber < 18836))) &&
+                               lpVersionInformation->bSemiAnnual;
+  else
+    return IsWindowsServer2019(lpVersionInformation, bCheckUnderlying) &&
+                               (((lpVersionInformation->dwEmulatedBuildNumber == 18362) && (lpVersionInformation->dwUBR >= 10000)) ||
+                               ((lpVersionInformation->dwEmulatedBuildNumber > 18362) && (lpVersionInformation->dwUnderlyingBuildNumber < 18836))) &&
+                               lpVersionInformation->bSemiAnnual;
+}
+
+_Success_(return != FALSE) BOOL COSVersion::IsWindowsServerVersion2004(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
+{
+  if (bCheckUnderlying)
+    return IsWindowsServer2019(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber >= 18836) && lpVersionInformation->bSemiAnnual;
+  else
+    return IsWindowsServer2019(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber >= 18836) && lpVersionInformation->bSemiAnnual;
 }
 
 _Success_(return != FALSE) BOOL COSVersion::IsWindows10(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
@@ -4269,23 +4371,43 @@ _Success_(return != FALSE) BOOL COSVersion::IsWindows10Version1809(_In_ LPCOS_VE
   if (bCheckUnderlying)
     return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber > 17134) && (lpVersionInformation->dwUnderlyingBuildNumber <= 17763);
   else
-    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber > 17134) && (lpVersionInformation->dwUnderlyingBuildNumber <= 17763);
+    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber > 17134) && (lpVersionInformation->dwEmulatedBuildNumber <= 17763);
 }
 
 _Success_(return != FALSE) BOOL COSVersion::IsWindows10Version1903(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
 {
   if (bCheckUnderlying)
-    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber > 17763) && (lpVersionInformation->dwUnderlyingBuildNumber < 18836);
+    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber > 17763) && (lpVersionInformation->dwUnderlyingBuildNumber <= 18362) && (lpVersionInformation->dwUBR < 10000);
   else
-    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber > 17763) && (lpVersionInformation->dwEmulatedBuildNumber < 18836);
+    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber > 17763) && (lpVersionInformation->dwEmulatedBuildNumber <= 18362) && (lpVersionInformation->dwUBR < 10000);
 }
 
-_Success_(return != FALSE) BOOL COSVersion::IsWindows10Codename20H1(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
+_Success_(return != FALSE) BOOL COSVersion::IsWindows10Version1909(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
 {
   if (bCheckUnderlying)
-    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber >= 18836);
+    return IsWindows10(lpVersionInformation, bCheckUnderlying) &&
+             (((lpVersionInformation->dwUnderlyingBuildNumber == 18362) && (lpVersionInformation->dwUBR >= 10000)) ||
+              ((lpVersionInformation->dwUnderlyingBuildNumber > 18362) && (lpVersionInformation->dwUnderlyingBuildNumber < 18836)));
   else
-    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber >= 18836);
+    return IsWindows10(lpVersionInformation, bCheckUnderlying) &&
+             (((lpVersionInformation->dwEmulatedBuildNumber == 18362) && (lpVersionInformation->dwUBR >= 10000)) ||
+              ((lpVersionInformation->dwEmulatedBuildNumber > 18362) && (lpVersionInformation->dwUnderlyingBuildNumber < 18836)));
+}
+
+_Success_(return != FALSE) BOOL COSVersion::IsWindows10Version2004(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
+{
+  if (bCheckUnderlying)
+    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber >= 18836) && (lpVersionInformation->dwUnderlyingBuildNumber < 19536);
+  else
+    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber >= 18836) && (lpVersionInformation->dwEmulatedBuildNumber < 19536);
+}
+
+_Success_(return != FALSE) BOOL COSVersion::IsWindows10ActiveDevelopmentBranch(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
+{
+  if (bCheckUnderlying)
+    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber >= 19536);
+  else
+    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber >= 19536);
 }
 
 _Success_(return != FALSE) BOOL COSVersion::IsWindows8Point1(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
@@ -5120,9 +5242,39 @@ _Success_(return != FALSE) BOOL COSVersion::IsIoTEnterprise(_In_ LPCOS_VERSION_I
   return ((lpVersionInformation->dwSuiteMask3 & COSVERSION_SUITE3_IOTENTERPRISE) != 0);
 }
 
-_Success_(return != FALSE) BOOL COSVersion::IsLite(_In_ LPCOS_VERSION_INFO lpVersionInformation)
+_Success_(return != FALSE) BOOL COSVersion::IsWindows10X(_In_ LPCOS_VERSION_INFO lpVersionInformation)
 {
   return ((lpVersionInformation->dwSuiteMask3 & COSVERSION_SUITE3_LITE) != 0);
+}
+
+_Success_(return != FALSE) BOOL COSVersion::IsXBoxSystemOS(_In_ LPCOS_VERSION_INFO lpVersionInformation)
+{
+  return ((lpVersionInformation->dwSuiteMask3 & COSVERSION_SUITE3_XBOX_SYSTEMOS) != 0);
+}
+
+_Success_(return != FALSE) BOOL COSVersion::IsXBoxNativeOS(_In_ LPCOS_VERSION_INFO lpVersionInformation)
+{
+  return ((lpVersionInformation->dwSuiteMask3 & COSVERSION_SUITE3_XBOX_NATIVEOS) != 0);
+}
+
+_Success_(return != FALSE) BOOL COSVersion::IsXBoxGamesOS(_In_ LPCOS_VERSION_INFO lpVersionInformation)
+{
+  return ((lpVersionInformation->dwSuiteMask3 & COSVERSION_SUITE3_XBOX_GAMEOS) != 0);
+}
+
+_Success_(return != FALSE) BOOL COSVersion::IsXBoxEraOS(_In_ LPCOS_VERSION_INFO lpVersionInformation)
+{
+  return ((lpVersionInformation->dwSuiteMask3 & COSVERSION_SUITE3_XBOX_ERAOS) != 0);
+}
+
+_Success_(return != FALSE) BOOL COSVersion::IsXBoxDurangoHostOS(_In_ LPCOS_VERSION_INFO lpVersionInformation)
+{
+  return ((lpVersionInformation->dwSuiteMask3 & COSVERSION_SUITE3_XBOX_DURANGOHOSTOS) != 0);
+}
+
+_Success_(return != FALSE) BOOL COSVersion::IsXBoxScarlettHostOS(_In_ LPCOS_VERSION_INFO lpVersionInformation)
+{
+  return ((lpVersionInformation->dwSuiteMask3 & COSVERSION_SUITE3_XBOX_SCARLETTHOSTOS) != 0);
 }
 
 _Success_(return != FALSE) BOOL COSVersion::Is64Bit(_In_ LPCOS_VERSION_INFO /*lpVersionInformation*/, _In_ BOOL bCheckUnderlying)
