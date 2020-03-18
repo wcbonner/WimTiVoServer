@@ -328,18 +328,18 @@ void PopulateTiVoFileList(std::vector<cTiVoFile> & TiVoFileList, CCriticalSectio
 	std::cout << "[" << getTimeISO8601() << "] " << __FUNCTION__ << " " << FileSpec.c_str() << std::endl;
 	#endif
 
-	static CString csLocalSkipExtensions;
+	// 2020-03-18 Change to read registry each time as opposed to only on load, only write if nothing read
+	CString csLocalSkipExtensions;
+	CString csRegKey(_T("Software\\WimsWorld\\"));
+	csRegKey.Append(theApp.m_pszAppName);
+	TCHAR vData[1024];
+	DWORD cbData = sizeof(vData);
+	if (ERROR_SUCCESS == RegGetValue(HKEY_LOCAL_MACHINE, csRegKey, _T("IgnoreExt"), RRF_RT_REG_SZ, NULL, vData, &cbData))
+		csLocalSkipExtensions = CString(vData);
 	if (csLocalSkipExtensions.IsEmpty())
 	{
-		CString csRegKey(_T("Software\\WimsWorld\\"));
-		csRegKey.Append(theApp.m_pszAppName);
-		TCHAR vData[1024];
-		DWORD cbData = sizeof(vData);
-		if (ERROR_SUCCESS == RegGetValue(HKEY_LOCAL_MACHINE, csRegKey, _T("IgnoreExt"), RRF_RT_REG_SZ, NULL, vData, &cbData))
-			csLocalSkipExtensions = CString(vData);
-		if (csLocalSkipExtensions.IsEmpty())
-			csLocalSkipExtensions = _T("txt");
-		RegSetKeyValue(HKEY_LOCAL_MACHINE, csRegKey, _T("IgnoreExt"), REG_SZ, csLocalSkipExtensions.GetString(), csLocalSkipExtensions.GetLength()*sizeof(TCHAR)+1);
+		csLocalSkipExtensions = _T("txt;srt");
+		RegSetKeyValue(HKEY_LOCAL_MACHINE, csRegKey, _T("IgnoreExt"), REG_SZ, csLocalSkipExtensions.GetString(), csLocalSkipExtensions.GetLength() * sizeof(TCHAR) + 1);
 	}
 
 	CFileFind finder;
