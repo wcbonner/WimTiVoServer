@@ -3,17 +3,17 @@ Module : Dtwinver.h
 Purpose: Declaration of a comprehensive class to perform OS version detection
 Created: PJN / 11-05-1996
 
-Copyright (c) 1997 - 2019 by PJ Naughter (Web: www.naughter.com, Email: pjna@naughter.com)
+Copyright (c) 1997 - 2020 by PJ Naughter (Web: www.naughter.com, Email: pjna@naughter.com)
 
 All rights reserved.
 
 Copyright / Usage Details:
 
-You are allowed to include the source code in any product (commercial, shareware, freeware or otherwise) 
-when your product is released in binary form. You are allowed to modify the source code in any way you want 
-except you cannot modify the copyright details at the top of each module. If you want to distribute source 
-code with your application, then you are only allowed to distribute versions released by the author. This is 
-to maintain a single distribution point for the source code. 
+You are allowed to include the source code in any product (commercial, shareware, freeware or otherwise)
+when your product is released in binary form. You are allowed to modify the source code in any way you want
+except you cannot modify the copyright details at the top of each module. If you want to distribute source
+code with your application, then you are only allowed to distribute versions released by the author. This is
+to maintain a single distribution point for the source code.
 
 */
 
@@ -29,7 +29,7 @@ to maintain a single distribution point for the source code.
 #endif
 #if defined(_DOS)
   #define COSVERSION_DOS 1
-#else              
+#else
   #define COSVERSION_WIN 1
   #if defined(_WIN64)
     #define COSVERSION_WIN64 1
@@ -47,17 +47,17 @@ to maintain a single distribution point for the source code.
 
 ////////////////////////////////// Includes ///////////////////////////////////
 
-#include <windows.h> 
+#include <windows.h>
 #if defined(COSVERSION_WIN32) || defined(COSVERSION_WIN64)
 #include <tchar.h>
 #else
 #include <ctype.h>
 #include <stdlib.h>
 #include <shellapi.h>
-#endif
-#include <string.h>
-#include <stdio.h>
-#include <stdarg.h>
+#endif //#if defined(COSVERSION_WIN32) || defined(COSVERSION_WIN64)
+#include <string.h> //NOLINT(modernize-deprecated-headers)
+#include <stdio.h> //NOLINT(modernize-deprecated-headers)
+#include <stdarg.h> //NOLINT(modernize-deprecated-headers)
 
 
 ////////////////////////////////// Defines ////////////////////////////////////
@@ -158,6 +158,7 @@ to maintain a single distribution point for the source code.
 #define COSVERSION_SUITE3_XBOX_ERAOS                          0x08000000
 #define COSVERSION_SUITE3_XBOX_DURANGOHOSTOS                  0x10000000
 #define COSVERSION_SUITE3_XBOX_SCARLETTHOSTOS                 0x20000000
+#define COSVERSION_SUITE3_AZURESTACKHCI_SERVER_CORE           0x40000000
 
 #ifndef _Success_
 #define _Success_(expr)
@@ -223,64 +224,67 @@ public:
     ARM32_ON_WIN64_PROCESSOR = 14,
     IA32_ON_ARM64_PROCESSOR = 15
   };
-  
+
 //Defines
   struct OS_VERSION_INFO
   {
     //What version of OS is being emulated
-    DWORD          dwEmulatedMajorVersion;
-    DWORD          dwEmulatedMinorVersion;
-    DWORD          dwEmulatedBuildNumber;
-    OS_PLATFORM    EmulatedPlatform;
+    DWORD dwEmulatedMajorVersion;
+    DWORD dwEmulatedMinorVersion;
+    DWORD dwEmulatedBuildNumber;
+    OS_PLATFORM EmulatedPlatform;
   #if !defined(COSVERSION_CE)
-    PROCESSOR_TYPE EmulatedProcessorType;       //The emulated processor type
+    PROCESSOR_TYPE EmulatedProcessorType; //The emulated processor type
   #endif
   #if defined(COSVERSION_WIN32) || defined(COSVERSION_WIN64)
   #if !defined(WINAPI_FAMILY) || (WINAPI_FAMILY == WINAPI_FAMILY_DESKTOP_APP)
-    TCHAR          szEmulatedCSDVersion[128];
+    TCHAR szEmulatedCSDVersion[128]; //NOLINT(modernize-avoid-c-arrays)
   #endif //#if !defined(WINAPI_FAMILY) || (WINAPI_FAMILY == WINAPI_FAMILY_DESKTOP_APP)
   #else
-    char           szEmulatedCSDVersion[128];
+    char szEmulatedCSDVersion[128]; //NOLINT(modernize-avoid-c-arrays)
   #endif //#if defined(COSVERSION_WIN32) || defined(COSVERSION_WIN64)
-    WORD           wEmulatedServicePackMajor;
-    WORD           wEmulatedServicePackMinor;
+    WORD wEmulatedServicePackMajor;
+    WORD wEmulatedServicePackMinor;
 
     //What version of OS is really running
-    DWORD          dwUnderlyingMajorVersion;
-    DWORD          dwUnderlyingMinorVersion;
-    DWORD          dwUnderlyingBuildNumber;
-    OS_PLATFORM    UnderlyingPlatform;
+    DWORD dwUnderlyingMajorVersion;
+    DWORD dwUnderlyingMinorVersion;
+    DWORD dwUnderlyingBuildNumber;
+    OS_PLATFORM UnderlyingPlatform;
   #if !defined(COSVERSION_CE)
-    PROCESSOR_TYPE UnderlyingProcessorType;     //The underlying processor type
+    PROCESSOR_TYPE UnderlyingProcessorType; //The underlying processor type
   #endif //#if !defined(COSVERSION_CE)
   #if defined(COSVERSION_WIN32) || defined(COSVERSION_WIN64) 
   #if !defined(WINAPI_FAMILY) || (WINAPI_FAMILY == WINAPI_FAMILY_DESKTOP_APP)
-    TCHAR          szUnderlyingCSDVersion[128];
+    TCHAR szUnderlyingCSDVersion[128]; //NOLINT(modernize-avoid-c-arrays)
   #endif //#if !defined(WINAPI_FAMILY) || (WINAPI_FAMILY == WINAPI_FAMILY_DESKTOP_APP)
-  #else  
-    char           szUnderlyingCSDVersion[128];
-  #endif //#if defined(COSVERSION_WIN32) || defined(COSVERSION_WIN64)  
-    WORD           wUnderlyingServicePackMajor;
-    WORD           wUnderlyingServicePackMinor;
-    DWORD          dwSuiteMask;                 //Bitmask of various OS suites
-    DWORD          dwSuiteMask2;                //Second set of Bitmask of various OS suites
-    DWORD          dwSuiteMask3;                //Third set of Bitmask of various OS suites
-    OS_TYPE        OSType;                      //The basic OS type
-    DWORD          dwUBR;                       //"Updated Build Revision" value. Only applicable for Windows 10 / Server 2016+
-    DWORD          dwProductType;               //The value as returned from GetProductInfo
-    BOOL           bSemiAnnual;                 //Is this version of Windows from a Semi-annual server release
+  #else
+    char szUnderlyingCSDVersion[128]; //NOLINT(modernize-avoid-c-arrays)
+  #endif //#if defined(COSVERSION_WIN32) || defined(COSVERSION_WIN64)
+    WORD wUnderlyingServicePackMajor;
+    WORD wUnderlyingServicePackMinor;
+    DWORD dwSuiteMask; //Bitmask of various OS suites
+    DWORD dwSuiteMask2; //Second set of Bitmask of various OS suites
+    DWORD dwSuiteMask3; //Third set of Bitmask of various OS suites
+    OS_TYPE OSType; //The basic OS type
+    DWORD dwUBR; //"Updated Build Revision" value. Only applicable for Windows 10 / Server 2016+
+    DWORD dwProductType; //The value as returned from GetProductInfo
+    BOOL bSemiAnnual; //Is this version of Windows from a Semi-annual server release
+    ULONGLONG ullUAPInfo; //The first value returned from RtlGetDeviceFamilyInfoEnum
+    DWORD ulDeviceFamily; //The second value returned from RtlGetDeviceFamilyInfoEnum
+    DWORD ulDeviceForm; //The third value returned from RtlGetDeviceFamilyInfoEnum
 
   #if defined(COSVERSION_CE)
     TCHAR szOEMInfo[256];
     TCHAR szPlatformType[256];
   #endif //#if defined(COSVERSION_CE)
   };
-  typedef OS_VERSION_INFO* POS_VERSION_INFO;
-  typedef FAR OS_VERSION_INFO* LPOS_VERSION_INFO;
-  typedef const FAR OS_VERSION_INFO* LPCOS_VERSION_INFO;
+  typedef OS_VERSION_INFO* POS_VERSION_INFO; //NOLINT(modernize-use-using)
+  typedef FAR OS_VERSION_INFO* LPOS_VERSION_INFO; //NOLINT(modernize-use-using)
+  typedef const FAR OS_VERSION_INFO* LPCOS_VERSION_INFO; //NOLINT(modernize-use-using)
 
 //Constructors / Destructors
-  COSVersion(); 
+  COSVersion();
   ~COSVersion();
 
 //Methods:
@@ -510,38 +514,38 @@ public:
   _Success_(return != FALSE) BOOL IsXBoxEraOS(_In_ LPCOS_VERSION_INFO lpVersionInformation);
   _Success_(return != FALSE) BOOL IsXBoxDurangoHostOS(_In_ LPCOS_VERSION_INFO lpVersionInformation);
   _Success_(return != FALSE) BOOL IsXBoxScarlettHostOS(_In_ LPCOS_VERSION_INFO lpVersionInformation);
+  _Success_(return != FALSE) BOOL IsAzureStackHCIServerCore(_In_ LPCOS_VERSION_INFO lpVersionInformation);
 
 protected:
 //Defines / typedefs
 #if defined(COSVERSION_WIN16_OR_DOS)
-  #define CPEX_DEST_STDCALL        0x00000000L
-  #define HKEY32                   DWORD
-  #define HKEY_LOCAL_MACHINE       (( HKEY32 ) 0x80000002 )
-  #define TCHAR                    char
-  #define WCHAR                    unsigned short
+  #define CPEX_DEST_STDCALL 0x00000000L
+  #define HKEY32 DWORD
+  #define HKEY_LOCAL_MACHINE (( HKEY32 ) 0x80000002 )
+  #define TCHAR char
+  #define WCHAR unsigned short
   #define _T
-  #define _tcsicmp                 strcmpi
-  #define _tcscpy                  strcpy
-  #define _tcslen                  strlen
-  #define _istdigit                isdigit
-  #define _ttoi                    atoi
-  #define _tcsupr                  strupr
-  #define _tcsstr                  strstr
-  #define _stscanf                 sscanf
-  #define _tcsstr                  strstr
-  #define LPCTSTR                  LPCSTR
-  #define ERROR_CALL_NOT_IMPLEMENTED  120
-  #define REG_DWORD                ( 4 )
-  #define REG_MULTI_SZ             ( 7 )
-  #define VER_PLATFORM_WIN32s             0
-  #define VER_PLATFORM_WIN32_WINDOWS      1
-  #define VER_PLATFORM_WIN32_NT           2
-  #define VER_PLATFORM_WIN32_CE           3
-                      
+  #define _tcsicmp strcmpi
+  #define _tcscpy strcpy
+  #define _tcslen strlen
+  #define _istdigit isdigit
+  #define _ttoi atoi
+  #define _tcsupr strupr
+  #define _tcsstr strstr
+  #define _stscanf sscanf
+  #define _tcsstr strstr
+  #define LPCTSTR LPCSTR
+  #define ERROR_CALL_NOT_IMPLEMENTED 120
+  #define REG_DWORD ( 4 )
+  #define REG_MULTI_SZ ( 7 )
+  #define VER_PLATFORM_WIN32s 0
+  #define VER_PLATFORM_WIN32_WINDOWS 1
+  #define VER_PLATFORM_WIN32_NT 2
+  #define VER_PLATFORM_WIN32_CE 3
   #define LPTSTR LPSTR
 
   typedef struct OSVERSIONINFO
-  { 
+  {
     DWORD dwOSVersionInfoSize;
     DWORD dwMajorVersion;
     DWORD dwMinorVersion;
@@ -572,62 +576,62 @@ protected:
     WORD wProcessorRevision;
   } SYSTEM_INFO, *LPSYSTEM_INFO;
 
-  #define PROCESSOR_ARCHITECTURE_INTEL            0
-  #define PROCESSOR_ARCHITECTURE_MIPS             1
-  #define PROCESSOR_ARCHITECTURE_ALPHA            2
-  #define PROCESSOR_ARCHITECTURE_PPC              3
-  #define PROCESSOR_ARCHITECTURE_SHX              4
-  #define PROCESSOR_ARCHITECTURE_ARM              5
-  #define PROCESSOR_ARCHITECTURE_IA64             6
-  #define PROCESSOR_ARCHITECTURE_ALPHA64          7
-  #define PROCESSOR_ARCHITECTURE_MSIL             8
-  #define PROCESSOR_ARCHITECTURE_AMD64            9
-  #define PROCESSOR_ARCHITECTURE_IA32_ON_WIN64    10
-  #define PROCESSOR_ARCHITECTURE_UNKNOWN          0xFFFF
-  
+  #define PROCESSOR_ARCHITECTURE_INTEL 0
+  #define PROCESSOR_ARCHITECTURE_MIPS 1
+  #define PROCESSOR_ARCHITECTURE_ALPHA 2
+  #define PROCESSOR_ARCHITECTURE_PPC 3
+  #define PROCESSOR_ARCHITECTURE_SHX 4
+  #define PROCESSOR_ARCHITECTURE_ARM 5
+  #define PROCESSOR_ARCHITECTURE_IA64 6
+  #define PROCESSOR_ARCHITECTURE_ALPHA64 7
+  #define PROCESSOR_ARCHITECTURE_MSIL  8
+  #define PROCESSOR_ARCHITECTURE_AMD64 9
+  #define PROCESSOR_ARCHITECTURE_IA32_ON_WIN64 10
+  #define PROCESSOR_ARCHITECTURE_UNKNOWN 0xFFFF
+
 //Methods
-  static BOOL WFWLoaded();                                     
+  static BOOL WFWLoaded();
   LONG RegQueryValueEx(HKEY32 hKey, LPSTR lpszValueName, LPDWORD lpdwReserved, LPDWORD lpdwType, LPBYTE  lpbData, LPDWORD lpcbData);
 
 //Function Prototypes
-  typedef DWORD (FAR PASCAL  *lpfnLoadLibraryEx32W) (LPCSTR, DWORD, DWORD);
-  typedef BOOL  (FAR PASCAL  *lpfnFreeLibrary32W)   (DWORD);
-  typedef DWORD (FAR PASCAL  *lpfnGetProcAddress32W)(DWORD, LPCSTR);
-  typedef DWORD (FAR __cdecl *lpfnCallProcEx32W)    (DWORD, DWORD, DWORD, DWORD, ...);
-  typedef WORD  (FAR PASCAL  *lpfnWNetGetCaps)      (WORD);
-  typedef BOOL  (FAR PASCAL  *lpfnGetProductInfo)   (DWORD, DWORD, DWORD, DWORD, PDWORD);
+  typedef DWORD (FAR PASCAL *lpfnLoadLibraryEx32W)(LPCSTR, DWORD, DWORD);
+  typedef BOOL (FAR PASCAL *lpfnFreeLibrary32W)(DWORD);
+  typedef DWORD (FAR PASCAL *lpfnGetProcAddress32W)(DWORD, LPCSTR);
+  typedef DWORD (FAR __cdecl *lpfnCallProcEx32W)(DWORD, DWORD, DWORD, DWORD, ...);
+  typedef WORD (FAR PASCAL *lpfnWNetGetCaps)(WORD);
+  typedef BOOL (FAR PASCAL *lpfnGetProductInfo)(DWORD, DWORD, DWORD, DWORD, PDWORD);
 
 //Member variables
-  lpfnLoadLibraryEx32W  m_lpfnLoadLibraryEx32W;
-  lpfnFreeLibrary32W    m_lpfnFreeLibrary32W;
+  lpfnLoadLibraryEx32W m_lpfnLoadLibraryEx32W;
+  lpfnFreeLibrary32W m_lpfnFreeLibrary32W;
   lpfnGetProcAddress32W m_lpfnGetProcAddress32W;
-  lpfnCallProcEx32W     m_lpfnCallProcEx32W;
-  DWORD                 m_hAdvApi32;    
-  DWORD                 m_hKernel32;
-  DWORD                 m_lpfnRegQueryValueExA;
-  DWORD                 m_lpfnGetVersionExA;
-  DWORD                 m_lpfnGetVersion;
-  DWORD                 m_lpfnGetSystemInfo;
-  DWORD                 m_lpfnGetNativeSystemInfo;
-  DWORD                 m_lpfnGetProductInfo;
+  lpfnCallProcEx32W m_lpfnCallProcEx32W;
+  DWORD m_hAdvApi32;
+  DWORD m_hKernel32;
+  DWORD m_lpfnRegQueryValueExA;
+  DWORD m_lpfnGetVersionExA;
+  DWORD m_lpfnGetVersion;
+  DWORD m_lpfnGetSystemInfo;
+  DWORD m_lpfnGetNativeSystemInfo;
+  DWORD m_lpfnGetProductInfo;
 #endif //#if defined(COSVERSION_WIN16_OR_DOS)
 
-#if defined(COSVERSION_WIN32) || defined(COSVERSION_WIN64) 
+#if defined(COSVERSION_WIN32) || defined(COSVERSION_WIN64)
 //Function Prototypes
-  typedef BOOL (WINAPI *lpfnIsWow64Process)(HANDLE, PBOOL);  
-  typedef void (WINAPI *lpfnGetNativeSystemInfo)(LPSYSTEM_INFO);
-  typedef BOOL (WINAPI *lpfnGetProductInfo)(DWORD, DWORD, DWORD, DWORD, DWORD*);
+  typedef BOOL (WINAPI *lpfnIsWow64Process)(HANDLE, PBOOL); //NOLINT(modernize-use-using)
+  typedef void (WINAPI *lpfnGetNativeSystemInfo)(LPSYSTEM_INFO); //NOLINT(modernize-use-using)
+  typedef BOOL (WINAPI *lpfnGetProductInfo)(DWORD, DWORD, DWORD, DWORD, DWORD*); //NOLINT(modernize-use-using)
 #endif
 
 //Defines / Macros
-  typedef struct OSVERSIONINFOEX 
-  {  
+  typedef struct OSVERSIONINFOEX //NOLINT(modernize-use-using)
+  {
     DWORD dwOSVersionInfoSize;
     DWORD dwMajorVersion;
     DWORD dwMinorVersion;
     DWORD dwBuildNumber;
     DWORD dwPlatformId;
-    TCHAR szCSDVersion[128];
+    TCHAR szCSDVersion[128]; //NOLINT(modernize-avoid-c-arrays)
     WORD wServicePackMajor;
     WORD wServicePackMinor;
     WORD wSuiteMask;
@@ -635,27 +639,28 @@ protected:
     BYTE wReserved;
   } OSVERSIONINFOEX, *POSVERSIONINFOEX, *LPOSVERSIONINFOEX;
 
-  typedef struct _OSVERSIONINFOEXW 
+  typedef struct _OSVERSIONINFOEXW //NOLINT(modernize-use-using)
   {
-    DWORD  dwOSVersionInfoSize;
-    DWORD  dwMajorVersion;
-    DWORD  dwMinorVersion;
-    DWORD  dwBuildNumber;
-    DWORD  dwPlatformId;
-    WCHAR  szCSDVersion[128];
-    WORD   wServicePackMajor;
-    WORD   wServicePackMinor;
-    WORD   wSuiteMask;
-    BYTE  wProductType;
-    BYTE  wReserved;
+    DWORD dwOSVersionInfoSize;
+    DWORD dwMajorVersion;
+    DWORD dwMinorVersion;
+    DWORD dwBuildNumber;
+    DWORD dwPlatformId;
+    WCHAR szCSDVersion[128]; //NOLINT(modernize-avoid-c-arrays)
+    WORD wServicePackMajor;
+    WORD wServicePackMinor;
+    WORD wSuiteMask;
+    BYTE wProductType;
+    BYTE wReserved;
   } RTL_OSVERSIONINFOEXW, *PRTL_OSVERSIONINFOEXW;
-                                        
-#if defined(_WIN32) || defined(_WINDOWS)                                        
-//Function Prototypes                  
-  typedef BOOL (WINAPI *lpfnGetVersionEx)(LPOSVERSIONINFO);  
-  typedef DWORD (WINAPI *lpfnGetVersion)();
-  typedef LONG (WINAPI *lpfnRtlGetVersion)(PRTL_OSVERSIONINFOEXW);
-#endif  
+
+#if defined(_WIN32) || defined(_WINDOWS)
+//Function Prototypes
+  typedef BOOL (WINAPI *lpfnGetVersionEx)(LPOSVERSIONINFO); //NOLINT(modernize-use-using)
+  typedef DWORD (WINAPI *lpfnGetVersion)(); //NOLINT(modernize-use-using)
+  typedef LONG (WINAPI *lpfnRtlGetVersion)(PRTL_OSVERSIONINFOEXW); //NOLINT(modernize-use-using)
+  typedef VOID (WINAPI *lpfnRtlGetDeviceFamilyInfo)(ULONGLONG*, DWORD*, DWORD*); //NOLINT(modernize-use-using)
+#endif //#if defined(_WIN32) || defined(_WINDOWS)
 
 //Methods
 #if defined(COSVERSION_DOS)
@@ -687,6 +692,7 @@ protected:
   static DWORD GetNTCurrentBuildFromRegistry(_In_ HKEY hKeyCurrentVersion);
   _Success_(return != FALSE) static BOOL GetNTCurrentBuildFromRegistry(_Out_ DWORD& dwCurrentBuild);
   _Success_(return != FALSE) static BOOL GetNTRTLVersion(_Inout_ LPOS_VERSION_INFO lpVersionInformation);
+  _Success_(return != FALSE) static BOOL GetDeviceFamilyInfo(_Inout_ LPOS_VERSION_INFO lpVersionInformation);
   _Success_(return != FALSE) static BOOL GetWindows8Point1Or2012R2Update(_Inout_ LPOS_VERSION_INFO lpVersionInformation);
   void _GetVersion(_In_ DWORD dwMajorVersion, _In_ DWORD dwMinorVersion, _In_ DWORD dwBuildNumber, _In_z_ const TCHAR* szCSDVersion, _In_ WORD wServicePackMajor,
                    _In_ WORD wServicePackMinor, _In_ DWORD dwPlatformId, _In_ BOOL bOnlyUpdateDCDetails, _Inout_ LPOS_VERSION_INFO lpVersionInformation);

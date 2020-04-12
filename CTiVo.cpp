@@ -996,6 +996,7 @@ const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath) cons
 	CString rval(QuoteFileName(csFFMPEGPath));
 	rval.Append(_T(" -hide_banner -i "));
 	rval.Append(QuoteFileName(m_csPathName));
+	//rval.Append(_T(" -map 0:v -map 0:a?")); // copy all audio streams Added 2020-04-04
 	rval.Append(_T(" -map_metadata -1"));
 	if (m_VideoCompatible)
 		rval.Append(_T(" -vcodec copy"));
@@ -1017,6 +1018,7 @@ const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath) cons
 	rval.Append(_T(" -report"));
 	#endif
 	rval.Append(_T(" -f vob -"));
+	//rval.Append(_T(" -f mpegts -")); // use mpegts as output Added 2020-04-04
 	return(rval);
 }
 /////////////////////////////////////////////////////////////////////////////
