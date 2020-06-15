@@ -1048,7 +1048,7 @@ UINT CWimTiVoClientDoc::TiVoConvertFileThread(LPVOID lvp)
 										//pDoc->m_LogFile << " -acodec copy ";
 										pDoc->m_LogFile << " -profile:v high";
 										pDoc->m_LogFile << " -level 4.1";
-										pDoc->m_LogFile << "-y " << CStringA(QuoteFileName(csMP4PathName)).GetString() << std::endl;
+										pDoc->m_LogFile << " -y " << CStringA(QuoteFileName(csMP4PathName)).GetString() << std::endl;
 									}
 									if (-1 == _tspawnlp(_P_WAIT, pDoc->m_csFFMPEGPath.GetString(), pDoc->m_csFFMPEGPath.GetString(), _T("-i"), QuoteFileName(csMPEGPathName).GetString(), 
 										_T("-metadata"), csTitle.GetString(),
