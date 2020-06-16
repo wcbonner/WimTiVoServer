@@ -448,6 +448,7 @@ History: PJN / 24-02-1997 A number of updates including support for NT 3.1,
                           4. Added support for returning the information from the Windows 10 RtlGetDeviceFamilyInfoEnum API.This addition allows 
                           DtWinVer to return true version information even if the process in which the DtWinVer code is running with OS Version 
                           compatibility mode shims applied.
+         PJN / 17-05-2020 1. Added support for Windows Server vNext (aka the version of Windows Server after Windows Server version 2004).
 
 Copyright (c) 1997 - 2020 by PJ Naughter (Web: www.naughter.com, Email: pjna@naughter.com)
 
@@ -4371,9 +4372,17 @@ _Success_(return != FALSE) BOOL COSVersion::IsWindowsServerVersion1909(_In_ LPCO
 _Success_(return != FALSE) BOOL COSVersion::IsWindowsServerVersion2004(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
 {
   if (bCheckUnderlying)
-    return IsWindowsServer2019(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber >= 18836) && lpVersionInformation->bSemiAnnual;
+    return IsWindowsServer2019(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber >= 18836) && (lpVersionInformation->dwUnderlyingBuildNumber < 19536) && lpVersionInformation->bSemiAnnual;
   else
-    return IsWindowsServer2019(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber >= 18836) && lpVersionInformation->bSemiAnnual;
+    return IsWindowsServer2019(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber >= 18836) && (lpVersionInformation->dwUnderlyingBuildNumber < 19536) && lpVersionInformation->bSemiAnnual;
+}
+
+_Success_(return != FALSE) BOOL COSVersion::IsWindowsServervNext(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
+{
+  if (bCheckUnderlying)
+    return IsWindowsServer2019(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber >= 19536);
+  else
+    return IsWindowsServer2019(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber >= 19536);
 }
 
 _Success_(return != FALSE) BOOL COSVersion::IsWindows10(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)

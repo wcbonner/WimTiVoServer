@@ -406,6 +406,7 @@ public:
   _Success_(return != FALSE) BOOL IsWindowsServerVersion1903(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
   _Success_(return != FALSE) BOOL IsWindowsServerVersion1909(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
   _Success_(return != FALSE) BOOL IsWindowsServerVersion2004(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
+  _Success_(return != FALSE) BOOL IsWindowsServervNext(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
 
   _Success_(return != FALSE) BOOL IsWebWindowsServer2019(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
   _Success_(return != FALSE) BOOL IsStandardWindowsServer2019(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
@@ -637,7 +638,7 @@ protected:
     WORD wSuiteMask;
     BYTE wProductType;
     BYTE wReserved;
-  } OSVERSIONINFOEX, *POSVERSIONINFOEX, *LPOSVERSIONINFOEX;
+  } OSVERSIONINFOEX, *POSVERSIONINFOEX, *LPOSVERSIONINFOEX; //NOLINT(modernize-use-using)
 
   typedef struct _OSVERSIONINFOEXW //NOLINT(modernize-use-using)
   {
@@ -652,7 +653,7 @@ protected:
     WORD wSuiteMask;
     BYTE wProductType;
     BYTE wReserved;
-  } RTL_OSVERSIONINFOEXW, *PRTL_OSVERSIONINFOEXW;
+  } RTL_OSVERSIONINFOEXW, *PRTL_OSVERSIONINFOEXW; //NOLINT(modernize-use-using)
 
 #if defined(_WIN32) || defined(_WINDOWS)
 //Function Prototypes
