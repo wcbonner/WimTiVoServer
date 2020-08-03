@@ -83,6 +83,7 @@
     <ExecutablePath>C:\Users\Wim\Downloads\ffmpeg-20130915-git-7ac6c63-win64-shared\bin;$(ExecutablePath)</ExecutablePath>
     <IncludePath>C:\Users\Wim\Downloads\ffmpeg-20130915-git-7ac6c63-win64-dev\include;$(IncludePath)</IncludePath>
     <LibraryPath>C:\Users\Wim\Downloads\ffmpeg-20130915-git-7ac6c63-win64-dev\lib;$(LibraryPath)</LibraryPath>
+    <IntDir>$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
@@ -92,6 +93,7 @@
     <ExecutablePath>C:\Users\Wim\Downloads\ffmpeg-20130915-git-7ac6c63-win64-shared\bin;$(ExecutablePath)</ExecutablePath>
     <IncludePath>C:\Users\Wim\Downloads\ffmpeg-20130915-git-7ac6c63-win64-dev\include;$(IncludePath)</IncludePath>
     <LibraryPath>C:\Users\Wim\Downloads\ffmpeg-20130915-git-7ac6c63-win64-dev\lib;$(LibraryPath)</LibraryPath>
+    <IntDir>$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
