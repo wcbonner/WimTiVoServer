@@ -1,4 +1,7 @@
-﻿// WimTiVoServer.cpp : Defines the entry point for the console application.
+﻿/////////////////////////////////////////////////////////////////////////////
+// Copyright (C) 2020 William C Bonner
+/////////////////////////////////////////////////////////////////////////////
+// WimTiVoServer.cpp : Defines the entry point for the console application.
 //
 
 // Other Things to look at:
@@ -16,12 +19,6 @@
 // some possible settings info: http://pytivo.sourceforge.net/forum/hd-tivo-ideal-settings-t40.html
 
 // Logon to Tivo with username: "tivo" password: MAK
-// Wim's TiVoHD (MAK) Media Access Key: 1760168186
-// Mom & Dad's TiVoHD (MAK) Media Access Key: 9371539867
-// [2012-12-26T03:10:42] 192.168.1.11 tivoconnect=1 swversion=11.0k-01-2-652 method=broadcast identity=6520201806EEAAE machine=Living Room platform=tcd/Series3 services=TiVoMediaServer:80/http
-// [2012-12-26T06:32:43] 192.168.1.48 TiVoConnect=1 Machine=HPQUAD Identity={E2C4F367-F194-4C8D-84B6-EBDF47CCF26E} Method=Broadcast Platform=pc/WinNT:6.1.7601 Services=TiVoMediaServer:8080/http
-// [2013-01-26T03:47:21] 192.168.0.5 TiVoConnect=1 Machine=INSPIRON Identity={9DA17E3D-FEC4-4533-9F0F-E2DB35EAA9B1} Method=Broadcast Platform=pc/WinNT:6.1.7601 Services=TiVoMediaServer:8080/http
-// [2013-01-26T03:47:21] 192.168.0.108 tivoconnect=1 swversion=11.0k-01-2-652 method=broadcast identity=6520001802E00C3 machine=TivoHD platform=tcd/Series3 services=TiVoMediaServer:80/http
 
 // STL Reference I like to use: http://cplusplus.com/reference/fstream/ofstream/ofstream/
 // I'm going to try to use XMLLite for XML Processing. http://msdn.microsoft.com/en-us/library/windows/desktop/ms752864(v=vs.85).aspx
@@ -52,7 +49,6 @@
 
 // Here's an experiment in making a decent quality file for the ipad with subtitles, it seemed to compare favorbly with the original.
 // "c:\\Users\\Wim\\Downloads\\ffmpeg-20130318-git-519ebb5-win64-static\\bin\\ffmpeg.exe" -report -i THE_INTOUCHABLES_t08.mkv -filter_complex "[0:0][0:2]overlay" -ac 2 THE_INTOUCHABLES.mp4
-
 
 #include "stdafx.h"
 #include "WimTiVoServer.h"
