@@ -18,3 +18,5 @@ The software pays attention to two primary registry keys.
  
  The program polls the container directories every 15 minutes for new files to include in the list.
  
+# WimTiVoBeaconListener
+Windows program that listens on UDP Port 2190 for TiVo Beacon messages and displays the recieved beacon on the console.
