@@ -154,7 +154,7 @@
     <CustomBuildStep />
   </ItemDefinitionGroup>
   <ItemGroup>
-    <None Include="ReadMe.txt" />
+    <None Include="README.md" />
     <None Include="WimTiVoServerEventLog.mc" />
   </ItemGroup>
   <ItemGroup>

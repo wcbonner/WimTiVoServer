@@ -18,6 +18,8 @@
 #include <afx.h>
 #include <afxwin.h>         // MFC core and standard components
 #include <afxext.h>         // MFC extensions
+#include <afxcview.h>
+
 #ifndef _AFX_NO_OLE_SUPPORT
 #include <afxdtctl.h>           // MFC support for Internet Explorer 4 Common Controls
 #endif
@@ -27,7 +29,7 @@
 
 #include <iostream>
 
-// TODO: reference additional headers your program requires here
+#include <afxcontrolbars.h>     // MFC support for ribbons and control bars
 #include <afxsock.h>		// MFC socket extensions
 #include <afxinet.h>
 #include <afxmt.h>			// for CCriticalSection

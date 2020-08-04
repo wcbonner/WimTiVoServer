@@ -15,6 +15,7 @@
 #include "stdafx.h"
 #include "afxwinappex.h"
 #include "afxdialogex.h"
+#include "CTiVo.h"
 #include "WimTiVoClient.h"
 #include "MainFrm.h"
 
