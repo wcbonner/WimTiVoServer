@@ -18,5 +18,13 @@ The software pays attention to two primary registry keys.
  
  The program polls the container directories every 15 minutes for new files to include in the list.
  
+# WimTiVoClient
+Windows GUI Application that allows listing all of the files on your TiVo and transferring them to your computer. Optionally utilizes TiVoDecode and FFmpeg to transcode the retrieved .tivo file to a more friendly format. https://sourceforge.net/projects/tivodecode/ Needs the Media Access Key (MAK) from your TiVo to be able to communicate with the TiVo. Transferred file name format is based on the TiVo Desktop software that TiVo produced when they were a much more consumer friendly company.
+
+Start the program, let it run for a minute or so and hopefully hear a beacon from your TiVo, exit the program, and restart it. Now you should hopefully be able to select your TiVo in the drop down list and then hit the Get Now Playing Button.
+
+Important registry key that is visible but not modifiable from the interface, is where to store the recieved video files:
+ - HKEY_CURRENT_USER\SOFTWARE\WimsWorld\WimTiVoClient\TiVo\TiVoFileDestination
+ 
 # WimTiVoBeaconListener
-Windows program that listens on UDP Port 2190 for TiVo Beacon messages and displays the recieved beacon on the console.
+Windows command line program that listens on UDP Port 2190 for TiVo Beacon messages and displays them. Useful to make sure that your machine is recieving network packets from your TiVo or the WimTiVoServer itself. If messages aren't being recieved, they may be blocked by a firewall.
