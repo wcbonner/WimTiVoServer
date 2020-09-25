@@ -449,6 +449,9 @@ History: PJN / 24-02-1997 A number of updates including support for NT 3.1,
                           DtWinVer to return true version information even if the process in which the DtWinVer code is running with OS Version 
                           compatibility mode shims applied.
          PJN / 17-05-2020 1. Added support for Windows Server vNext (aka the version of Windows Server after Windows Server version 2004).
+         PJN / 16-06-2020 1. Provided a new IsWindows10Codename20H2 method.
+         PJN / 12-08-2020 1. Added support for the following product types: PRODUCT_DATACENTER_SERVER_AZURE_EDITION and
+                          PRODUCT_DATACENTER_SERVER_CORE_AZURE_EDITION
 
 Copyright (c) 1997 - 2020 by PJ Naughter (Web: www.naughter.com, Email: pjna@naughter.com)
 
@@ -1285,6 +1288,15 @@ to maintain a single distribution point for the source code.
 #define PRODUCT_AZURESTACKHCI_SERVER_CORE 0x00000196
 #endif //#ifndef PRODUCT_AZURESTACKHCI_SERVER_CORE
 
+#ifndef PRODUCT_DATACENTER_SERVER_AZURE_EDITION
+#define PRODUCT_DATACENTER_SERVER_AZURE_EDITION 0x00000197
+#endif //#ifndef PRODUCT_DATACENTER_SERVER_AZURE_EDITION
+
+#ifndef PRODUCT_DATACENTER_SERVER_CORE_AZURE_EDITION
+#define PRODUCT_DATACENTER_SERVER_CORE_AZURE_EDITION 0x00000198
+#endif //#ifndef PRODUCT_DATACENTER_SERVER_CORE_AZURE_EDITION
+
+
 #ifndef VER_PLATFORM_WIN32_CE
 #define VER_PLATFORM_WIN32_CE 3
 #endif //#ifndef VER_PLATFORM_WIN32_CE
@@ -1862,12 +1874,12 @@ _Success_(return != FALSE) BOOL COSVersion::GetVersion(_Inout_ LPOS_VERSION_INFO
 
   DWORD dwVersion = ::GetVersion();
   // GetVersion does not differentiate between Windows 3.1 and Windows 3.11
-      
+
   lpVersionInformation->dwEmulatedMajorVersion = LOBYTE(LOWORD(dwVersion));
   lpVersionInformation->dwEmulatedMinorVersion = HIBYTE(LOWORD(dwVersion));
-  lpVersionInformation->dwEmulatedBuildNumber  = 0; //no build number with Win3.1x
-  lpVersionInformation->EmulatedPlatform       = Windows3x;
-      
+  lpVersionInformation->dwEmulatedBuildNumber = 0; //no build number with Win3.1x
+  lpVersionInformation->EmulatedPlatform = Windows3x;
+
   //Call to get the underlying OS here through 16 -> 32 bit Generic Thunk
   BOOL bFoundUnderlyingOS = FALSE;
   OSVERSIONINFO osvi;
@@ -1894,7 +1906,7 @@ _Success_(return != FALSE) BOOL COSVersion::GetVersion(_Inout_ LPOS_VERSION_INFO
       {
         lpVersionInformation->wUnderlyingServicePackMajor = 2;
         lpVersionInformation->wUnderlyingServicePackMinor = 5;
-      }  
+      }
       else if (IsWindows98SP1(osvi.dwMajorVersion, osvi.dwMinorVersion, osvi.dwBuildNumber))
         lpVersionInformation->wUnderlyingServicePackMajor = 1;
     }
@@ -1911,7 +1923,7 @@ _Success_(return != FALSE) BOOL COSVersion::GetVersion(_Inout_ LPOS_VERSION_INFO
 
       //Get the Bing Edition details
       GetBingEditionIDFromRegistry(lpVersionInformation);
-          
+
       //Determine if it is NT SP6a Vs SP6
       GetNTSP6aDetailsFromRegistry(lpVersionInformation, FALSE);
 
@@ -1938,7 +1950,7 @@ _Success_(return != FALSE) BOOL COSVersion::GetVersion(_Inout_ LPOS_VERSION_INFO
     }
     else
       return FALSE;
-       
+
     bFoundUnderlyingOS = TRUE;
   }
   else
@@ -1947,17 +1959,17 @@ _Success_(return != FALSE) BOOL COSVersion::GetVersion(_Inout_ LPOS_VERSION_INFO
     //Windows NT 3.5 or earlier since anything released later by MS had this function.
     DWORD dwVersion = ::GetVersion();
     if (dwVersion)
-    {              
+    {
       lpVersionInformation->dwUnderlyingMajorVersion = (DWORD)(LOBYTE(LOWORD(dwVersion)));
       lpVersionInformation->dwUnderlyingMinorVersion = (DWORD)(HIBYTE(LOWORD(dwVersion)));
       lpVersionInformation->dwUnderlyingBuildNumber  = 0;
       lpVersionInformation->UnderlyingPlatform   = WindowsNT;
       _fstrcpy(lpVersionInformation->szUnderlyingCSDVersion, "");
-   
+
       bFoundUnderlyingOS = TRUE;
     }
   }
-  
+
   //Get the processor details
   GetProcessorType(lpVersionInformation);
 
@@ -2047,9 +2059,9 @@ _Success_(return != FALSE) BOOL COSVersion::GetVersion(_Inout_ LPOS_VERSION_INFO
         lpVersionInformation->UnderlyingPlatform = Dos;
         _fstrcpy(lpVersionInformation->szUnderlyingCSDVersion, "");
       }
-    }   
+    }
   }
-#endif //#if defined(COSVERSION_WIN16) 
+#endif //#if defined(COSVERSION_WIN16)
 
 #endif //#if defined(COSVERSION_CE)
 
@@ -2125,39 +2137,44 @@ BOOL COSVersion::GetInfoBySpawingWriteVer(COSVersion::LPOS_VERSION_INFO lpVersio
                           pszToken = strtok(NULL, pszSeparators);
                           if (pszToken)
                           {
-                            lpVersionInformation->OSType = (COSVersion::OS_TYPE) atoi(pszToken);
-
+                            lpVersionInformation->dwSuiteMask4 = atol(pszToken);
                             pszToken = strtok(NULL, pszSeparators);
                             if (pszToken)
                             {
-                              lpVersionInformation->UnderlyingProcessorType = (COSVersion::PROCESSOR_TYPE) atoi(pszToken);
+                              lpVersionInformation->OSType = (COSVersion::OS_TYPE) atoi(pszToken);
 
-                              //CSDVersion string, UBR, ProductType, SemiAnnual, uDeviceFamily and uDeviceForm are optional so consider it successful if we got as far as here
-                              //Also note that we do not support returning ullUAPInfo from this code path
-                              bSuccess = TRUE;
                               pszToken = strtok(NULL, pszSeparators);
                               if (pszToken)
                               {
-                                strcpy(lpVersionInformation->szUnderlyingCSDVersion, pszToken);
+                                lpVersionInformation->UnderlyingProcessorType = (COSVersion::PROCESSOR_TYPE) atoi(pszToken);
+
+                                //CSDVersion string, UBR, ProductType, SemiAnnual, uDeviceFamily and uDeviceForm are optional so consider it successful if we got as far as here
+                                //Also note that we do not support returning ullUAPInfo from this code path
+                                bSuccess = TRUE;
                                 pszToken = strtok(NULL, pszSeparators);
                                 if (pszToken)
                                 {
-                                  lpVersionInformation->dwUBR = atoi(pszToken);
+                                  strcpy(lpVersionInformation->szUnderlyingCSDVersion, pszToken);
                                   pszToken = strtok(NULL, pszSeparators);
                                   if (pszToken)
                                   {
-                                    lpVersionInformation->dwProductType = atoi(pszToken);
+                                    lpVersionInformation->dwUBR = atoi(pszToken);
                                     pszToken = strtok(NULL, pszSeparators);
                                     if (pszToken)
                                     {
-                                      lpVersionInformation->bSemiAnnual = (atoi(pszToken) != 0);
+                                      lpVersionInformation->dwProductType = atoi(pszToken);
                                       pszToken = strtok(NULL, pszSeparators);
                                       if (pszToken)
                                       {
-                                        lpVersionInformation->ulDeviceFamily = atoi(pszToken);
+                                        lpVersionInformation->bSemiAnnual = (atoi(pszToken) != 0);
                                         pszToken = strtok(NULL, pszSeparators);
                                         if (pszToken)
-                                          lpVersionInformation->ulDeviceForm = atoi(pszToken);
+                                        {
+                                          lpVersionInformation->ulDeviceFamily = atoi(pszToken);
+                                          pszToken = strtok(NULL, pszSeparators);
+                                          if (pszToken)
+                                            lpVersionInformation->ulDeviceForm = atoi(pszToken);
+                                        }
                                       }
                                     }
                                   }
@@ -2205,13 +2222,13 @@ void COSVersion::GetWinInfo()
     or      ax,ax
     jz      RunningUnderWin31       ; can check if running in standard
                                     ; or enhanced mode
-   
+
   ; check for Windows 3.0 enhanced mode
     mov     ax,1600h                ; WIN386CHECK
     int     2fh
     test    al,7fh
     jnz     RunningUnderWin30Enh    ; enhanced mode
-   
+
   ; check for 3.0 WINOLDAP
     mov     ax,4680h                ; IS_WINOLDAP_ACTIVE
     int     2fh
@@ -2232,13 +2249,13 @@ void COSVersion::GetWinInfo()
     pop     bx
     or      ax,ax
     jz      NotRunningUnderWin      ; MS-DOS 5.0 task switcher found
-   
+
   ; check for standard mode Windows 3.0
     mov     ax,1605h                ; PMODE_START
     int     2fh
     cmp     cx,-1
     jz      RunningUnderWin30Std
-   
+
   ; check for real mode Windows 3.0
     mov     ax,1606h                ; PMODE_STOP
     int     2fh                     ; in case someone is counting
@@ -2247,41 +2264,41 @@ void COSVersion::GetWinInfo()
     mov     byte ptr [MajorVer], 3h
     mov     byte ptr [MinorVer], 0h
     jmp     ExitLabel
-   
+
   RunningUnderWin30Std:
     ; Standard mode Windows 3.0 is running
     mov     byte ptr [bRunningWindows], 1
     mov     byte ptr [MajorVer], 3h
     mov     byte ptr [MinorVer], 0h
     jmp     ExitLabel
-   
+
   RunningUnderWin31:
     ; At this point: CX == 3 means Windows 3.1 enhanced mode
     ;                CX == 2 means Windows 3.1 standard mode
     mov     byte ptr [bRunningWindows], 1
-    
+
     ; Get the version of Windows 
     mov     ax, 1600h   ; Get Enhanced-Mode Windows Installed State
     int     2Fh
     mov     byte ptr [MajorVer], al
     mov     byte ptr [MinorVer], ah
     jmp     ExitLabel
-   
+
   RunningUnderWin30Enh:
     ; Enhanced mode Windows 3.0 is running
     mov     byte ptr [bRunningWindows], 1
     mov     byte ptr [MajorVer], 3h
     mov     byte ptr [MinorVer], 0h
     jmp     ExitLabel
-   
+
   NotRunningUnderWin:
     mov     byte ptr [bRunningWindows], 0
-    
+
   ExitLabel:
   }
 
   WinVer = (WORD) ((MajorVer << 8) + MinorVer);
-} 
+}
 #else
 #if !defined(WINAPI_FAMILY) || (WINAPI_FAMILY == WINAPI_FAMILY_DESKTOP_APP)
 void COSVersion::GetNTSP6aDetailsFromRegistry(_Inout_ LPOS_VERSION_INFO lpVersionInformation, _In_ BOOL bUpdateEmulatedAlso)
@@ -3667,7 +3684,24 @@ void COSVersion::GetProductInfo(_Inout_ LPOS_VERSION_INFO lpVersionInformation)
     }
     case PRODUCT_AZURESTACKHCI_SERVER_CORE:
     {
+      lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_AZURE;
       lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_AZURESTACKHCI_SERVER_CORE;
+      lpVersionInformation->dwSuiteMask |= COSVERSION_SUITE_SERVER_CORE;
+      break;
+    }
+    case PRODUCT_DATACENTER_SERVER_AZURE_EDITION:
+    {
+      lpVersionInformation->dwSuiteMask |= COSVERSION_SUITE_DATACENTER;
+      lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_AZURE;
+      lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_DATACENTER_SERVER_AZURE_EDITION;
+      break;
+    }
+    case PRODUCT_DATACENTER_SERVER_CORE_AZURE_EDITION:
+    {
+      lpVersionInformation->dwSuiteMask |= COSVERSION_SUITE_DATACENTER;
+      lpVersionInformation->dwSuiteMask |= COSVERSION_SUITE_SERVER_CORE;
+      lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_AZURE;
+      lpVersionInformation->dwSuiteMask4 |= COSVERSION_SUITE4_DATACENTER_SERVER_CORE_AZURE_EDITION;
       break;
     }
     default:
@@ -4469,9 +4503,17 @@ _Success_(return != FALSE) BOOL COSVersion::IsWindows10Version1909(_In_ LPCOS_VE
 _Success_(return != FALSE) BOOL COSVersion::IsWindows10Version2004(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
 {
   if (bCheckUnderlying)
-    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber >= 18836) && (lpVersionInformation->dwUnderlyingBuildNumber < 19536);
+    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber >= 18836) && (lpVersionInformation->dwUnderlyingBuildNumber < 19042);
   else
-    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber >= 18836) && (lpVersionInformation->dwEmulatedBuildNumber < 19536);
+    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber >= 18836) && (lpVersionInformation->dwEmulatedBuildNumber < 19042);
+}
+
+_Success_(return != FALSE) BOOL COSVersion::IsWindows10Codename20H2(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
+{
+  if (bCheckUnderlying)
+    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber == 19042);
+  else
+    return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber == 19042);
 }
 
 _Success_(return != FALSE) BOOL COSVersion::IsWindows10ActiveDevelopmentBranch(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
@@ -5352,6 +5394,16 @@ _Success_(return != FALSE) BOOL COSVersion::IsXBoxScarlettHostOS(_In_ LPCOS_VERS
 _Success_(return != FALSE) BOOL COSVersion::IsAzureStackHCIServerCore(_In_ LPCOS_VERSION_INFO lpVersionInformation)
 {
   return ((lpVersionInformation->dwSuiteMask3 & COSVERSION_SUITE3_AZURESTACKHCI_SERVER_CORE) != 0);
+}
+
+_Success_(return != FALSE) BOOL COSVersion::IsDatacenterServerAzureEdition(_In_ LPCOS_VERSION_INFO lpVersionInformation)
+{
+  return ((lpVersionInformation->dwSuiteMask3 & COSVERSION_SUITE3_DATACENTER_SERVER_AZURE_EDITION) != 0);
+}
+
+_Success_(return != FALSE) BOOL COSVersion::IsDatacenterServerCoreAzureEdition(_In_ LPCOS_VERSION_INFO lpVersionInformation)
+{
+  return ((lpVersionInformation->dwSuiteMask4 & COSVERSION_SUITE4_DATACENTER_SERVER_CORE_AZURE_EDITION) != 0);
 }
 
 _Success_(return != FALSE) BOOL COSVersion::Is64Bit(_In_ LPCOS_VERSION_INFO /*lpVersionInformation*/, _In_ BOOL bCheckUnderlying)
