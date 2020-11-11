@@ -452,6 +452,7 @@ History: PJN / 24-02-1997 A number of updates including support for NT 3.1,
          PJN / 16-06-2020 1. Provided a new IsWindows10Codename20H2 method.
          PJN / 12-08-2020 1. Added support for the following product types: PRODUCT_DATACENTER_SERVER_AZURE_EDITION and
                           PRODUCT_DATACENTER_SERVER_CORE_AZURE_EDITION
+         PJN / 11-11-2020 1. Renamed IsWindows10Codename20H2 method to IsWindows10Version20H2.
 
 Copyright (c) 1997 - 2020 by PJ Naughter (Web: www.naughter.com, Email: pjna@naughter.com)
 
@@ -4508,7 +4509,7 @@ _Success_(return != FALSE) BOOL COSVersion::IsWindows10Version2004(_In_ LPCOS_VE
     return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber >= 18836) && (lpVersionInformation->dwEmulatedBuildNumber < 19042);
 }
 
-_Success_(return != FALSE) BOOL COSVersion::IsWindows10Codename20H2(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
+_Success_(return != FALSE) BOOL COSVersion::IsWindows10Version20H2(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
 {
   if (bCheckUnderlying)
     return IsWindows10(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber == 19042);

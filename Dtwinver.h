@@ -361,7 +361,7 @@ public:
   _Success_(return != FALSE) BOOL IsWindows10Version1903(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
   _Success_(return != FALSE) BOOL IsWindows10Version1909(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
   _Success_(return != FALSE) BOOL IsWindows10Version2004(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
-  _Success_(return != FALSE) BOOL IsWindows10Codename20H2(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
+  _Success_(return != FALSE) BOOL IsWindows10Version20H2(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
   _Success_(return != FALSE) BOOL IsWindows10ActiveDevelopmentBranch(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
 
   _Success_(return != FALSE) BOOL IsWebWindowsServer2003(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
