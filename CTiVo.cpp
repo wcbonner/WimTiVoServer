@@ -1338,19 +1338,22 @@ bool XML_Parse_TiVoNowPlaying(const CString & Source, std::vector<cTiVoFile> & T
 								position.QuadPart = 0;
 								spMemoryStreamOne->Seek(position, STREAM_SEEK_SET, NULL);
 								rval = XML_Parse_TiVoNowPlaying(spMemoryStreamOne, strPassword, TiVoFileList, TiVoTiVoContainers);
-								//#ifdef _DEBUG
-								//CComPtr<IStream> spMemoryStreamTwo;
-								//static int iFileCount = 0;
-								//CString csFileName(AfxGetAppName());
-								//csFileName.AppendFormat(_T(".%d.xml"), iFileCount++);
-								//if (SUCCEEDED(SHCreateStreamOnFile(csFileName.GetString(), STGM_CREATE | STGM_WRITE, &spMemoryStreamTwo))) 
-								//{
-								//	STATSTG statstg;
-								//	spMemoryStreamOne->Stat(&statstg, STATFLAG_NONAME);
-								//	spMemoryStreamOne->Seek(position, STREAM_SEEK_SET, NULL);
-								//	spMemoryStreamOne->CopyTo(spMemoryStreamTwo, statstg.cbSize, NULL, NULL);
-								//}
-								//#endif
+								#ifdef _DEBUG
+								CComPtr<IStream> spMemoryStreamTwo;
+								static int iFileCount = 0;
+								TCHAR szLogFilePath[MAX_PATH] = _T("");
+								SHGetFolderPath(NULL, CSIDL_PERSONAL, NULL, 0, szLogFilePath);
+								PathAppend(szLogFilePath, AfxGetAppName());
+								CString csFileName(szLogFilePath);
+								csFileName.AppendFormat(_T(".%d.xml"), iFileCount++);
+								if (SUCCEEDED(SHCreateStreamOnFile(csFileName.GetString(), STGM_CREATE | STGM_WRITE, &spMemoryStreamTwo))) 
+								{
+									STATSTG statstg;
+									spMemoryStreamOne->Stat(&statstg, STATFLAG_NONAME);
+									spMemoryStreamOne->Seek(position, STREAM_SEEK_SET, NULL);
+									spMemoryStreamOne->CopyTo(spMemoryStreamTwo, statstg.cbSize, NULL, NULL);
+								}
+								#endif
 							}
 						}
 						else

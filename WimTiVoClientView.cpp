@@ -227,6 +227,10 @@ void CWimTiVoClientView::OnTiviNowplaying()
 	{
 		CWaitCursor wait;
 		CString csURL(pDoc->m_TiVoContainer.m_url.c_str());
+		#ifdef _DEBUG
+		// I added this on 2021-10-07 when I was attempting to debug a problem retrieving the file list from my Tivo. I'd deleted a football game, but it seems to be half hanging out on the TiVo. On the TV, I can see a group with 5 items listed, but when I look in the group, it only shows 4. That seems to be the stopper file in the normal date based transfer of file listing.
+		csURL.Append(_T("&SortOrder=Title"));
+		#endif // !_DEBUG
 		csURL.Append(_T("&Recurse=Yes"));
 		csURL.Append(_T("&ItemCount=32"));
 
