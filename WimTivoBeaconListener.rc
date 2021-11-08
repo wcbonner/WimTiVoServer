@@ -51,8 +51,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,5,8,4
- PRODUCTVERSION 1,5,8,4
+ FILEVERSION 1,6,11,8
+ PRODUCTVERSION 1,6,11,8
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -69,12 +69,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "WimsWorld"
             VALUE "FileDescription", "WimTivoBeaconListener"
-            VALUE "FileVersion", "1.5.8.4"
+            VALUE "FileVersion", "1.6.11.8"
             VALUE "InternalName", "WimTivoBeaconListener"
-            VALUE "LegalCopyright", "Copyright © 2020 William C Bonner.  All rights reserved."
+            VALUE "LegalCopyright", "Copyright © 2021 William C Bonner.  All rights reserved."
             VALUE "OriginalFilename", "WimTivoBeaconListener.exe"
             VALUE "ProductName", "WimTivoBeaconListener"
-            VALUE "ProductVersion", "1.5.8.4"
+            VALUE "ProductVersion", "1.6.11.8"
         END
     END
     BLOCK "VarFileInfo"
