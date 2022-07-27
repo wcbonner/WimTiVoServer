@@ -297,9 +297,6 @@ void CWimTiVoClientView::OnTiviNowplaying()
 				XML_Parse_TiVoNowPlaying(CString(ss.str().c_str()), pDoc->m_TiVoFiles, TiVoContainers, pDoc->m_InternetSession);
 			}
 		}
-		for (auto TiVoFile = pDoc->m_TiVoFiles.begin(); TiVoFile != pDoc->m_TiVoFiles.end(); TiVoFile++)
-			TiVoFile->SetURL(CString(DereferenceURL(CStringA(TiVoFile->GetURL()).GetString(), CStringA(csURL).GetString()).c_str()));
-
 		pDoc->m_TiVoTotalTime = CTimeSpan::CTimeSpan();
 		pDoc->m_TiVoTotalSize = 0;
 		for (auto TiVoFile = pDoc->m_TiVoFiles.begin(); TiVoFile != pDoc->m_TiVoFiles.end(); TiVoFile++)

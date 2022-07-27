@@ -32,7 +32,7 @@ class cTiVoFile
 {
 private:
 	CString m_csPathName;
-	CString m_csURL;
+	CString m_csURL; // only used for remote items
 	CString m_Title;
 	CString m_EpisodeTitle;
 	CString m_Description;
@@ -83,8 +83,7 @@ public:
 	void PopulateFromFFMPEG(void);
 	#endif
 	void PopulateFromFFProbe(void);
-	const CString & SetURL(const CString & csURL);
-	const CString & GetURL(void) const { return(m_csURL); }
+	const CString GetURL(void) const;
 	const CString & GetTitle(void) const { return(m_Title); }
 	const CString & GetEpisodeTitle(void) const { return(m_EpisodeTitle); }
 	const CString & GetDescription(void) const { return(m_Description); }
@@ -98,6 +97,10 @@ public:
 	void GetTiVoItem(CComPtr<IXmlWriter> & pWriter) const;
 	void GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const;
 	const CString GetFFMPEGCommandLine(const CString & csFFMPEGPath = _T("ffmpeg.exe")) const;
+#ifdef CACHE_FILE
+	void WriteToCache(CComPtr<IXmlWriter>& pWriter);
+	bool PopulateFromXML(CComPtr<IXmlReader>& pReader, CComPtr<IStream>& spStream);
+#endif // CACHE_FILE
 };
 bool cTiVoFileCompareDate(const cTiVoFile & a, const cTiVoFile & b);
 bool cTiVoFileCompareDateReverse(const cTiVoFile & a, const cTiVoFile & b);

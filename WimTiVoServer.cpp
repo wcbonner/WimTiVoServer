@@ -517,6 +517,25 @@ UINT PopulateTiVoFileList(LPVOID lvp)
 		if (ERROR_SUCCESS == RegGetValue(HKEY_LOCAL_MACHINE, csRegKey, _T("Container"), RRF_RT_REG_SZ, NULL, vData, &cbData))
 			csLocalContainers = CString(vData);
 	}
+#ifdef CACHE_FILE
+	CString csXMLCacheName;
+	if (csXMLCacheName.IsEmpty())
+	{
+		CString csRegKey(_T("Software\\WimsWorld\\"));
+		csRegKey.Append(theApp.m_pszAppName);
+		TCHAR vData[MAX_PATH];
+		DWORD cbData = sizeof(vData);
+		if (ERROR_SUCCESS != RegGetValue(HKEY_LOCAL_MACHINE, csRegKey, _T("XMLCacheDirectory"), RRF_RT_REG_SZ, NULL, vData, &cbData))
+		{
+			unsigned long buffersize = sizeof(vData) / sizeof(TCHAR);
+			GetModuleFileName(AfxGetResourceHandle(), vData, buffersize);
+			PathRemoveFileSpec(vData);
+		}
+		PathAppend(vData, _T("WimTivoServerCache.xml"));
+		csXMLCacheName = CString(vData);
+	}
+#endif // CACHE_FILE
+
 	if (ApplicationLogHandle != NULL) 
 	{
 		CString csSubstitutionText(__FUNCTION__);
@@ -572,6 +591,32 @@ UINT PopulateTiVoFileList(LPVOID lvp)
 			LPCTSTR lpStrings[] = { csSubstitutionText.GetString(), NULL };
 			ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
 		}
+#ifdef CACHE_FILE
+		if ((TiVoFileListSizeBefore != TiVoFileListSizeAfter) && !csXMLCacheName.IsEmpty())
+		{
+			HRESULT hr;
+			CComPtr<IStream> pOutFileStream;
+			CComPtr<IXmlWriter> pWriter;
+
+			if (SUCCEEDED(hr = ::SHCreateStreamOnFile(csXMLCacheName.GetString(), STGM_READWRITE | STGM_CREATE, &pOutFileStream)))
+				if (SUCCEEDED(hr = CreateXmlWriter(__uuidof(IXmlWriter), (void**)&pWriter, NULL)))
+					if (SUCCEEDED(hr = pWriter->SetOutput(pOutFileStream)))
+					{
+						pWriter->SetProperty(XmlWriterProperty_Indent, TRUE);
+						pWriter->WriteStartDocument(XmlStandalone_Omit);
+						pWriter->WriteStartElement(NULL, L"TiVoFileList", NULL);
+						ccTiVoFileListCritSec.Lock();
+						for (auto iter = TiVoFileList.begin(); iter != TiVoFileList.end(); iter++)
+							iter->WriteToXML(pWriter);
+						ccTiVoFileListCritSec.Unlock();
+						pWriter->WriteEndElement();	// TiVoFileList
+						//pWriter->WriteFullEndElement();
+						pWriter->WriteComment(L" Copyright © 2022 William C Bonner ");
+						pWriter->WriteEndDocument();
+						pWriter->Flush();
+					}
+		}
+#endif // CACHE_FILE
 	} while (WAIT_TIMEOUT == WaitForSingleObject(LocalTerminationEventHandle, 15*60*1000));
 	if (ApplicationLogHandle != NULL) 
 	{

@@ -244,7 +244,6 @@ void cTiVoFile::SetPathName(const CString csNewPath)
 		PopulateFromFFMPEG();
 		#endif
 		PopulateFromFFProbe();
-		SetURL(csNewPath);
 
 		if (m_Title.IsEmpty())
 		{
@@ -296,7 +295,6 @@ void cTiVoFile::SetPathName(const CFileFind & csNewPath)
 		XMLFile.Close();
 	}
 
-	SetURL(csNewPath.GetFilePath());
 	if (!csNewPath.GetFileName().Right(5).CompareNoCase(_T(".tivo")))
 		m_SourceFormat = _T("video/x-tivo-mpeg");
 	else
@@ -330,7 +328,9 @@ void cTiVoFile::SetFromTiVoItem(const CString &csTitle, const CString &csEpisode
 	m_Description.Replace(_T("Copyright Tribune Media Services, Inc."), _T("")); // Hack to get rid of copyright notice in the descriptive text.
 	m_Description.Replace(_T("Copyright Rovi, Inc."), _T("")); // Hack to get rid of copyright notice in the descriptive text.
 	m_Description.Trim();
-	SetURL(csContentURL);
+	m_csURL = csContentURL;
+	//for (auto TiVoFile = pDoc->m_TiVoFiles.begin(); TiVoFile != pDoc->m_TiVoFiles.end(); TiVoFile++)
+	//	TiVoFile->SetURL(CString(DereferenceURL(CStringA(TiVoFile->GetURL()).GetString(), CStringA(csURL).GetString()).c_str()));
 	m_CaptureDate = ctCaptureDate;
 	m_Duration = 1000 * ctsDuration.GetTotalSeconds();
 	m_csMAK = csMAK;
@@ -763,23 +763,11 @@ void cTiVoFile::PopulateFromFFProbe(void)
 #define NT_SUCCESS(Status)          (((NTSTATUS)(Status)) >= 0)
 #define STATUS_UNSUCCESSFUL         ((NTSTATUS)0xC0000001L)
 static const BYTE rgbMsg[] = { 0x61, 0x62, 0x63 }; 
-const CString & cTiVoFile::SetURL(const CString & csURL)
+const CString cTiVoFile::GetURL(void) const
 {
-	const CString tocompare(_T("http://"));
 	CString csrVal(m_csURL);
-	if (!tocompare.Compare(csURL.Left(tocompare.GetLength())))
-		m_csURL = csURL;
-	else
+	if (csrVal.IsEmpty())
 	{
-		m_csURL = csUrlPrefix;
-		m_csURL.Append(csURL);
-		m_csURL.Replace(_T("\\"), _T("/"));
-		TCHAR lpszBuffer[_MAX_PATH];
-		DWORD dwBufferLength = sizeof(lpszBuffer) / sizeof(TCHAR);
-		InternetCanonicalizeUrl(m_csURL.GetString(), lpszBuffer, &dwBufferLength, 0);
-		m_csURL = CString(lpszBuffer, dwBufferLength);
-		m_csURL.Replace(_T(":"), _T("%3A"));
-
 		// https://docs.microsoft.com/en-us/windows/desktop/SecCNG/creating-a-hash-with-cng
 		//open an algorithm handle
 		BCRYPT_ALG_HANDLE hAlg = NULL;
@@ -809,17 +797,18 @@ const CString & cTiVoFile::SetURL(const CString & csURL)
 							{
 								//hash some data
 								//if (NT_SUCCESS(status = BCryptHashData(hHash, (PBYTE)rgbMsg, sizeof(rgbMsg), 0)))
-								if (NT_SUCCESS(status = BCryptHashData(hHash, (PBYTE)csURL.GetString(), csURL.GetLength()*sizeof(TCHAR), 0)))
+								if (NT_SUCCESS(status = BCryptHashData(hHash, (PBYTE)m_csPathName.GetString(), m_csPathName.GetLength() * sizeof(TCHAR), 0)))
 								{
 									//close the hash
 									if (NT_SUCCESS(status = BCryptFinishHash(hHash, pbHash, cbHash, 0)))
 									{
-										dwBufferLength = sizeof(lpszBuffer) / sizeof(TCHAR);
+										TCHAR lpszBuffer[_MAX_PATH];
+										DWORD dwBufferLength = sizeof(lpszBuffer) / sizeof(TCHAR);
 										if (CryptBinaryToStringW(pbHash, cbHash, CRYPT_STRING_HEX | CRYPT_STRING_NOCRLF, lpszBuffer, &dwBufferLength))
 										{
-											m_csURL = csUrlPrefix;
-											m_csURL.Append(CString(lpszBuffer, dwBufferLength));
-											m_csURL.Replace(_T(" "), _T(""));
+											csrVal = csUrlPrefix;
+											csrVal.Append(CString(lpszBuffer, dwBufferLength));
+											csrVal.Replace(_T(" "), _T(""));
 										}
 									}
 								}
@@ -887,7 +876,7 @@ void cTiVoFile::GetTiVoItem(CComPtr<IXmlWriter> & pWriter) const
 				pWriter->WriteElementString(NULL, L"CaptureDate", NULL, ss.str().c_str());
 			}
 		pWriter->WriteEndElement();	// Details
-		if (!m_ContentType.IsEmpty() && !m_csURL.IsEmpty())
+		if (!m_ContentType.IsEmpty() && !GetURL().IsEmpty())
 		{
 			pWriter->WriteStartElement(NULL, L"Links", NULL);
 				pWriter->WriteStartElement(NULL, L"Content", NULL);
@@ -1644,3 +1633,154 @@ const std::string DereferenceURL(const std::string & URL, const std::string & UR
 	return(ss.str());
 }
 /////////////////////////////////////////////////////////////////////////////
+#ifdef CACHE_FILE
+void cTiVoFile::WriteToCache(CComPtr<IXmlWriter>& pWriter)
+{
+	std::wstringstream ss;
+
+	pWriter->WriteStartElement(NULL, L"cTiVoFile", NULL);
+
+	ss << m_AudioCompatible; pWriter->WriteElementString(NULL, L"m_AudioCompatible", NULL, ss.str().c_str()); ss = std::wstringstream();
+	pWriter->WriteElementString(NULL, L"m_CaptureDate", NULL, m_CaptureDate.FormatGmt(_T("%Y%m%dT%H%M%SZ")).GetString());
+	pWriter->WriteElementString(NULL, L"m_ContentType", NULL, m_ContentType.GetString());
+	pWriter->WriteElementString(NULL, L"m_csMAK", NULL, m_csMAK.GetString());
+	pWriter->WriteElementString(NULL, L"m_csPathName", NULL, m_csPathName.GetString());
+	pWriter->WriteElementString(NULL, L"m_Description", NULL, m_Description.GetString());
+	ss << m_Duration; pWriter->WriteElementString(NULL, L"m_Duration", NULL, ss.str().c_str()); ss = std::wstringstream();
+	pWriter->WriteElementString(NULL, L"m_EpisodeTitle", NULL, m_EpisodeTitle.GetString());
+	pWriter->WriteElementString(NULL, L"m_LastWriteTime", NULL, m_LastWriteTime.FormatGmt(_T("%Y%m%dT%H%M%SZ")).GetString());
+	pWriter->WriteElementString(NULL, L"m_SourceChannel", NULL, m_SourceChannel.GetString());
+	pWriter->WriteElementString(NULL, L"m_SourceFormat", NULL, m_SourceFormat.GetString());
+	ss << m_SourceSize; pWriter->WriteElementString(NULL, L"m_SourceSize", NULL, ss.str().c_str()); ss = std::wstringstream();
+	pWriter->WriteElementString(NULL, L"m_SourceStation", NULL, m_SourceStation.GetString());
+	pWriter->WriteElementString(NULL, L"m_Title", NULL, m_Title.GetString());
+	pWriter->WriteElementString(NULL, L"m_TvBusEnvelope", NULL, m_TvBusEnvelope.GetString());
+	pWriter->WriteElementString(NULL, L"m_vActor", NULL, m_vActor.GetString());
+	ss << m_VideoCompatible; pWriter->WriteElementString(NULL, L"m_VideoCompatible", NULL, ss.str().c_str()); ss = std::wstringstream();
+	ss << m_VideoHeight; pWriter->WriteElementString(NULL, L"m_VideoHeight", NULL, ss.str().c_str()); ss = std::wstringstream();
+	ss << m_VideoHighDefinition; pWriter->WriteElementString(NULL, L"m_VideoHighDefinition", NULL, ss.str().c_str()); ss = std::wstringstream();
+	ss << m_VideoWidth; pWriter->WriteElementString(NULL, L"m_VideoWidth", NULL, ss.str().c_str()); ss = std::wstringstream();
+	pWriter->WriteElementString(NULL, L"m_vProgramGenre", NULL, m_vProgramGenre.GetString());
+
+	pWriter->WriteEndElement();	// cTiVoFile
+}
+
+bool cTiVoFile::PopulateFromXML(CComPtr<IXmlReader> &pReader, CComPtr<IStream>& spStream)
+{
+	HRESULT hr = S_OK;
+	XmlNodeType nodeType;
+	//read until there are no more nodes 
+	while (S_OK == (hr = pReader->Read(&nodeType)))
+	{
+		if (nodeType == XmlNodeType_Element)
+		{
+			const WCHAR* pwszLocalName;
+			const WCHAR* pwszValue;
+			if (SUCCEEDED(hr = pReader->GetLocalName(&pwszLocalName, NULL)))
+			{
+				if (!ccsItem.Compare(pwszLocalName))
+				{
+					// re-initialize stuff when starting the Item
+					bIsItem = true;
+					bIsItemDetails = false;
+					bIsItemLinks = false;
+					bIsItemLinksContent = false;
+					bIsItemVideo = false;
+					bCopyProtected = false;
+					bIsItemVideoContainer = false;
+					csTitle.Empty();
+					csEpisodeTitle.Empty();
+					csDescription.Empty();
+					csSourceStation.Empty();
+					csContentURL.Empty();
+					csContentType.Empty();
+				}
+				else if (bIsItem && !ccsDetails.Compare(pwszLocalName))
+					bIsItemDetails = true;
+				else if (bIsItem && !ccsLinks.Compare(pwszLocalName))
+					bIsItemLinks = true;
+				else if (bIsItem && bIsItemLinks && !ccsContent.Compare(pwszLocalName))
+					bIsItemLinksContent = true;
+				// Here's where I need to dig deeper.
+				else if (bIsItemDetails)
+				{
+					if (SUCCEEDED(hr = pReader->Read(&nodeType)))
+					{
+						if (nodeType == XmlNodeType_Text)
+						{
+							if (SUCCEEDED(hr = pReader->GetValue(&pwszValue, NULL)))
+							{
+								if (!ccsContentType.Compare(pwszLocalName))
+								{
+									csContentType = pwszValue;
+									if (!ccsContentTypeVideo.CompareNoCase(csContentType))
+										bIsItemVideo = true;
+									else if (!ccsContentTypeVideoAlternate.CompareNoCase(csContentType))
+										bIsItemVideo = true;
+									else if (!ccsContentTypeContainer.Compare(csContentType))
+										bIsItemVideoContainer = true;
+									else if (!ccsContentTypeContainerAlternate.Compare(csContentType))
+										bIsItemVideoContainer = true;
+								}
+								else if (!ccsTitle.Compare(pwszLocalName))
+									csTitle = pwszValue;
+								else if (!ccsEpisodeTitle.Compare(pwszLocalName))
+									csEpisodeTitle = pwszValue;
+								else if (!ccsDescription.Compare(pwszLocalName))
+									csDescription = pwszValue;
+								else if (!ccsSourceStation.Compare(pwszLocalName))
+									csSourceStation = pwszValue;
+								else if (!ccsCopyProtected.Compare(pwszLocalName))
+									bCopyProtected = CString(pwszValue).CompareNoCase(_T("yes")) == 0;
+								else if (!ccsDuration.Compare(pwszLocalName))
+								{
+									auto tempDuration = _wtoi(pwszValue);
+									ctsDuration = CTimeSpan(0, 0, 0, tempDuration / 1000);
+								}
+								else if (!ccsSourceSize.Compare(pwszLocalName))
+								{
+									std::wstringstream ss;
+									ss << pwszValue;
+									ss >> llSourceSize;
+								}
+								else if (!ccsCaptureDate.Compare(pwszLocalName))
+								{
+									std::wstringstream ss;
+									ss << pwszValue;
+									ss << showbase << hex;
+									long long SecondsSinceEpoch;
+									ss >> SecondsSinceEpoch;
+									long SecondsFromUTC;
+									_get_timezone(&SecondsFromUTC);
+									ctCaptureDate = CTime(1970, 1, 1, 0, 0, 0) + CTimeSpan(0, 0, 0, SecondsSinceEpoch) - CTimeSpan(SecondsFromUTC);
+								}
+							}
+						}
+					}
+				}
+				else if (bIsItemLinksContent)
+				{
+					if (SUCCEEDED(hr = pReader->Read(&nodeType)))
+						if (nodeType == XmlNodeType_Text)
+							if (SUCCEEDED(hr = pReader->GetValue(&pwszValue, NULL)))
+								if (!ccsUrl.Compare(pwszLocalName))
+									csContentURL = pwszValue;
+								else if (!ccsContentType.Compare(pwszLocalName))
+									if (!ccsContentTypeContainer.Compare(pwszValue) || !ccsContentTypeContainerAlternate.Compare(pwszValue))
+										bIsItemVideoContainer = true;
+				}
+			}
+		}
+		else if (nodeType == XmlNodeType_EndElement)
+		{
+			break;
+		}
+	}
+	return false;
+}
+
+bool XML_Parse_CacheFile(CComPtr<IStream>& spStream, std::vector<cTiVoFile>& TiVoFileList)
+{
+
+}
+#endif // CACHE_FILE
