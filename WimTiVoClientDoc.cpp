@@ -145,9 +145,11 @@ CWimTiVoClientDoc::CWimTiVoClientDoc()
 	else
 		m_bFFMPEG = AfxGetApp()->GetProfileInt(_T("TiVo"), _T("FFMPEG"), true);
 	m_csTiVoDecodePath = FindEXEFromPath(_T("tivodecode.exe"));
+#ifndef _INTERNAL_TiVoDecode
 	if (m_csTiVoDecodePath.IsEmpty())
 		m_bTiVoDecode = false;
 	else
+#endif
 		m_bTiVoDecode = AfxGetApp()->GetProfileInt(_T("TiVo"), _T("TiVoDecode"), true);
 
 	m_csTDCatPath = FindEXEFromPath(_T("tdcat.exe"));

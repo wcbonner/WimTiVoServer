@@ -460,7 +460,9 @@ void CWimTiVoClientView::OnUpdateTiVoDecode(CCmdUI *pCmdUI)
 	CWimTiVoClientDoc * pDoc = GetDocument();
 	if (pDoc)
 	{
+#ifndef _INTERNAL_TiVoDecode
 		pCmdUI->Enable(!pDoc->m_csTiVoDecodePath.IsEmpty());
+#endif
 		pCmdUI->SetCheck(pDoc->m_bTiVoDecode);
 	}
 }
