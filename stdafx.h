@@ -73,6 +73,9 @@
 
 #include "WimTiVoServerEventLog.h"
 #include "Dtwinver.h"
+#define _INTERNAL_TiVoDecode
+#ifdef _INTERNAL_TiVoDecode
 #include "libTiVoDecode/happyfile.h"
 #include "libTiVoDecode/turing_stream.h"
 #include "libTiVoDecode/tivodecoder.h"
+#endif

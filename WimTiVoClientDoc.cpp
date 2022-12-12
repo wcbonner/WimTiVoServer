@@ -872,7 +872,6 @@ bool CWimTiVoClientDoc::GetTiVoFile(const cTiVoFile & TiVoFile) //, CInternetSes
 	}
 	return(rval);
 }
-#define _INTERNAL_TiVoDecode
 #ifdef _INTERNAL_TiVoDecode
 static int hread_wrapper(void* mem, int size, void* fh)
 {
