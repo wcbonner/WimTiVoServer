@@ -872,6 +872,19 @@ bool CWimTiVoClientDoc::GetTiVoFile(const cTiVoFile & TiVoFile) //, CInternetSes
 	}
 	return(rval);
 }
+#define _INTERNAL_TiVoDecode
+#ifdef _INTERNAL_TiVoDecode
+static int hread_wrapper(void* mem, int size, void* fh)
+{
+	return (int)hread(mem, size, (happy_file*)fh);
+}
+static int fwrite_wrapper(void* mem, int size, void* fh)
+{
+	return (int)fwrite(mem, 1, size, (FILE*)fh);
+}
+int o_verbose = 0;
+int o_no_verify = 0;
+#endif
 UINT CWimTiVoClientDoc::TiVoConvertFileThread(LPVOID lvp)
 {
 	TRACE(__FUNCTION__ "\n");
@@ -1008,12 +1021,77 @@ UINT CWimTiVoClientDoc::TiVoConvertFileThread(LPVOID lvp)
 								}
 								#endif
 							}
-
+#ifdef _INTERNAL_TiVoDecode
+							// The following is the equivelent of what happens inside the TiVoDecode program
+							// file position options
+							hoff_t begin_at = 0;
+							turing_state turing;
+							unsigned char old_code_byte;
+							char first = 1;
+							happy_file* hfh = NULL;
+							if (!(hfh = hopen((char*) CStringA(csTiVoFileName).GetString(), "rb")))
+							{
+								perror(CStringA(csTiVoFileName).GetString());
+								return 6;
+							}
+							FILE* ofh;
+							if (0 != fopen_s(&ofh, CStringA(csMPEGPathName).GetString(), "wb"))
+							{
+								perror("opening output file");
+								return 7;
+							}
+							if ((begin_at = init_turing_from_file(&turing, hfh, &hread_wrapper, (char *) CStringA(TiVoFile.GetMAK()).GetString())) < 0)
+								return 8;
+							if (hseek(hfh, begin_at, SEEK_SET) < 0)
+							{
+								perror("seek");
+								return 9;
+							}
+							unsigned int marker = 0xFFFFFFFF;
+							int running = 1;
+							while (running)
+							{
+								if ((marker & 0xFFFFFF00) == 0x100)
+								{
+									int ret = process_frame(old_code_byte, &turing, htell(hfh), hfh, &hread_wrapper, ofh, &fwrite_wrapper);
+									if (ret == 1)
+									{
+										marker = 0xFFFFFFFF;
+									}
+									else if (ret == 0)
+									{
+										fwrite(&old_code_byte, 1, 1, ofh);
+									}
+									else if (ret < 0)
+									{
+										perror("processing frame");
+										return 10;
+									}
+								}
+								else if (!first)
+								{
+									fwrite(&old_code_byte, 1, 1, ofh);
+								}
+								marker <<= 8;
+								if (hread(&old_code_byte, 1, hfh) == 0)
+								{
+									fprintf(stderr, "End of File\n");
+									running = 0;
+								}
+								else
+									marker |= old_code_byte;
+								first = 0;
+							}
+							destruct_turing(&turing);
+							hclose(hfh);
+							fclose(ofh);
+#else
 							if (pDoc->m_LogFile.is_open())
 								pDoc->m_LogFile << "[" << getTimeISO8601() << "]\tspawn: " << CStringA(pDoc->m_csTiVoDecodePath).GetString() << " " << CStringA(pDoc->m_csTiVoDecodePath).GetString() << " --mak " << CStringA(TiVoFile.GetMAK()).GetString() << " --out " << CStringA(QuoteFileName(csMPEGPathName)).GetString() << " " << CStringA(QuoteFileName(csTiVoFileName)).GetString() << std::endl;
 							if (-1 == _tspawnl(_P_WAIT, pDoc->m_csTiVoDecodePath.GetString(), pDoc->m_csTiVoDecodePath.GetString(), _T("--mak"), TiVoFile.GetMAK(), _T("--out"), QuoteFileName(csMPEGPathName).GetString(), QuoteFileName(csTiVoFileName).GetString(), NULL))
 								if (pDoc->m_LogFile.is_open())
 									pDoc->m_LogFile << "[                   ]  _tspawnlp failed: " /* << strerror(errno) */ << std::endl;
+#endif
 							if (TRUE == CFile::GetStatus(csMPEGPathName, status))
 							{
 								status.m_ctime = status.m_mtime = TiVoFile.GetCaptureDate();

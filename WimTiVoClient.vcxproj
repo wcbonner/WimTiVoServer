@@ -235,6 +235,11 @@
     <Image Include="res\writelarge.bmp" />
     <Image Include="res\writesmall.bmp" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="libTiVoDecode\libtivodecode.vcxproj">
+      <Project>{cf43fa26-79f1-45d6-a7d1-346cfe4fcf71}</Project>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
