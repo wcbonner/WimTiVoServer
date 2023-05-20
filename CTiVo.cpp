@@ -995,6 +995,9 @@ const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath) cons
 		//rval.Append(_T(" -vf subtitles="));
 		//rval.Append(QuoteFileName(m_csPathName));
 		rval.Append(_T(" -vcodec mpeg2video"));
+		//rval.Append(_T(" -vcodec libx264 -coder 0 -level 41 -g 250 -subq 6 -me_range 16 -qmin 10 -qmax 50 -bufsize 14000k -b:v 2500k -maxrate 10000k -trellis 2 -mbd 1")); // 2023-05-20
+		//rval.Append(_T(" -vcodec libx264")); // 2023-05-20
+
 		if ((m_VideoWidth > 1920) || (m_VideoHeight > 1080))
 			rval.Append(_T(" -s 1920x1080"));
 	}
@@ -1003,10 +1006,14 @@ const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath) cons
 		rval.Append(_T(" -acodec copy"));
 	else
 		rval.Append(_T(" -acodec ac3"));
+
+	//rval.Append(_T(" -map 0")); // attempt to copy all streams 2023-05-20
+
 	#ifdef _DEBUG
 	rval.Append(_T(" -report"));
 	#endif
 	rval.Append(_T(" -f vob -"));
+	//rval.Append(_T(" -f mpegts -")); // 2023-05-20
 	//rval.Append(_T(" -f mpegts -")); // use mpegts as output Added 2020-04-04
 	return(rval);
 }

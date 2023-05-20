@@ -1093,6 +1093,8 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 		HttpResponse << "Transfer-Encoding: chunked\r\n";
 		if (TiVoFileToSend.GetDuration() > 0) HttpResponse << "TiVo-Estimated-Length: " << max(TiVoFileToSend.GetSourceSize(), (TiVoFileToSend.GetDuration() * 1024)) << "\r\n"; // Since the Duration is 1/1000 of a second, and at least one example I transferred came in at roughly this multiple, 700bytes for every millisecond, worth a try.
 		HttpResponse << "Content-Type: video/x-tivo-mpeg\r\n";
+		//HttpResponse << "Content-Type: video/x-tivo-mpeg-ts\r\n";
+		//HttpResponse << "Content-Type: video/x-tivo-raw-tts\r\n";
 		HttpResponse << "Connection: close\r\n";
 		HttpResponse << "\r\n";
 		send(DataSocket, HttpResponse.str().c_str(), HttpResponse.str().length(),0);
@@ -1419,7 +1421,8 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 							ss << "[                   ] BytesSent: " << bytessent << " Speed: " << (CurrentFileSize / TotalSeconds) << " B/s, " << CStringA(ctsTotal.Format(_T("%H:%M:%S"))).GetString() << std::endl;
 						else
 							ss << "[                   ] BytesSent: " << bytessent << std::endl;
-						ss << "[                   ] ChunkCount: " << ChunkCount << " AvgChunkSize: " << (CurrentFileSize / ChunkCount) << std::endl;
+						if (ChunkCount > 0)
+							ss << "[                   ] ChunkCount: " << ChunkCount << " AvgChunkSize: " << (CurrentFileSize / ChunkCount) << std::endl;
 						ss << "[                   ] MaxChunkSize: " << MaxChunkSize << " MinChunkSize: " << MinChunkSize << std::endl;
 						if (bConsoleExists)
 						{
