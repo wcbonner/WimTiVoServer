@@ -1023,6 +1023,8 @@ UINT CWimTiVoClientDoc::TiVoConvertFileThread(LPVOID lvp)
 								#endif
 							}
 #ifdef _INTERNAL_TiVoDecode
+							// the URL below might be useful
+							// https://sourceforge.net/p/tivodecode/code/HEAD/tree/tivodownloadgui/trunk/TiVoDownloadGui.pm
 							// The following is the equivelent of what happens inside the TiVoDecode program
 							// file position options
 							hoff_t begin_at = 0;

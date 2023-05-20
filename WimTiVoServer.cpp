@@ -465,16 +465,16 @@ int GetTiVoQueryFormats(SOCKET DataSocket, const char * InBuffer)
 			//	pWriter->WriteElementString(NULL, _T("ContentType"), NULL, _T("video/mpeg"));
 			//	pWriter->WriteElementString(NULL, _T("Description"), NULL, _T("MPEG-2 Video"));
 			//pWriter->WriteEndElement();
-			//pWriter->WriteStartElement(NULL,_T("Format"),NULL);
-			//	pWriter->WriteElementString(NULL, _T("ContentType"), NULL, _T("video/x-tivo-mpeg-ts"));
-			//	pWriter->WriteElementString(NULL, _T("Description"), NULL, _T("TiVo TS Recording"));
-			//pWriter->WriteEndElement();
+			pWriter->WriteStartElement(NULL,_T("Format"),NULL);
+				pWriter->WriteElementString(NULL, _T("ContentType"), NULL, _T("video/x-tivo-mpeg-ts"));
+				pWriter->WriteElementString(NULL, _T("Description"), NULL, _T("TiVo TS Recording"));
+			pWriter->WriteEndElement();
 			//pWriter->WriteStartElement(NULL,_T("Format"),NULL);
 			//	pWriter->WriteElementString(NULL, _T("ContentType"), NULL, _T("video/x-tivo-raw-tts"));
 			//	pWriter->WriteElementString(NULL, _T("Description"), NULL, NULL);
 			//pWriter->WriteEndElement();
 		pWriter->WriteFullEndElement();
-		pWriter->WriteComment(L" Copyright © 2013 William C Bonner ");
+		pWriter->WriteComment(L" Copyright © 2023 William C Bonner ");
 		pWriter->WriteEndDocument();
 		pWriter->Flush();
 		// Allocates enough memeory for the xml content.
@@ -857,7 +857,7 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 				ccTiVoFileListCritSec.Unlock();
 			}
 			pWriter->WriteEndElement();	// TiVoContainer
-		pWriter->WriteComment(L" Copyright © 2020 William C Bonner ");
+		pWriter->WriteComment(L" Copyright © 2023 William C Bonner ");
 		pWriter->WriteEndDocument();
 		pWriter->Flush();
 
@@ -1092,15 +1092,14 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 		HttpResponse << "Date: " << getTimeRFC1123() << "\r\n";
 		HttpResponse << "Transfer-Encoding: chunked\r\n";
 		if (TiVoFileToSend.GetDuration() > 0) HttpResponse << "TiVo-Estimated-Length: " << max(TiVoFileToSend.GetSourceSize(), (TiVoFileToSend.GetDuration() * 1024)) << "\r\n"; // Since the Duration is 1/1000 of a second, and at least one example I transferred came in at roughly this multiple, 700bytes for every millisecond, worth a try.
-		HttpResponse << "Content-Type: video/x-tivo-mpeg\r\n";
-		//HttpResponse << "Content-Type: video/x-tivo-mpeg-ts\r\n";
-		//HttpResponse << "Content-Type: video/x-tivo-raw-tts\r\n";
+		HttpResponse << "Content-Type: " << CStringA(TiVoFileToSend.GetContentType()).GetString() << "\r\n";
 		HttpResponse << "Connection: close\r\n";
 		HttpResponse << "\r\n";
 		send(DataSocket, HttpResponse.str().c_str(), HttpResponse.str().length(),0);
 
-		if (!TiVoFileToSend.GetPathName().Right(5).CompareNoCase(_T(".tivo")))
+		if (0 == TiVoFileToSend.GetPathName().Right(5).CompareNoCase(_T(".tivo")))
 		{
+			// this block is run if I'm transferring a file with a .tivo extension
 			int nRet;
 			std::ifstream FileToTransfer;
 			FileToTransfer.open(CStringA(TiVoFileToSend.GetPathName()).GetString(), ios_base::in | ios_base::binary);
@@ -1182,7 +1181,10 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 			ASSERT(sizeof(tivo_stream_header) == SIZEOF_STREAM_HEADER);
 			std::string("TiVo").copy(tivo_stream_header.filetype, 4);
 			tivo_stream_header.dummy_0004 = htons(4);
-			tivo_stream_header.dummy_0006 = htons(13); // mime = video/x-tivo-mpeg so flag is 13. If mime = video/x-tivo-mpeg-ts, flag would be 45
+			if (0 == TiVoFileToSend.GetContentType().Compare(_T("video/x-tivo-mpeg")))
+				tivo_stream_header.dummy_0006 = htons(13); // mime = video/x-tivo-mpeg so flag is 13. If mime = video/x-tivo-mpeg-ts, flag would be 45
+			else
+				tivo_stream_header.dummy_0006 = htons(45); // mime = video/x-tivo-mpeg so flag is 13. If mime = video/x-tivo-mpeg-ts, flag would be 45
 			tivo_stream_header.dummy_0008 = htons(0);
 			tivo_stream_header.mpeg_offset = htonl(padding + chunklen);
 			tivo_stream_header.chunks = htons(2);

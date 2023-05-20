@@ -259,6 +259,7 @@ void cTiVoFile::SetPathName(const CString csNewPath)
 		}
 	}
 	m_ContentType = _T("video/x-tivo-mpeg");
+	//m_ContentType = _T("video/x-tivo-mpeg-ts");
 	// Final Output of object values
 	wcout << L"[                   ] " << setw(20) << right << L"m_Title" << L" : " << m_Title.GetString() << endl;
 	wcout << L"[                   ] " << setw(20) << right << L"m_EpisodeTitle" << L" : " << m_EpisodeTitle.GetString() << endl;
@@ -279,6 +280,7 @@ void cTiVoFile::SetPathName(const CFileFind & csNewPath)
 	m_Title.Replace(_T("."), _T(" ")); // replace periods with spaces as on 2019-12-09
 	m_Title.Replace(_T("_"), _T(" ")); // replace underscore with spaces as on 2019-12-09
 	m_ContentType = _T("video/x-tivo-mpeg");
+	//m_ContentType = _T("video/x-tivo-mpeg-ts");
 	csNewPath.GetLastWriteTime(m_LastWriteTime);
 	csNewPath.GetLastWriteTime(m_CaptureDate);
 	CFile XMLFile;
@@ -296,7 +298,7 @@ void cTiVoFile::SetPathName(const CFileFind & csNewPath)
 	}
 
 	if (!csNewPath.GetFileName().Right(5).CompareNoCase(_T(".tivo")))
-		m_SourceFormat = _T("video/x-tivo-mpeg");
+		m_SourceFormat = _T("video/x-tivo-mpeg"); 	// this block is run if I'm transferring a file with a .tivo extension
 	else
 	{
 		#ifdef AVCODEC_AVCODEC_H
@@ -985,35 +987,62 @@ const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath) cons
 	CString rval(QuoteFileName(csFFMPEGPath));
 	rval.Append(_T(" -hide_banner -i "));
 	rval.Append(QuoteFileName(m_csPathName));
-	//rval.Append(_T(" -map 0:v -map 0:a?")); // copy all audio streams Added 2020-04-04
-	rval.Append(_T(" -map_metadata -1"));
-	if (m_VideoCompatible)
-		rval.Append(_T(" -vcodec copy"));
-	else
-	{
-		// quick and dirty addition to support subtitles
-		//rval.Append(_T(" -vf subtitles="));
-		//rval.Append(QuoteFileName(m_csPathName));
-		rval.Append(_T(" -vcodec mpeg2video"));
-		//rval.Append(_T(" -vcodec libx264 -coder 0 -level 41 -g 250 -subq 6 -me_range 16 -qmin 10 -qmax 50 -bufsize 14000k -b:v 2500k -maxrate 10000k -trellis 2 -mbd 1")); // 2023-05-20
-		//rval.Append(_T(" -vcodec libx264")); // 2023-05-20
-
-		if ((m_VideoWidth > 1920) || (m_VideoHeight > 1080))
-			rval.Append(_T(" -s 1920x1080"));
-	}
-	rval.Append(_T(" -b:v 16384k -maxrate 30000k -bufsize 4096k -ab 448k -ar 48000"));
-	if (m_AudioCompatible)
-		rval.Append(_T(" -acodec copy"));
-	else
-		rval.Append(_T(" -acodec ac3"));
-
-	//rval.Append(_T(" -map 0")); // attempt to copy all streams 2023-05-20
-
 	#ifdef _DEBUG
 	rval.Append(_T(" -report"));
 	#endif
-	rval.Append(_T(" -f vob -"));
-	//rval.Append(_T(" -f mpegts -")); // 2023-05-20
+	if (0 == GetContentType().Compare(_T("video/x-tivo-mpeg")))
+	{
+		//rval.Append(_T(" -map 0:v -map 0:a?")); // copy all audio streams Added 2020-04-04
+		rval.Append(_T(" -map_metadata -1"));
+		if (m_VideoCompatible)
+			rval.Append(_T(" -vcodec copy"));
+		else
+		{
+			// quick and dirty addition to support subtitles
+			//rval.Append(_T(" -vf subtitles="));
+			//rval.Append(QuoteFileName(m_csPathName));
+			rval.Append(_T(" -vcodec mpeg2video"));
+
+			if ((m_VideoWidth > 1920) || (m_VideoHeight > 1080))
+				rval.Append(_T(" -s 1920x1080"));
+		}
+		rval.Append(_T(" -b:v 16384k -maxrate 30000k -bufsize 4096k -ab 448k -ar 48000"));
+		if (m_AudioCompatible)
+			rval.Append(_T(" -acodec copy"));
+		else
+			rval.Append(_T(" -acodec ac3"));
+
+		rval.Append(_T(" -f vob -"));
+	}
+	else
+	{
+		//rval.Append(_T(" -map 0:v -map 0:a?")); // copy all audio streams Added 2020-04-04
+		rval.Append(_T(" -map_metadata -1"));
+		if (m_VideoCompatible)
+			rval.Append(_T(" -vcodec copy"));
+		else
+		{
+			// quick and dirty addition to support subtitles
+			//rval.Append(_T(" -vf subtitles="));
+			//rval.Append(QuoteFileName(m_csPathName));
+			//rval.Append(_T(" -vcodec mpeg2video"));
+			//rval.Append(_T(" -vcodec libx264 -coder 0 -level 41 -g 250 -subq 6 -me_range 16 -qmin 10 -qmax 50 -bufsize 14000k -b:v 2500k -maxrate 10000k -trellis 2 -mbd 1")); // 2023-05-20
+			rval.Append(_T(" -vcodec libx264")); // 2023-05-20
+
+			if ((m_VideoWidth > 1920) || (m_VideoHeight > 1080))
+				rval.Append(_T(" -s 1920x1080"));
+		}
+		rval.Append(_T(" -b:v 16384k -maxrate 30000k -bufsize 4096k -ab 448k -ar 48000"));
+		if (m_AudioCompatible)
+			rval.Append(_T(" -acodec copy"));
+		else
+			rval.Append(_T(" -acodec ac3"));
+
+		//rval.Append(_T(" -map 0")); // attempt to copy all streams 2023-05-20
+
+		rval.Append(_T(" -f mpegts -")); // 2023-05-20
+	}
+
 	//rval.Append(_T(" -f mpegts -")); // use mpegts as output Added 2020-04-04
 	return(rval);
 }

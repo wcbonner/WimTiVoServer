@@ -19,7 +19,6 @@ int	nerrors;
 
 static const char	*hex = "0123456789abcdef";
 #define HEX(c) ((int)(strchr(hex, (c)) - hex))
-//#define HEX(c) ((strchr(hex, (c)) - hex))
 
 int
 hexprint(const char *s, unsigned char *p, int n)

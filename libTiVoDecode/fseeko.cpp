@@ -17,7 +17,7 @@
  * We have to use the native defines here because configure hasn't
  * completed yet.
  */
-#if defined(__bsdi__) || defined(__NetBSD__) || defined(WIN32)
+#if defined(__bsdi__) || defined(__NetBSD__) || defined(_WIN32)
 
 #ifdef HAVE_CONFIG_H
 # include "tdconfig.h"
@@ -31,7 +31,7 @@
 #ifdef HAVE_UNISTD_H
 # include <unistd.h>
 #endif
-#ifdef WIN32
+#ifdef _WIN32
 # include <io.h>
 #endif
 
@@ -43,7 +43,7 @@
 # include <sys/stat.h>
 #endif
 
-#ifdef WIN32
+#ifdef _WIN32
 # define OFF_T_TYPE __int64
 #else
 # define OFF_T_TYPE off_t
@@ -58,11 +58,10 @@
  *	This is thread-safe on BSD/OS using flockfile/funlockfile.
  */
 
-int
-fseeko(FILE *stream, OFF_T_TYPE offset, int whence)
+int fseeko(FILE *stream, OFF_T_TYPE offset, int whence)
 {
 	fpos_t		floc;
-#ifndef WIN32
+#ifndef _WIN32
 	struct stat filestat;
 #endif
 
@@ -84,7 +83,7 @@ fseeko(FILE *stream, OFF_T_TYPE offset, int whence)
 			flockfile(stream);
 #endif
 			fflush(stream);		/* force writes to fd for stat() */
-#ifdef WIN32
+#ifdef _WIN32
 			floc = _filelengthi64(_fileno(stream));
 #else
 			if (fstat(fileno(stream), &filestat) != 0)
@@ -113,8 +112,7 @@ failure:
 }
 
 
-OFF_T_TYPE
-ftello(FILE *stream)
+OFF_T_TYPE ftello(FILE *stream)
 {
 	fpos_t		floc;
 

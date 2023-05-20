@@ -3,9 +3,9 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-# if !defined(HAVE_FSEEKO) && (defined(__bsdi__) || defined(__NetBSD__) || defined(WIN32))
+# if !defined(HAVE_FSEEKO) && (defined(__bsdi__) || defined(__NetBSD__) || defined(_WIN32))
 
-#  ifdef WIN32
+#  ifdef _WIN32
 #   define OFF_T_TYPE __int64
 #  else
 #   define OFF_T_TYPE off_t

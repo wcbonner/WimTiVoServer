@@ -91,6 +91,7 @@ public:
 	const CTime & GetLastWriteTime(void) const { return(m_LastWriteTime); }
 	const CString & SetMAK(const CString & csMAK);
 	const CString & GetMAK(void) const { return(m_csMAK); }
+	const CString & GetContentType(void) const { return(m_ContentType); }
 	const CString & GetSourceFormat(void) const { return(m_SourceFormat); }
 	const unsigned long long & GetDuration(void) const { return(m_Duration); }
 	const unsigned long long & GetSourceSize(void) const { return(m_SourceSize); }

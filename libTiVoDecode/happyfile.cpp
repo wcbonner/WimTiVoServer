@@ -16,7 +16,7 @@
 #ifdef _WIN32
 # include <io.h>
 #endif
-#include "fseeko.h"
+//#include "fseeko.h"
 #include "happyfile.h"
 
 #if defined HAVE_FSEEKO
