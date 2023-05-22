@@ -1051,6 +1051,7 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 	int sa_len = sizeof(adr_inet);
 	getpeername(DataSocket, (struct sockaddr *)&adr_inet, &sa_len);
 	std::cout << "[" << getTimeISO8601() << "] "  << __FUNCTION__ << "\t" << inet_ntoa(adr_inet.sin_addr) << " " << csInBuffer.GetString() << endl;
+	// GET /TiVoConnect/TivoNowPlaying/c649de2a0acc35fe3d172aa032dc679938e9fa7b22f06cd78ee9acaad6cc141b?Format=video%2Fx-tivo-mpeg HTTP/1.1
 	#endif
 	int rval = 0;
 

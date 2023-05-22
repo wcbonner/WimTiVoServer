@@ -50,6 +50,7 @@ private:
 	bool m_AudioCompatible;
 	bool m_VideoCompatible;
 	bool m_VideoHighDefinition;
+	bool m_Subtitles;
 	int m_VideoWidth;
 	int m_VideoHeight;
 	CString m_TvBusEnvelope;
@@ -58,6 +59,7 @@ public:
 	m_AudioCompatible(false),
 	m_VideoCompatible(false),
 	m_VideoHighDefinition(false),
+	m_Subtitles(false),
 	m_VideoWidth(0),
 	m_VideoHeight(0),
 	m_SourceSize(0),
@@ -97,7 +99,7 @@ public:
 	const unsigned long long & GetSourceSize(void) const { return(m_SourceSize); }
 	void GetTiVoItem(CComPtr<IXmlWriter> & pWriter) const;
 	void GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const;
-	const CString GetFFMPEGCommandLine(const CString & csFFMPEGPath = _T("ffmpeg.exe")) const;
+	const CString GetFFMPEGCommandLine(const CString & csFFMPEGPath = _T("ffmpeg.exe"), const bool bForceSubtitles = false) const;
 #ifdef CACHE_FILE
 	void WriteToCache(CComPtr<IXmlWriter>& pWriter);
 	bool PopulateFromXML(CComPtr<IXmlReader>& pReader, CComPtr<IStream>& spStream);

@@ -659,6 +659,11 @@ void cTiVoFile::PopulateFromFFProbe(void)
 														if (!cs_codec_name.Compare(_T("ac3")))
 															m_AudioCompatible = true;
 													}	
+													else if (!cs_codec_type.Compare(_T("subtitle")))
+													{
+														if (!cs_codec_name.Compare(_T("subrip")))
+															m_Subtitles = true;
+													}
 												}
 												else if (!csLocalName.Compare(_T("format")))
 												{
@@ -982,7 +987,7 @@ void cTiVoFile::GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const
 		pWriter->WriteRaw(L"</TvBusMarshalledStruct:TvBusEnvelope>");
 	}
 }
-const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath) const
+const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath, const bool bForceSubtitles) const
 {
 	CString rval(QuoteFileName(csFFMPEGPath));
 	rval.Append(_T(" -hide_banner -i "));
@@ -998,9 +1003,16 @@ const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath) cons
 			rval.Append(_T(" -vcodec copy"));
 		else
 		{
-			// quick and dirty addition to support subtitles
-			//rval.Append(_T(" -vf subtitles="));
-			//rval.Append(QuoteFileName(m_csPathName));
+			if (m_Subtitles && bForceSubtitles)
+			{
+				// quick and dirty addition to support subtitles https://trac.ffmpeg.org/wiki/HowToBurnSubtitlesIntoVideo
+				CString csSubtitlePath(QuoteFileName(m_csPathName));
+				csSubtitlePath.Replace(_T("\\"), _T("/"));
+				csSubtitlePath.Replace(_T("["), _T("\\["));
+				csSubtitlePath.Replace(_T("]"), _T("\\]"));
+				csSubtitlePath.Delete(0, 2);
+				rval.Append(_T(" -vf subtitles=")); rval.Append(csSubtitlePath);
+			}
 			rval.Append(_T(" -vcodec mpeg2video"));
 
 			if ((m_VideoWidth > 1920) || (m_VideoHeight > 1080))
