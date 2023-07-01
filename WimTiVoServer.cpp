@@ -1039,6 +1039,7 @@ int GetTiVoTVBusQuery(SOCKET DataSocket, const char * InBuffer)
 	#endif
 	return(0);
 }
+static bool bForceSubtitles(false);
 int GetFile(SOCKET DataSocket, const char * InBuffer)
 {
 	TRACE("%s %s\n", CStringA(CTime::GetCurrentTime().Format(_T("[%Y-%m-%dT%H:%M:%S]"))).GetString(), __FUNCTION__);
@@ -1276,7 +1277,7 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 					siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
  
 					static const CString csFFMPEGPath(FindEXEFromPath(_T("ffmpeg.exe")));
-					CString csCommandLine(TiVoFileToSend.GetFFMPEGCommandLine(csFFMPEGPath));
+					CString csCommandLine(TiVoFileToSend.GetFFMPEGCommandLine(csFFMPEGPath, bForceSubtitles));
 					TRACE(_T("CreateProcess: %s\n"), csCommandLine.GetString());
 					if (ApplicationLogHandle != NULL) 
 					{
@@ -2362,6 +2363,7 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 				csBox += _T("\t-install\n");
 				csBox += _T("\t-remove\n");
 				csBox += _T("\t-ClearRegistry\n");
+				csBox += _T("\t-ForceSubtitles\n");
 				_tprintf(csBox);
 			}
 			// install this program in the service control manager
@@ -2531,6 +2533,10 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 				csRegKey.Format(_T("Software\\WimsWorld\\%s"), theApp.m_pszAppName);
 				theApp.DelRegTree(HKEY_CURRENT_USER, csRegKey);
 				theApp.DelRegTree(HKEY_LOCAL_MACHINE, csRegKey);
+			}
+			else if (Parameters.CompareNoCase(_T("-ForceSubtitles")) == 0)
+			{
+				bForceSubtitles = true;
 			}
 			else
 			{			

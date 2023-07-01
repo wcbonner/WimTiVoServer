@@ -589,6 +589,7 @@ void cTiVoFile::PopulateFromFFProbe(void)
 									bool bIsFormat = false;
 									bool bVideoStreamInfoNeeded = true;
 									bool bAudioStreamInfoNeeded = true;
+									bool bSubtitleStreamInfoNeeded = true;
 
 									//read until there are no more nodes 
 									while (S_OK == (hr = pReader->Read(&nodeType))) 
@@ -598,7 +599,7 @@ void cTiVoFile::PopulateFromFFProbe(void)
 											if (SUCCEEDED(hr = pReader->GetLocalName(&pwszLocalName, NULL)))
 											{
 												csLocalName = CString(pwszLocalName);
-												if ((bVideoStreamInfoNeeded || bAudioStreamInfoNeeded) && !csLocalName.Compare(_T("stream")))
+												if ((bVideoStreamInfoNeeded || bAudioStreamInfoNeeded || bSubtitleStreamInfoNeeded) && !csLocalName.Compare(_T("stream")))
 												{
 													CString cs_codec_name;
 													CString cs_codec_type;
@@ -661,6 +662,7 @@ void cTiVoFile::PopulateFromFFProbe(void)
 													}	
 													else if (!cs_codec_type.Compare(_T("subtitle")))
 													{
+														bSubtitleStreamInfoNeeded = false;
 														if (!cs_codec_name.Compare(_T("subrip")))
 															m_Subtitles = true;
 													}
