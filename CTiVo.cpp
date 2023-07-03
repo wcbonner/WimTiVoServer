@@ -991,7 +991,7 @@ void cTiVoFile::GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const
 const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath, const bool bForceSubtitles) const
 {
 	CString rval(QuoteFileName(csFFMPEGPath));
-	rval.Append(_T(" -hide_banner -i "));
+	rval.Append(_T(" -hide_banner -forced_subs_only 1 -i "));
 	rval.Append(QuoteFileName(m_csPathName));
 	#ifdef _DEBUG
 	rval.Append(_T(" -report"));
@@ -1019,7 +1019,7 @@ const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath, cons
 				else if (!m_Subtitles.Compare(_T("dvd_subtitle")))
 				{
 					// https://trac.ffmpeg.org/wiki/HowToBurnSubtitlesIntoVideo
-					rval.Append(_T(" -filter_complex \"[0:v][0:s]overlay[v]\" -map \"[v]\" -map 0:a"));
+					rval.Append(_T(" -filter_complex \"[0:v][0:s]overlay[v]\" -map \"[v]\" -map 0:a:0?"));
 				}
 			}
 			rval.Append(_T(" -vcodec mpeg2video"));
