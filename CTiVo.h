@@ -50,7 +50,7 @@ private:
 	bool m_AudioCompatible;
 	bool m_VideoCompatible;
 	bool m_VideoHighDefinition;
-	bool m_Subtitles;
+	CString m_Subtitles;
 	int m_VideoWidth;
 	int m_VideoHeight;
 	CString m_TvBusEnvelope;
@@ -59,7 +59,6 @@ public:
 	m_AudioCompatible(false),
 	m_VideoCompatible(false),
 	m_VideoHighDefinition(false),
-	m_Subtitles(false),
 	m_VideoWidth(0),
 	m_VideoHeight(0),
 	m_SourceSize(0),

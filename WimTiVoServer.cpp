@@ -2534,12 +2534,10 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 				theApp.DelRegTree(HKEY_CURRENT_USER, csRegKey);
 				theApp.DelRegTree(HKEY_LOCAL_MACHINE, csRegKey);
 			}
-			else if (Parameters.CompareNoCase(_T("-ForceSubtitles")) == 0)
-			{
-				bForceSubtitles = true;
-			}
 			else
-			{			
+			{	
+				if (Parameters.CompareNoCase(_T("-ForceSubtitles")) == 0)
+					bForceSubtitles = true;
 				#ifdef AVCODEC_AVCODEC_H
 				av_register_all(); // FFMPEG initialization
 				#endif

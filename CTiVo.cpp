@@ -663,8 +663,7 @@ void cTiVoFile::PopulateFromFFProbe(void)
 													else if (!cs_codec_type.Compare(_T("subtitle")))
 													{
 														bSubtitleStreamInfoNeeded = false;
-														if (!cs_codec_name.Compare(_T("subrip")))
-															m_Subtitles = true;
+														m_Subtitles = cs_codec_name;
 													}
 												}
 												else if (!csLocalName.Compare(_T("format")))
@@ -1001,19 +1000,27 @@ const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath, cons
 	{
 		//rval.Append(_T(" -map 0:v -map 0:a?")); // copy all audio streams Added 2020-04-04
 		rval.Append(_T(" -map_metadata -1"));
-		if (m_VideoCompatible)
+		if (m_VideoCompatible && !bForceSubtitles)
 			rval.Append(_T(" -vcodec copy"));
 		else
 		{
-			if (m_Subtitles && bForceSubtitles)
+			if (bForceSubtitles)
 			{
-				// quick and dirty addition to support subtitles https://trac.ffmpeg.org/wiki/HowToBurnSubtitlesIntoVideo
-				CString csSubtitlePath(QuoteFileName(m_csPathName));
-				csSubtitlePath.Replace(_T("\\"), _T("/"));
-				csSubtitlePath.Replace(_T("["), _T("\\["));
-				csSubtitlePath.Replace(_T("]"), _T("\\]"));
-				csSubtitlePath.Delete(0, 2);
-				rval.Append(_T(" -vf subtitles=")); rval.Append(csSubtitlePath);
+				if (!m_Subtitles.Compare(_T("subrip")))
+				{
+					// quick and dirty addition to support subtitles https://trac.ffmpeg.org/wiki/HowToBurnSubtitlesIntoVideo
+					CString csSubtitlePath(QuoteFileName(m_csPathName));
+					csSubtitlePath.Replace(_T("\\"), _T("/"));
+					csSubtitlePath.Replace(_T("["), _T("\\["));
+					csSubtitlePath.Replace(_T("]"), _T("\\]"));
+					csSubtitlePath.Delete(0, 2);
+					rval.Append(_T(" -vf subtitles=")); rval.Append(csSubtitlePath);
+				}
+				else if (!m_Subtitles.Compare(_T("dvd_subtitle")))
+				{
+					// https://trac.ffmpeg.org/wiki/HowToBurnSubtitlesIntoVideo
+					rval.Append(_T(" -filter_complex \"[0:v][0:s]overlay[v]\" -map \"[v]\" -map 0:a"));
+				}
 			}
 			rval.Append(_T(" -vcodec mpeg2video"));
 
