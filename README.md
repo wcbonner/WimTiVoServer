@@ -17,6 +17,9 @@ The software pays attention to two primary registry keys.
  Each is a ";" seperated list. The first is a pathspec of files to include and make available for a tivo on the local network to transfer. The second is a list of extensions to explicitly ignore. if the program is started and these do not exist, it will attempt to create them with default values.
  
  The program polls the container directories every 15 minutes for new files to include in the list.
+
+ ## History (Reasons why this will not be ported from Windows)
+ Originally written using MFC classes and slowly migrated to using more std:: classes. Still very much dependent on [xmllite](https://learn.microsoft.com/en-us/previous-versions/windows/desktop/ms752838(v=vs.85)) for xml processing.
  
 # WimTiVoClient
 Windows GUI Application that allows listing all of the files on your TiVo and transferring them to your computer. Optionally utilizes TiVoDecode and FFmpeg to transcode the retrieved .tivo file to a more friendly format. https://sourceforge.net/projects/tivodecode/ Needs the Media Access Key (MAK) from your TiVo to be able to communicate with the TiVo. Transferred file name format is based on the TiVo Desktop software that TiVo produced when they were a much more consumer friendly company.
