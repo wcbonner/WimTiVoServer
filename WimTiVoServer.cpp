@@ -1317,6 +1317,16 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 					// If an error occurs, exit the application. 
 					if ( bSuccess ) 
 					{
+						// I should request that the machine not go to standby while sending the file
+						// https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-powersetrequest
+						POWER_REQUEST_CONTEXT RequestContext; // { POWER_REQUEST_CONTEXT_VERSION, POWER_REQUEST_CONTEXT_SIMPLE_STRING, .Reason.SimpleReasonString = { L"FFMPEG running" }};
+						RequestContext.Version = POWER_REQUEST_CONTEXT_VERSION;
+						RequestContext.Flags = POWER_REQUEST_CONTEXT_SIMPLE_STRING;
+						RequestContext.Reason.SimpleReasonString = L"FFMPEG running";
+						auto PowerRequest = PowerCreateRequest(&RequestContext);
+						BOOL MyPowerRequestWasSuccessful = FALSE;
+						if (PowerRequest != INVALID_HANDLE_VALUE)
+							MyPowerRequestWasSuccessful = PowerSetRequest(PowerRequest, PowerRequestExecutionRequired);
 						CloseHandle(g_hChildStd_OUT_Wr);	// If I don't do this, then the parent will never exit!
 						//BOOL on = 1;
 						//if (SOCKET_ERROR != setsockopt(DataSocket, IPPROTO_TCP, TCP_NODELAY, (char *)&on, sizeof(on)))	// Attempt to see if this is related to why many of my transfers are failing.
@@ -1448,6 +1458,11 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 							LPCTSTR lpStrings[] = { csSubstitutionText.GetString(), NULL };
 							ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
 						}
+						// clean up windows power request stuff
+						if (TRUE == MyPowerRequestWasSuccessful)
+							PowerClearRequest(PowerRequest, PowerRequestExecutionRequired);
+						if (PowerRequest != INVALID_HANDLE_VALUE)
+							CloseHandle(PowerRequest);
 					}
 				}
 				CloseHandle(g_hChildStd_OUT_Rd);
