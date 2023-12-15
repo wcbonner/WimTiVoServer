@@ -129,30 +129,48 @@ CString GetFileVersion(const CString & filename, const int digits = 4)
 	return(rval);
 }
 /////////////////////////////////////////////////////////////////////////////
-string timeToISO8601(const time_t & TheTime)
+std::string timeToISO8601(const time_t& TheTime, const bool LocalTime = false)
 {
-	ostringstream ISOTime;
-	//ISOTime.imbue(std::locale::classic());
-	time_t timer = TheTime;
-	struct tm * UTC = gmtime(&timer);
-	if (UTC != NULL)
+	std::ostringstream ISOTime;
+	struct tm UTC;
+	struct tm* timecallresult(nullptr);
+	if (LocalTime)
+		#ifdef localtime_r
+		timecallresult = localtime_r(&TheTime, &UTC);
+		#else
+		timecallresult = localtime(&TheTime);
+		#endif
+	else
+		#ifdef gmtime_r
+		timecallresult = gmtime_r(&TheTime, &UTC);
+		#else
+		timecallresult = gmtime(&TheTime);
+		#endif
+	if (nullptr != timecallresult)
 	{
+		#ifndef gmtime_r
+		UTC = *timecallresult;
+		#endif // !gmtime_r
+
 		ISOTime.fill('0');
-		ISOTime << UTC->tm_year+1900 << "-";
+		if (!((UTC.tm_year == 70) && (UTC.tm_mon == 0) && (UTC.tm_mday == 1)))
+		{
+			ISOTime << UTC.tm_year + 1900 << "-";
+			ISOTime.width(2);
+			ISOTime << UTC.tm_mon + 1 << "-";
+			ISOTime.width(2);
+			ISOTime << UTC.tm_mday << "T";
+		}
 		ISOTime.width(2);
-		ISOTime << UTC->tm_mon+1 << "-";
+		ISOTime << UTC.tm_hour << ":";
 		ISOTime.width(2);
-		ISOTime << UTC->tm_mday << "T";
+		ISOTime << UTC.tm_min << ":";
 		ISOTime.width(2);
-		ISOTime << UTC->tm_hour << ":";
-		ISOTime.width(2);
-		ISOTime << UTC->tm_min << ":";
-		ISOTime.width(2);
-		ISOTime << UTC->tm_sec;
+		ISOTime << UTC.tm_sec;
 	}
 	return(ISOTime.str());
 }
-string timeToExcelDate(const time_t & TheTime)
+std::string timeToExcelDate(const time_t & TheTime)
 {
 	ostringstream ISOTime;
 	time_t timer = TheTime;
@@ -174,13 +192,16 @@ string timeToExcelDate(const time_t & TheTime)
 	}
 	return(ISOTime.str());
 }
-string getTimeISO8601(void)
+std::string getTimeISO8601(const bool LocalTime = false)
 {
 	time_t timer;
 	time(&timer);
-	return(timeToISO8601(timer));
+	std::string isostring(timeToISO8601(timer, LocalTime));
+	std::string rval;
+	rval.assign(isostring.begin(), isostring.end());
+	return(rval);
 }
-string getTimeRFC1123(void)
+std::string getTimeRFC1123(void)
 {
 	//InternetTimeFromSystemTime(&sysTime, INTERNET_RFC1123_FORMAT, tchInternetTime, sizeof(tchInternetTime));
 	//HttpResponse << "Date: " << CStringA(CString(tchInternetTime)).GetString() << "\r\n";
@@ -191,7 +212,7 @@ string getTimeRFC1123(void)
 	RFCTime.append(" GMT");
 	return(RFCTime);
 }
-time_t ISO8601totime(const string & ISOTime)
+time_t ISO8601totime(const std::string & ISOTime)
 {
 	struct tm UTC;
 	UTC.tm_year = atol(ISOTime.substr(0,4).c_str())-1900;
@@ -212,9 +233,9 @@ time_t ISO8601totime(const string & ISOTime)
 	return(timer);
 }
 /////////////////////////////////////////////////////////////////////////////
-std::wstring getwTimeISO8601(void)
+std::wstring getwTimeISO8601(const bool LocalTime = false)
 {
-	std::string isostring(getTimeISO8601());
+	std::string isostring(getTimeISO8601(LocalTime));
 	std::wstring rval;
 	rval.assign(isostring.begin(), isostring.end());
 
@@ -566,7 +587,7 @@ UINT PopulateTiVoFileList(LPVOID lvp)
 		ss.imbue(std::locale(""));
 		ccTiVoFileListCritSec.Lock();
 		auto TiVoFileListSizeAfter = TiVoFileList.size();
-		ss << "[" << getTimeISO8601() << "] " __FUNCTION__ " TiVoFileListSizeBefore: " << TiVoFileListSizeBefore << " TiVoFileListSizeAfter: " << TiVoFileListSizeAfter << std::endl;
+		ss << "[" << getTimeISO8601(true) << "] " __FUNCTION__ " TiVoFileListSizeBefore: " << TiVoFileListSizeBefore << " TiVoFileListSizeAfter: " << TiVoFileListSizeAfter << std::endl;
 		ccTiVoFileListCritSec.Unlock();
 		if (bConsoleExists)
 		{
@@ -672,7 +693,7 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 			CStringA csValue(csToken.Right(csToken.GetLength() - (csToken.Find("=")+1)));
 			if (!csKey.CompareNoCase("Container"))
 			{
-				std::cout << "[" << getTimeISO8601() << "] " << csToken.GetString() << std::endl;
+				std::cout << "[" << getTimeISO8601(true) << "] " << csToken.GetString() << std::endl;
 				csContainer = csValue;
 			}
 			else if (!csKey.CompareNoCase("Recurse"))
@@ -1302,7 +1323,7 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 					TCHAR szOldTitle[MAX_PATH] = _T("");
 					if (bConsoleExists)
 					{
-						std::wcout << "[" << getwTimeISO8601() << "][" << piProcInfo.dwProcessId << "." << piProcInfo.dwThreadId << "] CreateProcess: " << csCommandLine.GetString() << std::endl;
+						std::wcout << "[" << getwTimeISO8601(true) << "][" << piProcInfo.dwProcessId << "." << piProcInfo.dwThreadId << "] CreateProcess: " << csCommandLine.GetString() << std::endl;
 						// Open LogFile, write transfer details, and close it again.
 						std::wofstream m_LogFile(GetLogFileName().GetString(), std::ios_base::out | std::ios_base::app | std::ios_base::ate);
 						if (m_LogFile.is_open())
@@ -1798,7 +1819,7 @@ UINT HTTPMain(LPVOID lvp)
 							CWinThread * ChildThread = AfxBeginThread(HTTPChild, (LPVOID)remoteSocket, THREAD_PRIORITY_ABOVE_NORMAL, 0, CREATE_SUSPENDED);
 							ChildThread->m_bAutoDelete = FALSE;
 							ThreadPtrList.push(ChildThread);
-							std::wcout << "[" << getwTimeISO8601() << "] ThreadList Size: " << ThreadPtrList.size() << std::endl;
+							std::wcout << "[" << getwTimeISO8601(true) << "] ThreadList Size: " << ThreadPtrList.size() << std::endl;
 							ChildThread->ResumeThread();
 						}
 #endif // THREADTRACKING
@@ -1812,7 +1833,7 @@ UINT HTTPMain(LPVOID lvp)
 							Sleep(1); // I'm sleeping so that I'm not in a pure race condition
 						else
 						{
-							std::wcout << "[" << getwTimeISO8601() << "] ThreadPtrList Size: " << ThreadPtrList.size() << std::endl;
+							std::wcout << "[" << getwTimeISO8601(true) << "] ThreadPtrList Size: " << ThreadPtrList.size() << std::endl;
 							delete ThreadPtrList.front();
 							ThreadPtrList.pop();
 						}
@@ -2316,11 +2337,11 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 
 	HMODULE hModule = ::GetModuleHandle(NULL);
 	if (hModule == NULL)
-		std::cout << "[" << getTimeISO8601() << "] Fatal Error: GetModuleHandle failed " << ++nRetCode << std::endl;
+		std::cout << "[" << getTimeISO8601(true) << "] Fatal Error: GetModuleHandle failed " << ++nRetCode << std::endl;
 	else if (!AfxWinInit(hModule, NULL, ::GetCommandLine(), 0)) // initialize MFC and print and error on failure
-		std::cout << "[" << getTimeISO8601() << "] Fatal Error: MFC initialization failed " << ++nRetCode << std::endl;
+		std::cout << "[" << getTimeISO8601(true) << "] Fatal Error: MFC initialization failed " << ++nRetCode << std::endl;
 	else if (!AfxSocketInit())
-		std::cout << "[" << getTimeISO8601() << "] Fatal Error: Sockets initialization failed " << ++nRetCode << std::endl;
+		std::cout << "[" << getTimeISO8601(true) << "] Fatal Error: Sockets initialization failed " << ++nRetCode << std::endl;
 	else
 	{
 		SERVICE_TABLE_ENTRY serviceTable[] =
@@ -2335,15 +2356,15 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 		{
 			// This error is returned if the program is being run as a console application rather than as a service. If the program will be run as a console application for debugging purposes, structure it such that service-specific code is not called when this error is returned. According to http://msdn.microsoft.com/en-us/library/windows/desktop/ms686324(v=vs.85).aspx ERROR_FAILED_SERVICE_CONTROLLER_CONNECT
 			bConsoleExists = true;
-			std::cout << "[" << getTimeISO8601() << "] Running Application from the command line." << std::endl;
-			std::cout << "[" << getTimeISO8601() << "] Built on " << __DATE__ << " at " <<  __TIME__ << std::endl;
-			std::cout << "[" << getTimeISO8601() << "] Current locale setting is \"" << std::cout.getloc().name().c_str() << "\"" << std::endl;
+			std::cout << "[" << getTimeISO8601(true) << "] Running Application from the command line." << std::endl;
+			std::cout << "[" << getTimeISO8601(true) << "] Built on " << __DATE__ << " at " <<  __TIME__ << std::endl;
+			std::cout << "[" << getTimeISO8601(true) << "] Current locale setting is \"" << std::cout.getloc().name().c_str() << "\"" << std::endl;
 			std::cout << "[                   ] 1000.010 == " << 1000.010 << std::endl;
 			std::cout.imbue(std::locale(""));  // imbue global locale
 			std::wcout.imbue(std::locale(""));  // imbue global locale
 			//std::locale::global(std::locale("")); // replace the C++ global locale as well as the C locale with the user-preferred locale			
 			//std::cout.imbue(std::locale()); // use the new global locale for future wide character output
-			std::cout << "[" << getTimeISO8601() << "] Current locale setting is \"" << std::cout.getloc().name().c_str() << "\"" << std::endl;
+			std::cout << "[" << getTimeISO8601(true) << "] Current locale setting is \"" << std::cout.getloc().name().c_str() << "\"" << std::endl;
 			std::cout << "[                   ] 1000.010 == " << 1000.010 << std::endl;
 
 			// Open LogFile, write basic program details, and close it again.
@@ -2562,7 +2583,7 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 
 				ccTiVoFileListCritSec.Lock();
 				std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate);
-				std::cout << "[" << getTimeISO8601() << "] TiVoFileList Size: " << TiVoFileList.size() << std::endl;
+				std::cout << "[" << getTimeISO8601(true) << "] TiVoFileList Size: " << TiVoFileList.size() << std::endl;
 				ccTiVoFileListCritSec.Unlock();
 
 				terminateEvent_http = CreateEvent(0,TRUE,FALSE,0);
@@ -2581,10 +2602,10 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 							SetConsoleTitle(csNewTitle.GetString());
 						}
 						#ifdef _DEBUG
-						std::cout << "[" << getTimeISO8601() << "] Running for 30 minutes" << std::endl;
+						std::cout << "[" << getTimeISO8601(true) << "] Running for 30 minutes" << std::endl;
 						Sleep(30 * 60 * 1000); // Sleep 30 minutes
 						#else
-						std::cout << "[" << getTimeISO8601() << "] Running for 12 hours" << std::endl;
+						std::cout << "[" << getTimeISO8601(true) << "] Running for 12 hours" << std::endl;
 						Sleep(12 * 60 * 60 * 1000); // Sleep 12 hours
 						#endif
 						SetEvent(terminateEvent_beacon);
@@ -2603,7 +2624,7 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 				if (terminateEvent_populate)
 					CloseHandle(terminateEvent_populate);
 			}
-			std::cout << "[" << getTimeISO8601() << "] Exiting" << std::endl;
+			std::cout << "[" << getTimeISO8601(true) << "] Exiting" << std::endl;
 			//std::cout << "[" << getTimeISO8601() << "] Exiting" << ctime(std::chrono::system_clock::now()) << std::endl;
 		}
 	}
