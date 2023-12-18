@@ -222,6 +222,7 @@ bool cTiVoFile::operator==(const cTiVoFile & other) const
 		);
 }
 const CString csUrlPrefix(_T("/TiVoConnect/TivoNowPlaying/"));
+// This function is called from WimTiVoClient (2023-12-17)
 void cTiVoFile::SetPathName(const CString csNewPath)
 {
 	m_csPathName = csNewPath;
@@ -272,6 +273,7 @@ void cTiVoFile::SetPathName(const CString csNewPath)
 	wcout << L"[                   ] " << setw(20) << right << L"m_CaptureDate" << L" : " << m_CaptureDate.Format(_T("%c")).GetString() << endl;
 	wcout << L"[                   ] " << setw(20) << right << L"URL" << L" : " << GetURL().GetString() << endl;
 }	
+// This function is called from WimTiVoServer (2023-12-17)
 void cTiVoFile::SetPathName(const CFileFind & csNewPath)
 {
 	m_csPathName = csNewPath.GetFilePath();
@@ -767,6 +769,23 @@ void cTiVoFile::PopulateFromFFProbe(void)
 			CloseHandle(g_hChildStd_OUT_Rd);
 		}
 	}
+	if (m_EpisodeNumber == 0)
+	{
+		const std::regex SeasonEpisodeRegex("[S,s]([[:xdigit:]]{2})[E,e]([[:xdigit:]]{2})");
+		std::smatch SeasonEpisode;
+		std::string StringToSearch(CStringA(m_Title).GetString());
+		if (std::regex_search(StringToSearch, SeasonEpisode, SeasonEpisodeRegex))
+		{
+			std::stringstream ssSeason;
+			ssSeason << SeasonEpisode[1];
+			std::stringstream ssEpisode;
+			ssEpisode << SeasonEpisode[2];
+			int iSeason, iEpisode;
+			ssSeason >> iSeason;
+			ssEpisode >> iEpisode;
+			m_EpisodeNumber = iSeason * 100 + iEpisode;
+		}
+	}
 }
 #define NT_SUCCESS(Status)          (((NTSTATUS)(Status)) >= 0)
 #define STATUS_UNSUCCESSFUL         ((NTSTATUS)0xC0000001L)
@@ -943,6 +962,12 @@ void cTiVoFile::GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const
 				pWriter->WriteElementString(NULL, L"description", NULL, m_Description.GetString());
 				pWriter->WriteStartElement(NULL, L"vDirector", NULL);
 				pWriter->WriteEndElement();
+				if (0 != m_EpisodeNumber)
+				{
+					std::wstringstream myout;
+					myout << m_EpisodeNumber;
+					pWriter->WriteElementString(NULL, L"episodeNumber", NULL, myout.str().c_str());
+				}
 				pWriter->WriteElementString(NULL, L"episodeTitle", NULL, m_EpisodeTitle.GetString());
 				pWriter->WriteStartElement(NULL, L"vExecProducer", NULL);
 				pWriter->WriteEndElement();
@@ -962,12 +987,18 @@ void cTiVoFile::GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const
 				pWriter->WriteEndElement();
 				pWriter->WriteStartElement(NULL, L"vHost", NULL);
 				pWriter->WriteEndElement();
-				pWriter->WriteElementString(NULL, L"isEpisode", NULL, L"false");
+				if (0 == m_EpisodeNumber)
+					pWriter->WriteElementString(NULL, L"isEpisode", NULL, L"false");
+				else
+					pWriter->WriteElementString(NULL, L"isEpisode", NULL, L"true");
 				pWriter->WriteElementString(NULL, L"originalAirDate", NULL, m_CaptureDate.FormatGmt(_T("%Y-%m-%d:%H:%M:%SZ")));
 				pWriter->WriteStartElement(NULL, L"vProducer", NULL);
 				pWriter->WriteEndElement();
 				pWriter->WriteStartElement(NULL, L"series", NULL);
-					pWriter->WriteElementString(NULL, L"isEpisodic", NULL, L"false");
+					if (0 == m_EpisodeNumber)
+						pWriter->WriteElementString(NULL, L"isEpisodic", NULL, L"false");
+					else
+						pWriter->WriteElementString(NULL, L"isEpisodic", NULL, L"true");
 					pWriter->WriteStartElement(NULL, L"vSeriesGenre", NULL);
 					pWriter->WriteEndElement();
 					pWriter->WriteElementString(NULL, L"seriesTitle", NULL, m_Title.GetString());

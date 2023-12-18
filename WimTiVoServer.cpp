@@ -394,29 +394,29 @@ void PopulateTiVoFileList(std::vector<cTiVoFile> & TiVoFileList, CCriticalSectio
 		}
 		if (SkipExtension) // Added 2020-02-28 to ignore text files
 			continue;
-		cTiVoFile myFile;
 		if (finder.GetLength() > 0)
 		{
 			bool bNotInList = true;
 			ccTiVoFileListCritSec.Lock();
-			for (auto TiVoFile = TiVoFileList.begin(); TiVoFile != TiVoFileList.end(); TiVoFile++)
-				if (!TiVoFile->GetPathName().CompareNoCase(finder.GetFilePath()))
+			for (auto & TiVoFile : TiVoFileList)
+				if (!TiVoFile.GetPathName().CompareNoCase(finder.GetFilePath()))
 				{
 					CTime FinderTime;
 					if (finder.GetLastWriteTime(FinderTime))
-						if (FinderTime > TiVoFile->GetLastWriteTime())
-							TiVoFile->SetPathName(finder);
+						if (FinderTime > TiVoFile.GetLastWriteTime())
+							TiVoFile.SetPathName(finder);
 					bNotInList = false;
 					break;
 				}
 			ccTiVoFileListCritSec.Unlock();
 			if (bNotInList)
 			{
-				myFile.SetPathName(finder);
-				if (!myFile.GetSourceFormat().Left(6).CompareNoCase(_T("video/")))
+				cTiVoFile TiVoFile;
+				TiVoFile.SetPathName(finder);
+				if (!TiVoFile.GetSourceFormat().Left(6).CompareNoCase(_T("video/")))
 				{
 					ccTiVoFileListCritSec.Lock();
-					TiVoFileList.push_back(myFile);
+					TiVoFileList.push_back(TiVoFile);
 					ccTiVoFileListCritSec.Unlock();
 				}
 			}

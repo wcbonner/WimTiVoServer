@@ -35,6 +35,7 @@ private:
 	CString m_csURL; // only used for remote items
 	CString m_Title;
 	CString m_EpisodeTitle;
+	int m_EpisodeNumber;
 	CString m_Description;
 	CString m_ContentType;
 	CString m_SourceFormat;
@@ -56,6 +57,7 @@ private:
 	CString m_TvBusEnvelope;
 public:
 	cTiVoFile() : 
+	m_EpisodeNumber(0),
 	m_AudioCompatible(false),
 	m_VideoCompatible(false),
 	m_VideoHighDefinition(false),

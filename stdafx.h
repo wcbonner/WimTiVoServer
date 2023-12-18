@@ -42,6 +42,7 @@
 #include <algorithm>
 #include <ctime>
 #include <chrono>
+#include <regex>
 #include <signal.h>
 #include <memory> // for smart pointers
 #include <xmllite.h>
