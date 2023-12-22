@@ -2,7 +2,8 @@
 
 class cTiVoServer
 {
-//192.168.1.11 tivoconnect=1 swversion=11.0k-01-2-652 method=broadcast identity=6520201806EEAAE machine=Living Room platform=tcd/Series3 services=TiVoMediaServer:80/http
+//192.168.1.11  tivoconnect=1 swversion=11.0k-01-2-652 method=broadcast identity=6520201806EEAAE machine=Living Room platform=tcd/Series3 services=TiVoMediaServer:80/http
+//192.168.50.43 tivoconnect=1 swversion=20.7.4d.RC15-846-6-846 method=broadcast identity=84600119023FFD0 machine=WimRomio platform=tcd/Series5 services=TiVoMediaServer:80/http
 public:
 	std::string m_address;
 	std::string m_swversion;

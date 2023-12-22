@@ -53,6 +53,8 @@
 #pragma comment(lib, "bcrypt")
 #include <wincrypt.h>
 #pragma comment(lib, "crypt32.lib")
+#include <windns.h> // for mDNS functions related to Bonjour https://learn.microsoft.com/en-us/windows/win32/api/windns/nf-windns-dnsserviceregister
+#pragma comment(lib, "dnsapi.lib")
 
 // FFMPEG Libraries
 //extern "C" {

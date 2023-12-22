@@ -217,6 +217,112 @@ bool cTiVoServer::ReadTXT(const std::string & text, const char seperator)
 	return(rval);
 }
 /////////////////////////////////////////////////////////////////////////////
+// Attempt to browse mDNS for tivo reports via Bonjour (2023-12-20)
+#ifdef AppleExample1
+// this code came from: https://flylib.com/books/en/2.94.1.54/1/
+//#include <dns_sd.h> 
+#include <stdio.h>     // For stdout, stderr 
+#include <string.h>     // For strlen(), strcpy(  ), bzero(  ) 
+extern void HandleEvents(DNSServiceRef); 
+static void MyBrowseCallBack(DNSServiceRef service,
+	DNSServiceFlags flags,                 
+	uint32_t interfaceIndex,                 
+	DNSServiceErrorType errorCode,                 
+	const char * name,                 
+	const char * type,                 
+	const char * domain,                 
+	void * context)     
+{     
+#pragma unused(context)     
+	if (errorCode != kDNSServiceErr_NoError)         
+		fprintf(stderr, "MyBrowseCallBack returned %d\n", errorCode);     
+	else         
+	{         
+		char *addString  = (flags & kDNSServiceFlagsAdd) ? "ADD" : "REMOVE";
+		char *moreString = (flags & kDNSServiceFlagsMoreComing) ? "MORE" : "    ";
+		printf("%-7s%-5s %d%s.%s%s\n",             addString, moreString, interfaceIndex, name, type, domain);
+	}
+	if (!(flags & kDNSServiceFlagsMoreComing)) fflush(stdout);
+} 
+static DNSServiceErrorType MyDNSServiceBrowse(  )
+{     
+	DNSServiceErrorType error;
+	DNSServiceRef  serviceRef;
+	error = DNSServiceBrowse(&serviceRef,
+		0,                // no flags
+		0,                // all network interfaces
+		"_http._tcp",     // service type
+		"",               // default domains
+		MyBrowseCallBack, // call back function
+		NULL);            // no context
+	if (error == kDNSServiceErr_NoError)
+	{
+		HandleEvents(serviceRef); // Add service to runloop to get callbacks
+		DNSServiceRefDeallocate(serviceRef);
+	}
+	return error;
+}
+int main (int argc, const char * argv[])
+{
+	DNSServiceErrorType error = MyDNSServiceBrowse(  );
+	if (error)
+	fprintf(stderr, "DNSServiceDiscovery returned %d\n", error);
+	return 0;
+} 
+#endif // AppleExample1
+#ifdef AooleExample2
+#include <dns_sd.h> 
+#include <stdio.h>            // For stdout, stderr 
+#include <string.h>            // For strlen(  ), strcpy(  ), bzero(  ) 
+extern void HandleEvents(DNSServiceRef); 
+static void MyRegisterCallBack(
+	DNSServiceRef service,                    
+	DNSServiceFlags flags,                    
+	DNSServiceErrorType errorCode,                    
+	const char * name,                    
+	const char * type,                    
+	const char * domain,                    
+	void * context)
+{
+#pragma unused(flags)
+#pragma unused(context)
+	if (errorCode != kDNSServiceErr_NoError)
+		fprintf(stderr, "MyRegisterCallBack returned %d\n", errorCode);
+	else
+		printf("%-15s %s.%s%s\n","REGISTER", name, type, domain);
+}
+static DNSServiceErrorType MyDNSServiceRegister(  )
+{
+	DNSServiceErrorType error;
+	DNSServiceRef serviceRef;
+	error = DNSServiceRegister(
+		&serviceRef,
+		0,                  // no flags
+		0,                  // all network interfaces
+		"Not a real page",  // name
+		"_http._tcp",       // service type
+		"",                 // register in default domain(s)
+		NULL,               // use default host name
+		htons(9092),        // port number
+		0,                  // length of TXT record
+		NULL,               // no TXT record
+		MyRegisterCallBack, // call back function
+		NULL);              // no context
+	if (error == kDNSServiceErr_NoError)
+	{
+		HandleEvents(serviceRef);
+		DNSServiceRefDeallocate(serviceRef);
+	}
+	return error;
+}
+int main (int argc, const char * argv[])
+{
+	DNSServiceErrorType error = MyDNSServiceRegister(  );
+	fprintf(stderr, "DNSServiceDiscovery returned %d\n", error);
+	return 0;
+} 
+#endif // AooleExample2
+/////////////////////////////////////////////////////////////////////////////
 bool m_TiVoBeaconListenThreadStopRequested = false;
 /////////////////////////////////////////////////////////////////////////////
 int main(int argc,      // Number of strings in array argv  

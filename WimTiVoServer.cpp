@@ -1853,6 +1853,138 @@ UINT HTTPMain(LPVOID lvp)
 	SetEvent(LocalTerminationEventHandle); // this signals any waiting function that HTTPMain function is ending.
 	return(0);
 }
+// My callback function https://learn.microsoft.com/en-us/windows/win32/api/windns/nc-windns-dns_service_register_complete
+void DnsServiceRegisterComplete(DWORD Status, PVOID pQueryContext,PDNS_SERVICE_INSTANCE pInstance)
+{
+	if (bConsoleExists)
+	{
+		std::cout << "[" << getTimeISO8601() << "] DnsServiceRegisterComplete(" << Status << ") DNS_ERROR_RCODE_SERVER_FAILURE=" << DNS_ERROR_RCODE_SERVER_FAILURE << std::endl;
+	}
+	return;
+}
+void TiVomDNSRegister(bool enable = true)
+{
+	// Based on what the TiVo Roamio registers, I want to register several items:
+	// WimRomio._http._tcp.local
+	// WimRomio._tivo-remote._tcp.local
+	// WimRomio._tivo-device._tcp.local
+	// WimRomio._tivo-videos._tcp.local
+	// WimRomio._tivo-videostream._tcp.local
+	// WimRomio._tivo-mindrpc._tcp.local 
+
+	//Service data for service 'WimRomio' of type '_http._tcp' in domain 'local' on 3.0:
+	//	Host DVR-FFD0.local (192.168.50.43), port 80, TXT data: ['TSN=84600119023FFD0', 'platform=tcd/Series5', 'swversion=20.7.4d.RC15-846-6-846', 'path=/index.html']
+	//Service data for service 'WimBolt' of type '_http._tcp' in domain 'local' on 3.0:
+	//	Host DVR-4AC3.local (192.168.50.197), port 80, TXT data: ['TSN=8490001903F4AC3', 'platform=tcd/Series6', 'swversion=20.7.4d.RC15-USC-11-849', 'path=/index.html']
+	//Service data for service 'WimRomio' of type '_tivo-remote._tcp' in domain 'local' on 3.0:
+	//	Host DVR-FFD0.local (192.168.50.43), port 31339, TXT data: ['TSN=84600119023FFD0', 'platform=tcd/Series5', 'swversion=20.7.4d.RC15-846-6-846', 'path=/', 'protocol=tivo-remote']
+	//Service data for service 'WimBolt' of type '_tivo-remote._tcp' in domain 'local' on 3.0:
+	//	Host DVR-4AC3.local (192.168.50.197), port 31339, TXT data: ['TSN=8490001903F4AC3', 'platform=tcd/Series6', 'swversion=20.7.4d.RC15-USC-11-849', 'path=/', 'protocol=tivo-remote']
+	//Service data for service 'WimRomio' of type '_tivo-device._tcp' in domain 'local' on 3.0:
+	//	Host DVR-FFD0.local (192.168.50.43), port 80, TXT data: ['TSN=84600119023FFD0', 'platform=tcd/Series5', 'swversion=20.7.4d.RC15-846-6-846', 'platformName=TiVo Premiere', 'services=_tivo-mindrpc._tcp,_tivo-remote._tcp', 'path=/']
+	//Service data for service 'WimBolt' of type '_tivo-device._tcp' in domain 'local' on 3.0:
+	//	Host DVR-4AC3.local (192.168.50.197), port 80, TXT data: ['TSN=8490001903F4AC3', 'platform=tcd/Series6', 'swversion=20.7.4d.RC15-USC-11-849', 'platformName=TiVo Premiere', 'services=_tivo-mindrpc._tcp,_tivo-remote._tcp', 'path=/']
+	//Service data for service 'WimBolt' of type '_tivo-videos._tcp' in domain 'local' on 3.0:
+	//	Host DVR-4AC3.local (192.168.50.197), port 443, TXT data: ['TSN=8490001903F4AC3', 'platform=tcd/Series6', 'swversion=20.7.4d.RC15-USC-11-849', 'path=/TiVoConnect?Command=QueryContainer&Container=%2FNowPlaying', 'protocol=https']
+	//Service data for service 'WimRomio' of type '_tivo-videos._tcp' in domain 'local' on 3.0:
+	//	Host DVR-FFD0.local (192.168.50.43), port 443, TXT data: ['TSN=84600119023FFD0', 'platform=tcd/Series5', 'swversion=20.7.4d.RC15-846-6-846', 'path=/TiVoConnect?Command=QueryContainer&Container=%2FNowPlaying', 'protocol=https']
+	//Service data for service 'WimBolt' of type '_tivo-videostream._tcp' in domain 'local' on 3.0:
+	//	Host DVR-4AC3.local (192.168.50.197), port 443, TXT data: ['TSN=8490001903F4AC3', 'platform=tcd/Series6', 'swversion=20.7.4d.RC15-USC-11-849', 'path=/TiVoConnect?Command=QueryContainer&Container=%2FNowPlaying', 'protocol=https']
+	//Service data for service 'WimRomio' of type '_tivo-videostream._tcp' in domain 'local' on 3.0:
+	//	Host DVR-FFD0.local (192.168.50.43), port 443, TXT data: ['TSN=84600119023FFD0', 'platform=tcd/Series5', 'swversion=20.7.4d.RC15-846-6-846', 'path=/TiVoConnect?Command=QueryContainer&Container=%2FNowPlaying', 'protocol=https']
+	//Service data for service 'WimRomio' of type '_tivo-mindrpc._tcp' in domain 'local' on 3.0:
+	//	Host DVR-FFD0.local (192.168.50.43), port 1413, TXT data: ['TSN=84600119023FFD0', 'platform=tcd/Series5', 'swversion=20.7.4d.RC15-846-6-846', 'mindversion=7/25', 'path=/', 'protocol=tivo-mindrpc']
+	//Service data for service 'WimBolt' of type '_tivo-mindrpc._tcp' in domain 'local' on 3.0:
+	//	Host DVR-4AC3.local (192.168.50.197), port 1413, TXT data: ['TSN=8490001903F4AC3', 'platform=tcd/Series6', 'swversion=20.7.4d.RC15-USC-11-849', 'mindversion=7/25', 'path=/', 'protocol=tivo-mindrpc']
+
+	if (ControlSocket != INVALID_SOCKET)
+	{
+		struct sockaddr addr;
+		addr.sa_family = AF_UNSPEC;
+		socklen_t addr_len = sizeof(addr);
+		getsockname(ControlSocket, &addr, &addr_len);
+		if (addr.sa_family == AF_INET)
+		{
+			struct sockaddr_in* saServer = (sockaddr_in*)&addr;
+
+			WCHAR szHostName[256] = TEXT("");
+			DWORD dwSize = sizeof(szHostName);
+			GetComputerNameEx(ComputerNameDnsFullyQualified, szHostName, &dwSize);
+
+			//IP4_ADDRESS i4 = { 0 };
+			//InetPton(AF_INET, L"192.168.50.32", (void*)&i4);
+
+			// This is using an instance on the stack.
+			DNS_SERVICE_INSTANCE di = { 0 };
+			di.ip4Address = &saServer->sin_addr.S_un.S_addr;
+			di.pszInstanceName = L"WimSurface9._tivo-videos._tcp.local";
+			di.pszHostName = szHostName; // L"WimSurface9.WIMSWORLD.local";
+			//di.pszHostName = L"WimSurface9.local";
+			di.wPort = saServer->sin_port;
+
+			// Here I'm creating and destroying an instance just to test the function call.
+			auto MyServiceInstancePtr = DnsServiceConstructInstance(
+				L"WimSurface9._tivo-videos._tcp.local",
+				szHostName,
+				&saServer->sin_addr.S_un.S_addr,
+				nullptr,
+				saServer->sin_port,
+				0,
+				0,
+				0,
+				nullptr,
+				nullptr
+			);
+			DnsServiceFreeInstance(MyServiceInstancePtr);
+			// I'm thinking I should create an array of instance pointers, and then loop through registering them and deregistering them. 
+			DNS_SERVICE_REGISTER_REQUEST rd = { 0 };
+			rd.Version = DNS_QUERY_REQUEST_VERSION1;
+			rd.InterfaceIndex = 0;
+			rd.pServiceInstance = &di;
+			rd.pRegisterCompletionCallback = &DnsServiceRegisterComplete;
+			rd.pQueryContext = nullptr;
+			rd.hCredentials = 0;
+			rd.unicastEnabled = FALSE; // true if the DNS protocol should be used to advertise the service; false if the mDNS protocol should be used.
+			if (enable)
+			{
+				auto mDNSReturn = DnsServiceRegister(&rd, nullptr);
+				if (bConsoleExists)
+				{
+					std::cout << "[" << getTimeISO8601() << "] DnsServiceRegister(" << mDNSReturn << ") DNS_REQUEST_PENDING=" << DNS_REQUEST_PENDING << std::endl;
+				}
+			}
+			else
+			{
+				auto mDNSReturn = DnsServiceDeRegister(&rd, nullptr);
+				if (bConsoleExists)
+				{
+					std::cout << "[" << getTimeISO8601() << "] DnsServiceRegister(" << mDNSReturn << ") DNS_REQUEST_PENDING=" << DNS_REQUEST_PENDING << std::endl;
+				}
+			}
+		}
+		//DNS_SERVICE_INSTANCE mDNSService({
+		//	L"wimsurface9._http._tcp.local", 
+		//	L"wimsurface9._http._tcp.local"});
+		//DNS_SERVICE_REGISTER_REQUEST mDNSRequest({
+		//		DNS_QUERY_REQUEST_VERSION1,
+		//		0,
+		//	});
+		//auto mDNSReturn = DNSServiceRegister(
+		//	&serviceRef,
+		//	0,                  // no flags
+		//	0,                  // all network interfaces
+		//	"Not a real page",  // name
+		//	"_http._tcp",       // service type
+		//	"",                 // register in default domain(s)
+		//	NULL,               // use default host name
+		//	htons(9092),        // port number
+		//	0,                  // length of TXT record
+		//	NULL,               // no TXT record
+		//	MyRegisterCallBack, // call back function
+		//	NULL);              // no context
+	}
+	return;
+}
 bool TiVoBeaconSend(const std::string csServerBroadcast)
 {
 	bool rval = false;
@@ -2146,6 +2278,8 @@ UINT TiVoBeaconSendThread(LPVOID lvp)
 		ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
 	}
 
+	TiVomDNSRegister(true);	// I'm attempting to register my server using mDNS/Bonjour (2023-12-21)
+
 	do {
 		TiVoBeaconSend(myServer.WriteTXT('\n'));
 		#ifdef DEBUG
@@ -2156,6 +2290,9 @@ UINT TiVoBeaconSendThread(LPVOID lvp)
 		}
 		#endif // DEBUG
 	} while (WAIT_TIMEOUT == WaitForSingleObject(LocalTerminationEventHandle, 60*1000));
+
+	TiVomDNSRegister(false); // I'm attempting to deregister my server using mDNS/Bonjour (2023-12-21)
+
 	if (ApplicationLogHandle != NULL) 
 	{
 		CString csSubstitutionText(__FUNCTION__);
