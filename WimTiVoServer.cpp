@@ -1897,6 +1897,23 @@ void TiVomDNSRegister(bool enable = true)
 	//Service data for service 'WimBolt' of type '_tivo-mindrpc._tcp' in domain 'local' on 3.0:
 	//	Host DVR-4AC3.local (192.168.50.197), port 1413, TXT data: ['TSN=8490001903F4AC3', 'platform=tcd/Series6', 'swversion=20.7.4d.RC15-USC-11-849', 'mindversion=7/25', 'path=/', 'protocol=tivo-mindrpc']
 
+	//std::vector<std::pair<std::wstring, std::wstring>> myTivoDevice; // _tivo-device._tcp.local
+	//myTivoDevice.push_back(std::make_pair(L"TSN", std::wstring(myServer.m_identity)));
+	//myTivoDevice.push_back(std::make_pair(L"platform", myServer.m_platform));
+	//myTivoDevice.push_back(std::make_pair(L"swversion", myServer.m_swversion));
+	//myTivoDevice.push_back(std::make_pair(L"platformName", L"TiVo Premiere"));
+	//myTivoDevice.push_back(std::make_pair(L"services", L"_tivo-mindrpc._tcp,_tivo-remote._tcp"));
+	//myTivoDevice.push_back(std::make_pair(L"path", L"/"));
+
+	// machine=WimSurface9 address=192.168.50.32 identity={0850B36A-6F4B-442D-9C1F-026E48FB7C9F} method=broadcast platform=pc/WinNT:10.0.22631 services=TiVoMediaServer:61842/http swversion=20231222133941 tivoconnect=1
+
+	//std::vector<std::pair<std::string, std::string>> myTivoVideos; // both _tivo-videos._tcp.local and _tivo-videostream._tcp.local
+	//myTivoVideos.push_back(std::make_pair("TSN", myServer.m_identity));
+	//myTivoVideos.push_back(std::make_pair("platform", myServer.m_platform));
+	//myTivoVideos.push_back(std::make_pair("swversion", myServer.m_swversion));
+	//myTivoVideos.push_back(std::make_pair("path", "/TiVoConnect?Command=QueryContainer&Container=%2FNowPlaying"));
+	//myTivoVideos.push_back(std::make_pair("protocol", "http"));
+
 	if (ControlSocket != INVALID_SOCKET)
 	{
 		struct sockaddr addr;
@@ -1909,38 +1926,51 @@ void TiVomDNSRegister(bool enable = true)
 
 			WCHAR szHostName[256] = TEXT("");
 			DWORD dwSize = sizeof(szHostName);
-			GetComputerNameEx(ComputerNameDnsFullyQualified, szHostName, &dwSize);
+			GetComputerNameEx(ComputerNameDnsHostname, szHostName, &dwSize);
 
-			//IP4_ADDRESS i4 = { 0 };
-			//InetPton(AF_INET, L"192.168.50.32", (void*)&i4);
+			// Interesting thing is that it seems that I put the keys in the oposite order that they get displayed by avahi-discover
+			//Service data for service 'WimSurface9' of type '_tivo-videos._tcp' in domain 'local' on 3.0:
+			//	Host WimSurface9.local (192.168.50.32), port 50656, TXT data: ['TSN={0850B36A-6F4B-442D-9C1F-026E48FB7C9F}', 'platform=pc/WinNT:10.0.22631', 'swversion=20231222133941', 'path=/TiVoConnect?Command=QueryContainer&Container=%2FNowPlaying', 'protocol=http']
+			//Service data for service 'WimRomio' of type '_tivo-videos._tcp' in domain 'local' on 3.0:
+			//	Host DVR-FFD0.local (192.168.50.43), port 443, TXT data: ['TSN=84600119023FFD0', 'platform=tcd/Series5', 'swversion=20.7.4d.RC15-846-6-846', 'path=/TiVoConnect?Command=QueryContainer&Container=%2FNowPlaying', 'protocol=https']
+			//Service data for service 'WimBolt' of type '_tivo-videos._tcp' in domain 'local' on 3.0:
+			//	Host DVR-4AC3.local (192.168.50.72), port 443, TXT data: ['TSN=8490001903F4AC3', 'platform=tcd/Series6', 'swversion=20.7.4d.RC15-USC-11-849', 'path=/TiVoConnect?Command=QueryContainer&Container=%2FNowPlaying', 'protocol=https']
 
-			// This is using an instance on the stack.
-			DNS_SERVICE_INSTANCE di = { 0 };
-			di.ip4Address = &saServer->sin_addr.S_un.S_addr;
-			di.pszInstanceName = L"WimSurface9._tivo-videos._tcp.local";
-			di.pszHostName = szHostName; // L"WimSurface9.WIMSWORLD.local";
-			//di.pszHostName = L"WimSurface9.local";
-			di.wPort = saServer->sin_port;
+			// These Keys are copied from what a real TiVo registers.
+			std::vector<PCWSTR> keys;
+			keys.push_back(L"protocol");
+			keys.push_back(L"path");
+			keys.push_back(L"swversion");
+			keys.push_back(L"platform");
+			keys.push_back(L"TSN");
+			// These Values should be set based on the same Items I'm putting in the beacon
+			std::vector<PCWSTR> values;
+			values.push_back(L"http");
+			values.push_back(L"/TiVoConnect?Command=QueryContainer&Container=%2FNowPlaying");
+			values.push_back(L"20231222133941");
+			values.push_back(L"pc/WinNT:10.0.22631");
+			values.push_back(L"{0850B36A-6F4B-442D-9C1F-026E48FB7C9F}");
 
 			// Here I'm creating and destroying an instance just to test the function call.
+			std::wstring MyServiceName(L"._tivo-videos._tcp.local"); MyServiceName.insert(0, szHostName);
+			std::wstring MyHostName(L".local"); MyHostName.insert(0, szHostName);
 			auto MyServiceInstancePtr = DnsServiceConstructInstance(
-				L"WimSurface9._tivo-videos._tcp.local",
-				szHostName,
+				MyServiceName.c_str(),
+				MyHostName.c_str(),
 				&saServer->sin_addr.S_un.S_addr,
 				nullptr,
 				saServer->sin_port,
 				0,
 				0,
-				0,
-				nullptr,
-				nullptr
+				keys.size(),
+				&keys[0],
+				&values[0]
 			);
-			DnsServiceFreeInstance(MyServiceInstancePtr);
 			// I'm thinking I should create an array of instance pointers, and then loop through registering them and deregistering them. 
 			DNS_SERVICE_REGISTER_REQUEST rd = { 0 };
 			rd.Version = DNS_QUERY_REQUEST_VERSION1;
 			rd.InterfaceIndex = 0;
-			rd.pServiceInstance = &di;
+			rd.pServiceInstance = MyServiceInstancePtr;
 			rd.pRegisterCompletionCallback = &DnsServiceRegisterComplete;
 			rd.pQueryContext = nullptr;
 			rd.hCredentials = 0;
@@ -1961,6 +1991,7 @@ void TiVomDNSRegister(bool enable = true)
 					std::cout << "[" << getTimeISO8601() << "] DnsServiceRegister(" << mDNSReturn << ") DNS_REQUEST_PENDING=" << DNS_REQUEST_PENDING << std::endl;
 				}
 			}
+			DnsServiceFreeInstance(MyServiceInstancePtr);
 		}
 		//DNS_SERVICE_INSTANCE mDNSService({
 		//	L"wimsurface9._http._tcp.local", 
