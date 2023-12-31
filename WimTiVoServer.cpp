@@ -73,6 +73,7 @@ bool pauseService = false;
 CWinThread * threadHandle = NULL;
 SOCKET ControlSocket = INVALID_SOCKET;
 bool bConsoleExists = false;
+bool bZeroConf = false;
 HANDLE ApplicationLogHandle = NULL;
 cTiVoServer myServer;
 CCriticalSection ccTiVoFileListCritSec;
@@ -2280,7 +2281,8 @@ UINT TiVoBeaconSendThread(LPVOID lvp)
 		ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
 	}
 
-	TiVomDNSRegister(true);	// I'm attempting to register my server using mDNS/Bonjour (2023-12-21)
+	if (bZeroConf)
+		TiVomDNSRegister(true);	// I'm attempting to register my server using mDNS/Bonjour (2023-12-21)
 
 	do {
 		TiVoBeaconSend(myServer.WriteTXT('\n'));
@@ -2293,7 +2295,8 @@ UINT TiVoBeaconSendThread(LPVOID lvp)
 		#endif // DEBUG
 	} while (WAIT_TIMEOUT == WaitForSingleObject(LocalTerminationEventHandle, 60*1000));
 
-	TiVomDNSRegister(false); // I'm attempting to deregister my server using mDNS/Bonjour (2023-12-21)
+	if (bZeroConf)
+		TiVomDNSRegister(false); // I'm attempting to deregister my server using mDNS/Bonjour (2023-12-21)
 
 	if (ApplicationLogHandle != NULL) 
 	{
@@ -2539,6 +2542,7 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 				csBox += _T("\t-remove\n");
 				csBox += _T("\t-ClearRegistry\n");
 				csBox += _T("\t-ForceSubtitles\n");
+				csBox += _T("\t-ZeroConf\n");
 				_tprintf(csBox);
 			}
 			// install this program in the service control manager
@@ -2710,9 +2714,15 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 				theApp.DelRegTree(HKEY_LOCAL_MACHINE, csRegKey);
 			}
 			else
-			{	
-				if (Parameters.CompareNoCase(_T("-ForceSubtitles")) == 0)
-					bForceSubtitles = true;
+			{
+				for (auto index = 1; index <= argc; index++)
+				{
+					Parameters = argv[index];
+					if (Parameters.CompareNoCase(_T("-ForceSubtitles")) == 0)
+						bForceSubtitles = true;
+					if (Parameters.CompareNoCase(_T("-ZeroConf")) == 0)
+						bZeroConf = true;
+				}
 				#ifdef AVCODEC_AVCODEC_H
 				av_register_all(); // FFMPEG initialization
 				#endif
