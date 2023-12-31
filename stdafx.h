@@ -42,6 +42,8 @@
 #include <algorithm>
 #include <ctime>
 #include <chrono>
+#include <codecvt>
+#include <locale>
 #include <regex>
 #include <signal.h>
 #include <memory> // for smart pointers
