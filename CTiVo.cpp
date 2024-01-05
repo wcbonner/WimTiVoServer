@@ -867,6 +867,9 @@ void cTiVoFile::GetTiVoItem(CComPtr<IXmlWriter> & pWriter) const
 	pWriter->WriteStartElement(NULL, L"Item", NULL);
 		pWriter->WriteStartElement(NULL, L"Details", NULL);
 			pWriter->WriteElementString(NULL, L"Title", NULL, m_Title.GetString());
+			//pWriter->WriteElementString(NULL, L"ContentType", NULL, L"x-tivo-container/tivo-videos");
+			//pWriter->WriteElementString(NULL, L"SourceFormat", NULL, L"x-tivo-container/folder");
+			//pWriter->WriteElementString(NULL, L"TotalItems", NULL, L"1");
 			if (!m_EpisodeTitle.IsEmpty()) pWriter->WriteElementString(NULL, L"EpisodeTitle", NULL, m_EpisodeTitle.GetString());
 			if (!m_Description.IsEmpty()) pWriter->WriteElementString(NULL, L"Description", NULL, m_Description.GetString());
 			if (!m_SourceStation.IsEmpty()) pWriter->WriteElementString(NULL, L"SourceStation", NULL, m_SourceStation.GetString());
@@ -907,6 +910,7 @@ void cTiVoFile::GetTiVoItem(CComPtr<IXmlWriter> & pWriter) const
 		{
 			pWriter->WriteStartElement(NULL, L"Links", NULL);
 				pWriter->WriteStartElement(NULL, L"Content", NULL);
+					//pWriter->WriteElementString(NULL, L"ContentType", NULL, L"x-tivo-container/folder");
 					pWriter->WriteElementString(NULL, L"ContentType", NULL, m_ContentType.GetString());
 					pWriter->WriteElementString(NULL, L"Url", NULL, GetURL().GetString());
 				pWriter->WriteEndElement();

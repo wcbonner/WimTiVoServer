@@ -73,6 +73,7 @@ bool pauseService = false;
 CWinThread * threadHandle = NULL;
 SOCKET ControlSocket = INVALID_SOCKET;
 bool bConsoleExists = false;
+bool bUDPTiVoBeacon = true;
 bool bZeroConf = false;
 HANDLE ApplicationLogHandle = NULL;
 cTiVoServer myServer;
@@ -699,6 +700,10 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 			}
 			else if (!csKey.CompareNoCase("Recurse"))
 				std::cout << "[                   ] " << csToken.GetString() << std::endl;
+			else if (!csKey.CompareNoCase("DoGenres"))
+				std::cout << "[                   ] " << csToken.GetString() << std::endl;
+			else if (!csKey.CompareNoCase("SerialNum"))
+				std::cout << "[                   ] " << csToken.GetString() << std::endl;
 			else if (!csKey.CompareNoCase("SortOrder"))
 			{
 				std::cout << "[                   ] " << csToken.GetString() << std::endl;
@@ -763,12 +768,70 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 			}
 			csToken = csCommand.Tokenize("& ?",curPos);
 		}
+		/*
+		wim@WimPi4-Dev:~ $ curl http://192.168.50.25:9032/TiVoConnect?Command=QueryContainer\&Container=Videos\&ItemCount=0\&SerialNum=84600119023FFD0
+		<?xml version="1.0" encoding="utf-8" ?>
+		<TiVoContainer>
+			<ItemStart>0</ItemStart>
+			<ItemCount>0</ItemCount>
+			<Details>
+				<Title>Videos</Title>
+				<ContentType>x-tivo-container/folder</ContentType>
+				<SourceFormat>x-tivo-container/folder</SourceFormat>
+				<TotalItems>51</TotalItems>
+				<UniqueId>1763150438</UniqueId>
+			</Details>
+		</TiVoContainer>
+
+<?xml version="1.0" encoding="UTF-8"?>
+<TiVoContainer>
+  <ItemStart>0</ItemStart>
+  <ItemCount>0</ItemCount>
+  <Details>
+	<Title>WimSurface9</Title>
+	<ContentType>x-tivo-container/folder</ContentType>
+	<SourceFormat>x-tivo-container/folder</SourceFormat>
+	<TotalItems>21</TotalItems>
+	<UniqueId>1763150439</UniqueId>
+  </Details>
+</TiVoContainer>
+		*/
+
 		pWriter->SetOutput(spMemoryStream);
 		pWriter->SetProperty(XmlWriterProperty_Indent, TRUE);
 		pWriter->WriteStartDocument(XmlStandalone_Omit);
 			pWriter->WriteStartElement(NULL,L"TiVoContainer",L"http://www.tivo.com/developer/calypso-protocol-1.6/");
-			if (csContainer.Compare(_T("%2F")) == 0)
+			if ((csContainer.Compare(_T("%2F")) == 0) ||
+				((csContainer.Compare(csMyHostName) == 0) && (iItemCount == 0)))
 			{
+//#define NewTest 1
+				#ifdef NewTest
+				CString csTemporary;
+				csTemporary.Format(_T("%d"), TiVoFileList.size());
+				pWriter->WriteElementString(NULL, _T("ItemStart"), NULL, _T("0"));
+				pWriter->WriteElementString(NULL, _T("ItemCount"), NULL, _T("0"));
+				pWriter->WriteStartElement(NULL, _T("Details"), NULL);
+				pWriter->WriteElementString(NULL, _T("Title"), NULL, csMyHostName.GetString());
+				pWriter->WriteElementString(NULL, _T("ContentType"), NULL, _T("x-tivo-container/folder"));
+				pWriter->WriteElementString(NULL, _T("SourceFormat"), NULL, _T("x-tivo-container/folder"));
+				//pWriter->WriteElementString(NULL,_T("TotalItems"),NULL, _T("1"));
+				pWriter->WriteElementString(NULL, L"TotalItems", NULL, csTemporary.GetString());
+				//pWriter->WriteElementString(NULL, L"UniqueId", NULL, L"1763150439");
+				pWriter->WriteEndElement();	// Details
+				//pWriter->WriteStartElement(NULL,_T("Item"),NULL);
+				//	pWriter->WriteStartElement(NULL,_T("Details"),NULL);
+				//		pWriter->WriteElementString(NULL,_T("Title"),NULL, csMyHostName.GetString());
+				//		pWriter->WriteElementString(NULL,_T("ContentType"),NULL, _T("x-tivo-container/tivo-videos"));
+				//		pWriter->WriteElementString(NULL,_T("SourceFormat"),NULL, _T("x-tivo-container/folder"));
+				//	pWriter->WriteEndElement();	// Details
+				//	pWriter->WriteStartElement(NULL,_T("Links"),NULL);
+				//		pWriter->WriteStartElement(NULL,_T("Content"),NULL);
+				//			pWriter->WriteElementString(NULL,_T("Url"),NULL, _T("/TiVoConnect?Command=QueryContainer&Container=%2FTiVoNowPlaying"));
+				//			pWriter->WriteElementString(NULL,_T("ContentType"),NULL, _T("x-tivo-container/tivo-videos"));
+				//		pWriter->WriteFullEndElement();	// Content
+				//	pWriter->WriteFullEndElement();	// Links
+				//pWriter->WriteFullEndElement();	// Item
+				#else
 				pWriter->WriteStartElement(NULL,_T("Details"),NULL);
 					pWriter->WriteElementString(NULL,_T("Title"),NULL, csMyHostName.GetString());
 					pWriter->WriteElementString(NULL,_T("ContentType"),NULL, _T("x-tivo-container/tivo-server"));
@@ -790,6 +853,7 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 				pWriter->WriteFullEndElement();	// Item
 				pWriter->WriteElementString(NULL,_T("ItemStart"),NULL, _T("0"));
 				pWriter->WriteElementString(NULL,_T("ItemCount"),NULL, _T("1"));
+				#endif // NewTest
 			}
 			else
 			{
@@ -910,6 +974,9 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 	HttpResponse << "\r\n";
 	send(DataSocket, HttpResponse.str().c_str(), HttpResponse.str().length(),0);
 	send(DataSocket, XMLDataBuff, strlen(XMLDataBuff), 0);
+#ifdef _DEBUG
+	std::cout << "[                   ] " << XMLDataBuff << std::endl;
+#endif
 	delete[] XMLDataBuff;
 
 #ifdef _DEBUG
@@ -1019,10 +1086,10 @@ int GetTiVoTVBusQuery(SOCKET DataSocket, const char * InBuffer)
 				//pWriter->WriteAttributeString(L"xmlns", L"schemaLocation", NULL, L"http://tivo.com/developer/xml/idl/TvBusMarshalledStruct TvBusMarshalledStruct.xsd http://tivo.com/developer/xml/idl/TvPgdRecording TvPgdRecording.xsd http://tivo.com/developer/xml/idl/TvBusDuration TvBusDuration.xsd http://tivo.com/developer/xml/idl/TvPgdShowing TvPgdShowing.xsd http://tivo.com/developer/xml/idl/TvDbShowingBit TvDbShowingBit.xsd http://tivo.com/developer/xml/idl/TvBusDateTime TvBusDateTime.xsd http://tivo.com/developer/xml/idl/TvPgdProgram TvPgdProgram.xsd http://tivo.com/developer/xml/idl/TvDbColorCode TvDbColorCode.xsd http://tivo.com/developer/xml/idl/TvPgdSeries TvPgdSeries.xsd http://tivo.com/developer/xml/idl/TvDbShowType TvDbShowType.xsd http://tivo.com/developer/xml/idl/TvPgdChannel TvPgdChannel.xsd http://tivo.com/developer/xml/idl/TvDbTvRating TvDbTvRating.xsd http://tivo.com/developer/xml/idl/TvDbRecordQuality TvDbRecordQuality.xsd http://tivo.com/developer/xml/idl/TvDbBitstreamFormat TvDbBitstreamFormat.xsd");
 				//pWriter->WriteAttributeString(L"xmlns", L"type", NULL, L"TvPgdRecording:TvPgdRecording");
 				ccTiVoFileListCritSec.Lock();
-				for (auto MyFile = TiVoFileList.begin(); MyFile != TiVoFileList.end(); MyFile++)
-					if (!MyFile->GetURL().CompareNoCase(csUrl))
+				for (auto & MyFile : TiVoFileList)
+					if (!MyFile.GetURL().CompareNoCase(csUrl))
 					{
-						MyFile->GetTvBusEnvelope(pWriter);
+						MyFile.GetTvBusEnvelope(pWriter);
 						break;
 					}
 				ccTiVoFileListCritSec.Unlock();
@@ -1940,6 +2007,8 @@ void TiVomDNSRegister(bool enable = true)
 			// Here I'm creating and destroying an instance just to test the function call.
 			std::wstring MyServiceName(L"._tivo-videos._tcp.local"); MyServiceName.insert(0, szHostName);
 			std::wstring MyHostName(L".local"); MyHostName.insert(0, szHostName);
+			std::wstring MyPath(L"/TiVoConnect?Command=QueryContainer&Container="); MyPath.append(szHostName);
+			//std::wstring MyPath(L"/TiVoConnect?Command=QueryContainer&Container=%2FTiVoNowPlaying");
 			std::wstring MyPlatform(std::wstring_convert<std::codecvt_utf8<wchar_t>>().from_bytes(myServer.m_platform));
 			std::wstring MyVersion(std::wstring_convert<std::codecvt_utf8<wchar_t>>().from_bytes(myServer.m_swversion));
 			std::wstring MyID(std::wstring_convert<std::codecvt_utf8<wchar_t>>().from_bytes(myServer.m_identity));
@@ -1947,7 +2016,7 @@ void TiVomDNSRegister(bool enable = true)
 			std::vector<PCWSTR> keys;
 			std::vector<PCWSTR> values;
 			keys.push_back(L"protocol"); values.push_back(L"http");
-			keys.push_back(L"path"); values.push_back(L"/TiVoConnect?Command=QueryContainer&Container=%2FNowPlaying");
+			keys.push_back(L"path"); values.push_back(MyPath.c_str());
 			keys.push_back(L"swversion"); values.push_back(MyVersion.c_str());
 			keys.push_back(L"platform"); values.push_back(MyPlatform.c_str());
 			keys.push_back(L"TSN"); values.push_back(MyID.c_str());
@@ -2285,14 +2354,17 @@ UINT TiVoBeaconSendThread(LPVOID lvp)
 		TiVomDNSRegister(true);	// I'm attempting to register my server using mDNS/Bonjour (2023-12-21)
 
 	do {
-		TiVoBeaconSend(myServer.WriteTXT('\n'));
-		#ifdef DEBUG
-		if (bConsoleExists)
+		if (bUDPTiVoBeacon)
 		{
-			//std::cout << "[                   ] " << myServer.WriteTXT(' ') << "\r";
-			std::cout << "[" << getTimeISO8601() << "] " << myServer.WriteTXT(' ') << "\r";
+			TiVoBeaconSend(myServer.WriteTXT('\n'));
+			#ifdef DEBUG
+			if (bConsoleExists)
+			{
+				//std::cout << "[                   ] " << myServer.WriteTXT(' ') << "\r";
+				std::cout << "[" << getTimeISO8601() << "] " << myServer.WriteTXT(' ') << "\r";
+			}
+			#endif // DEBUG
 		}
-		#endif // DEBUG
 	} while (WAIT_TIMEOUT == WaitForSingleObject(LocalTerminationEventHandle, 60*1000));
 
 	if (bZeroConf)
@@ -2715,13 +2787,16 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 			}
 			else
 			{
-				for (auto index = 1; index <= argc; index++)
+				for (auto index = argc; index > 1;)
 				{
-					Parameters = argv[index];
+					Parameters = argv[--index];
 					if (Parameters.CompareNoCase(_T("-ForceSubtitles")) == 0)
 						bForceSubtitles = true;
 					if (Parameters.CompareNoCase(_T("-ZeroConf")) == 0)
+					{
 						bZeroConf = true;
+						bUDPTiVoBeacon = false;
+					}
 				}
 				#ifdef AVCODEC_AVCODEC_H
 				av_register_all(); // FFMPEG initialization
