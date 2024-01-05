@@ -768,70 +768,12 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 			}
 			csToken = csCommand.Tokenize("& ?",curPos);
 		}
-		/*
-		wim@WimPi4-Dev:~ $ curl http://192.168.50.25:9032/TiVoConnect?Command=QueryContainer\&Container=Videos\&ItemCount=0\&SerialNum=84600119023FFD0
-		<?xml version="1.0" encoding="utf-8" ?>
-		<TiVoContainer>
-			<ItemStart>0</ItemStart>
-			<ItemCount>0</ItemCount>
-			<Details>
-				<Title>Videos</Title>
-				<ContentType>x-tivo-container/folder</ContentType>
-				<SourceFormat>x-tivo-container/folder</SourceFormat>
-				<TotalItems>51</TotalItems>
-				<UniqueId>1763150438</UniqueId>
-			</Details>
-		</TiVoContainer>
-
-<?xml version="1.0" encoding="UTF-8"?>
-<TiVoContainer>
-  <ItemStart>0</ItemStart>
-  <ItemCount>0</ItemCount>
-  <Details>
-	<Title>WimSurface9</Title>
-	<ContentType>x-tivo-container/folder</ContentType>
-	<SourceFormat>x-tivo-container/folder</SourceFormat>
-	<TotalItems>21</TotalItems>
-	<UniqueId>1763150439</UniqueId>
-  </Details>
-</TiVoContainer>
-		*/
-
 		pWriter->SetOutput(spMemoryStream);
 		pWriter->SetProperty(XmlWriterProperty_Indent, TRUE);
 		pWriter->WriteStartDocument(XmlStandalone_Omit);
 			pWriter->WriteStartElement(NULL,L"TiVoContainer",L"http://www.tivo.com/developer/calypso-protocol-1.6/");
-			if ((csContainer.Compare(_T("%2F")) == 0) ||
-				((csContainer.Compare(csMyHostName) == 0) && (iItemCount == 0)))
+			if (csContainer.Compare(_T("%2F")) == 0)
 			{
-//#define NewTest 1
-				#ifdef NewTest
-				CString csTemporary;
-				csTemporary.Format(_T("%d"), TiVoFileList.size());
-				pWriter->WriteElementString(NULL, _T("ItemStart"), NULL, _T("0"));
-				pWriter->WriteElementString(NULL, _T("ItemCount"), NULL, _T("0"));
-				pWriter->WriteStartElement(NULL, _T("Details"), NULL);
-				pWriter->WriteElementString(NULL, _T("Title"), NULL, csMyHostName.GetString());
-				pWriter->WriteElementString(NULL, _T("ContentType"), NULL, _T("x-tivo-container/folder"));
-				pWriter->WriteElementString(NULL, _T("SourceFormat"), NULL, _T("x-tivo-container/folder"));
-				//pWriter->WriteElementString(NULL,_T("TotalItems"),NULL, _T("1"));
-				pWriter->WriteElementString(NULL, L"TotalItems", NULL, csTemporary.GetString());
-				//pWriter->WriteElementString(NULL, L"UniqueId", NULL, L"1763150439");
-				pWriter->WriteEndElement();	// Details
-				//pWriter->WriteStartElement(NULL,_T("Item"),NULL);
-				//	pWriter->WriteStartElement(NULL,_T("Details"),NULL);
-				//		pWriter->WriteElementString(NULL,_T("Title"),NULL, csMyHostName.GetString());
-				//		pWriter->WriteElementString(NULL,_T("ContentType"),NULL, _T("x-tivo-container/tivo-videos"));
-				//		pWriter->WriteElementString(NULL,_T("SourceFormat"),NULL, _T("x-tivo-container/folder"));
-				//	pWriter->WriteEndElement();	// Details
-				//	pWriter->WriteStartElement(NULL,_T("Links"),NULL);
-				//		pWriter->WriteStartElement(NULL,_T("Content"),NULL);
-				//			pWriter->WriteElementString(NULL,_T("Url"),NULL, _T("/TiVoConnect?Command=QueryContainer&Container=%2FTiVoNowPlaying"));
-				//			pWriter->WriteElementString(NULL,_T("ContentType"),NULL, _T("x-tivo-container/tivo-videos"));
-				//		pWriter->WriteFullEndElement();	// Content
-				//	pWriter->WriteFullEndElement();	// Links
-				//pWriter->WriteFullEndElement();	// Item
-				#else
 				pWriter->WriteStartElement(NULL,_T("Details"),NULL);
 					pWriter->WriteElementString(NULL,_T("Title"),NULL, csMyHostName.GetString());
 					pWriter->WriteElementString(NULL,_T("ContentType"),NULL, _T("x-tivo-container/tivo-server"));
@@ -853,7 +795,49 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 				pWriter->WriteFullEndElement();	// Item
 				pWriter->WriteElementString(NULL,_T("ItemStart"),NULL, _T("0"));
 				pWriter->WriteElementString(NULL,_T("ItemCount"),NULL, _T("1"));
-				#endif // NewTest
+			}
+			else if ((csContainer.Compare(csMyHostName) == 0) && (iItemCount == 0))
+			{
+				// This is my attempt to do what pyTiVo is doing with ZeroConf mDNS advertising instead of the UDP TiVo Beacon
+				// pyTiVo advertises: path=/TiVoConnect?Command=QueryContainer&Container=Videos
+				// The Tivo seems to connect to that path to validate the server. I'm changing the name Videos that I'm using as the share on pyTiVo to ther servername in my own software.
+				//	wim@WimPi4-Dev:~ $ curl http://192.168.50.25:9032/TiVoConnect?Command=QueryContainer\&Container=Videos\&ItemCount=0
+				//	<?xml version="1.0" encoding="utf-8" ?>
+				//	<TiVoContainer>
+				//		<ItemStart>0</ItemStart>
+				//		<ItemCount>0</ItemCount>
+				//		<Details>
+				//			<Title>Videos</Title>
+				//			<ContentType>x-tivo-container/folder</ContentType>
+				//			<SourceFormat>x-tivo-container/folder</SourceFormat>
+				//			<TotalItems>51</TotalItems>
+				//			<UniqueId>1763150438</UniqueId>
+				//		</Details>
+				//	</TiVoContainer>
+				//
+				//	wim@WimPi4-Dev:~ $ curl http://192.168.50.32:64321/TiVoConnect?Command=QueryContainer\&Container=WimSurface9\&ItemCount=0
+				//	<?xml version="1.0" encoding="UTF-8"?>
+				//	<TiVoContainer xmlns="http://www.tivo.com/developer/calypso-protocol-1.6/">
+				//	  <ItemStart>0</ItemStart>
+				//	  <ItemCount>0</ItemCount>
+				//	  <Details>
+				//		<Title>WimSurface9</Title>
+				//		<ContentType>x-tivo-container/folder</ContentType>
+				//		<SourceFormat>x-tivo-container/folder</SourceFormat>
+				//		<TotalItems>23</TotalItems>
+				//	  </Details>
+				//	</TiVoContainer>
+				//	<!-- Copyright © 2024 William C Bonner -->
+				CString csTemporary;
+				pWriter->WriteElementString(NULL, _T("ItemStart"), NULL, _T("0"));
+				pWriter->WriteElementString(NULL, _T("ItemCount"), NULL, _T("0"));
+				pWriter->WriteStartElement(NULL, _T("Details"), NULL);
+					pWriter->WriteElementString(NULL, _T("Title"), NULL, csMyHostName.GetString());
+					pWriter->WriteElementString(NULL, _T("ContentType"), NULL, _T("x-tivo-container/folder"));
+					pWriter->WriteElementString(NULL, _T("SourceFormat"), NULL, _T("x-tivo-container/folder"));
+					csTemporary.Format(_T("%d"), TiVoFileList.size());
+					pWriter->WriteElementString(NULL, L"TotalItems", NULL, csTemporary.GetString());
+				pWriter->WriteEndElement();	// Details
 			}
 			else
 			{
@@ -943,7 +927,7 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 				ccTiVoFileListCritSec.Unlock();
 			}
 			pWriter->WriteEndElement();	// TiVoContainer
-		pWriter->WriteComment(L" Copyright © 2023 William C Bonner ");
+		pWriter->WriteComment(L" Copyright © 2024 William C Bonner ");
 		pWriter->WriteEndDocument();
 		pWriter->Flush();
 
@@ -1984,6 +1968,8 @@ void TiVomDNSRegister(bool enable = true)
 	//	Host DVR-4AC3.local (192.168.50.197), port 1413, TXT data: ['TSN=8490001903F4AC3', 'platform=tcd/Series6', 'swversion=20.7.4d.RC15-USC-11-849', 'mindversion=7/25', 'path=/', 'protocol=tivo-mindrpc']
 	//Service data for service 'pyTivo Desktop' of type '_pytivo._tcp' in domain 'local' on 3.0:
 	//	Host pyTivo\032Desktop._pytivo._tcp.local (192.168.50.25), port 9032, TXT data: ['platform=pyTivo', 'protocol=http', 'path=/Desktop']
+	//Service data for service 'Videos' of type '_tivo-videos._tcp' in domain 'local' on 3.0:
+	//	Host Videos._tivo-videos._tcp.local (192.168.50.25), port 9032, TXT data: ['platform=pc/pyTivo', 'protocol=http', 'path=/TiVoConnect?Command=QueryContainer&Container=Videos', 'tsn={a53d284e-81bf-441c-9d3c-8a3f903a53a0}']
 	// Interesting thing is that it seems that I put the keys in the oposite order that they get displayed by avahi-discover
 	//Service data for service 'WimSurface9' of type '_tivo-videos._tcp' in domain 'local' on 3.0:
 	//	Host WimSurface9.local (192.168.50.31), port 64321, TXT data: ['TSN={0850B36A-6F4B-442D-9C1F-026E48FB7C9F}', 'platform=pc/WinNT:10.0.22631', 'swversion=20231230214647', 'path=/TiVoConnect?Command=QueryContainer&Container=%2FNowPlaying', 'protocol=http']
