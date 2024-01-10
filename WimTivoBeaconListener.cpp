@@ -322,6 +322,83 @@ int main (int argc, const char * argv[])
 	return 0;
 } 
 #endif // AooleExample2
+// https://stackoverflow.com/questions/66474722/use-multicast-dns-when-network-cable-is-unplugged
+// https://git.walbeck.it/archive/mumble-voip_mumble/src/branch/master/src/mumble/Zeroconf.cpp
+DNS_SERVICE_CANCEL cancelBrowse{ 0 };	// A pointer to a DNS_SERVICE_CANCEL structure that can be used to cancel a pending asynchronous browsing operation. This handle must remain valid until the query is canceled.
+VOID WINAPI Browse_mDNS_Callback(DWORD Status, PVOID pQueryContext, PDNS_RECORD pDnsRecord)
+{
+	if (Status != ERROR_SUCCESS)
+	{
+		if (pDnsRecord)
+			DnsRecordListFree(pDnsRecord, DnsFreeRecordList);
+		if (Status == ERROR_CANCELLED)
+			std::wcout << "[                   ] DnsServiceBrowse() reports status code ERROR_CANCELLED" << std::endl;
+		else
+			std::wcout << "[                   ] DnsServiceBrowse() reports status code " << Status << ", ignoring results" << std::endl;
+	}
+	if (!pDnsRecord)
+		return;
+	std::cout << "[" << getTimeISO8601() << "] Browse_mDNS_Callback" << std::endl;
+	for (auto cur = pDnsRecord; cur; cur = cur->pNext)
+	{
+		std::wcout << "[                   ]                     pName: " << std::wstring(cur->pName) << std::endl;
+		switch (cur->wType)
+		{
+		case DNS_TYPE_PTR:
+			std::wcout << "[                   ]        Data.PTR.pNameHost: " << std::wstring(cur->Data.PTR.pNameHost) << std::endl;
+			break;
+		case DNS_TYPE_A:	//  RFC 1034/1035
+			{
+			wchar_t StringBuf[17];
+			std::wcout << "[                   ]          Data.A.IpAddress: " << InetNtopW(AF_INET, &(cur->Data.A.IpAddress), StringBuf, sizeof(StringBuf)) << std::endl;
+			}
+			break;
+		case DNS_TYPE_AAAA:
+		{
+			wchar_t StringBuf[47];
+			std::wcout << "[                   ]          Data.A.IpAddress: " << InetNtopW(AF_INET6, &(cur->Data.A.IpAddress), StringBuf, sizeof(StringBuf)) << std::endl;
+		}
+		break;
+		case DNS_TYPE_TEXT:	//  RFC 1034/1035
+			{
+			auto index = cur->Data.TXT.dwStringCount;
+			while (index > 0)
+			{
+				index--;
+				std::wcout << "[                   ]  Data.TXT.pStringArray[" << index <<"]: " << std::wstring(cur->Data.TXT.pStringArray[index]) << std::endl;
+			}
+			}
+			break;
+		case DNS_TYPE_SRV:	//  RFC 2052    (Service location)
+			std::wcout << "[                   ]      Data.SRV.pNameTarget: " << std::wstring(cur->Data.SRV.pNameTarget) << std::endl;
+			std::wcout << "[                   ]            Data.SRV.wPort: " << cur->Data.SRV.wPort << std::endl;
+			break;
+		default:
+			std::wcout << "[                   ]                     wType: " << cur->wType << std::endl;
+		}
+	}
+	DnsRecordListFree(pDnsRecord, DnsFreeRecordList);
+}
+void Browse_mDNS(void)
+{
+	DNS_SERVICE_BROWSE_REQUEST browseRequest{0};
+	browseRequest.Version = DNS_QUERY_REQUEST_VERSION1;
+	browseRequest.InterfaceIndex = 0;
+	browseRequest.QueryName = L"_tivo-videos._tcp.local";
+	browseRequest.pBrowseCallback = Browse_mDNS_Callback;
+	browseRequest.pQueryContext = (PVOID)43;
+	const DNS_STATUS result = DnsServiceBrowse(&browseRequest, &cancelBrowse);
+	if (result == DNS_REQUEST_PENDING)
+		std::cout << "[" << getTimeISO8601() << "] DnsServiceBrowse(DNS_REQUEST_PENDING)" << std::endl;
+	else
+		std::cout << "[" << getTimeISO8601() << "] DnsServiceBrowse(" << result << ") DNS_REQUEST_PENDING=" << DNS_REQUEST_PENDING << std::endl;
+}
+void Browse_mDNS_Cancel(void)
+{
+	auto result = DnsServiceBrowseCancel(&cancelBrowse);
+	if (result != ERROR_SUCCESS)
+		std::wcout << "[                   ] DnsServiceBrowseCancel(" << result << ")" << std::endl;
+}
 /////////////////////////////////////////////////////////////////////////////
 bool m_TiVoBeaconListenThreadStopRequested = false;
 /////////////////////////////////////////////////////////////////////////////
@@ -467,6 +544,8 @@ int main(int argc,      // Number of strings in array argv
 				free(ipTable);
 			}
 
+			Browse_mDNS();
+
 			std::cout << "[" << getTimeISO8601() << "] Listening for UDP TiVo Beacons..." << std::endl;
 
 			bool bDisplayRawBeacon = false;
@@ -517,6 +596,7 @@ int main(int argc,      // Number of strings in array argv
 					closesocket(theSocket);
 				}
 			} while (m_TiVoBeaconListenThreadStopRequested == false);
+			Browse_mDNS_Cancel();
 		}
     }
     else

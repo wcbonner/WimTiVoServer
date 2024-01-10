@@ -788,7 +788,9 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 					pWriter->WriteEndElement();	// Details
 					pWriter->WriteStartElement(NULL,_T("Links"),NULL);
 						pWriter->WriteStartElement(NULL,_T("Content"),NULL);
-							pWriter->WriteElementString(NULL,_T("Url"),NULL, _T("/TiVoConnect?Command=QueryContainer&Container=%2FTiVoNowPlaying"));
+							pWriter->WriteElementString(NULL, _T("Url"), NULL, _T("/TiVoConnect?Command=QueryContainer\&Container=%2FTiVoNowPlaying"));
+							//std::wstring MyURL(L"/TiVoConnect?Command=QueryContainer\&Container="); MyURL.append(csMyHostName.GetString());
+							//pWriter->WriteElementString(NULL, _T("Url"), NULL, MyURL.c_str());
 							pWriter->WriteElementString(NULL,_T("ContentType"),NULL, _T("x-tivo-container/tivo-videos"));
 						pWriter->WriteFullEndElement();	// Content
 					pWriter->WriteFullEndElement();	// Links
@@ -796,38 +798,9 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 				pWriter->WriteElementString(NULL,_T("ItemStart"),NULL, _T("0"));
 				pWriter->WriteElementString(NULL,_T("ItemCount"),NULL, _T("1"));
 			}
-			else if ((csContainer.Compare(csMyHostName) == 0) && (iItemCount == 0))
+			else if (csContainer.Compare(csMyHostName) == 0)
 			{
-				// This is my attempt to do what pyTiVo is doing with ZeroConf mDNS advertising instead of the UDP TiVo Beacon
-				// pyTiVo advertises: path=/TiVoConnect?Command=QueryContainer&Container=Videos
-				// The Tivo seems to connect to that path to validate the server. I'm changing the name Videos that I'm using as the share on pyTiVo to ther servername in my own software.
-				//	wim@WimPi4-Dev:~ $ curl http://192.168.50.25:9032/TiVoConnect?Command=QueryContainer\&Container=Videos\&ItemCount=0
-				//	<?xml version="1.0" encoding="utf-8" ?>
-				//	<TiVoContainer>
-				//		<ItemStart>0</ItemStart>
-				//		<ItemCount>0</ItemCount>
-				//		<Details>
-				//			<Title>Videos</Title>
-				//			<ContentType>x-tivo-container/folder</ContentType>
-				//			<SourceFormat>x-tivo-container/folder</SourceFormat>
-				//			<TotalItems>51</TotalItems>
-				//			<UniqueId>1763150438</UniqueId>
-				//		</Details>
-				//	</TiVoContainer>
-				//
-				//	wim@WimPi4-Dev:~ $ curl http://192.168.50.32:64321/TiVoConnect?Command=QueryContainer\&Container=WimSurface9\&ItemCount=0
-				//	<?xml version="1.0" encoding="UTF-8"?>
-				//	<TiVoContainer xmlns="http://www.tivo.com/developer/calypso-protocol-1.6/">
-				//	  <ItemStart>0</ItemStart>
-				//	  <ItemCount>0</ItemCount>
-				//	  <Details>
-				//		<Title>WimSurface9</Title>
-				//		<ContentType>x-tivo-container/folder</ContentType>
-				//		<SourceFormat>x-tivo-container/folder</SourceFormat>
-				//		<TotalItems>23</TotalItems>
-				//	  </Details>
-				//	</TiVoContainer>
-				//	<!-- Copyright © 2024 William C Bonner -->
+
 				CString csTemporary;
 				pWriter->WriteElementString(NULL, _T("ItemStart"), NULL, _T("0"));
 				pWriter->WriteElementString(NULL, _T("ItemCount"), NULL, _T("0"));
@@ -837,9 +810,20 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 					pWriter->WriteElementString(NULL, _T("SourceFormat"), NULL, _T("x-tivo-container/folder"));
 					csTemporary.Format(_T("%d"), TiVoFileList.size());
 					pWriter->WriteElementString(NULL, L"TotalItems", NULL, csTemporary.GetString());
+					std::wstring MyVersion(std::wstring_convert<std::codecvt_utf8<wchar_t>>().from_bytes(myServer.m_swversion));
+					pWriter->WriteElementString(NULL, _T("UniqueId"), NULL, MyVersion.c_str());
 				pWriter->WriteEndElement();	// Details
+				ccTiVoFileListCritSec.Lock();
+				for (auto& pItem : TiVoFileList)
+				{
+					if (iItemCount <= 0)
+						break;
+					pItem.GetTiVoItem(pWriter, true);
+					iItemCount--;
+				}
+				ccTiVoFileListCritSec.Unlock();
 			}
-			else
+			else //if ((csContainer.Compare(_T("%2FTiVoNowPlaying")) == 0) || (csContainer.Compare(_T("%2FNowPlaying")) == 0))
 			{
 				ccTiVoFileListCritSec.Lock();
 				if (CurrentTiVoFileListSortOrder != RequestedTiVoFileListSortOrder)
@@ -1871,7 +1855,7 @@ UINT HTTPMain(LPVOID lvp)
 							CWinThread * ChildThread = AfxBeginThread(HTTPChild, (LPVOID)remoteSocket, THREAD_PRIORITY_ABOVE_NORMAL, 0, CREATE_SUSPENDED);
 							ChildThread->m_bAutoDelete = FALSE;
 							ThreadPtrList.push(ChildThread);
-							std::wcout << "[" << getwTimeISO8601(true) << "] ThreadList Size: " << ThreadPtrList.size() << std::endl;
+							std::wcout << L"[" << getwTimeISO8601(true) << L"] ThreadList Size: " << ThreadPtrList.size() << std::endl;
 							ChildThread->ResumeThread();
 						}
 #endif // THREADTRACKING
@@ -1885,7 +1869,7 @@ UINT HTTPMain(LPVOID lvp)
 							Sleep(1); // I'm sleeping so that I'm not in a pure race condition
 						else
 						{
-							std::wcout << "[" << getwTimeISO8601(true) << "] ThreadPtrList Size: " << ThreadPtrList.size() << std::endl;
+							std::wcout << L"[" << getwTimeISO8601(true) << L"] ThreadPtrList Size: " << ThreadPtrList.size() << std::endl;
 							delete ThreadPtrList.front();
 							ThreadPtrList.pop();
 						}
@@ -1972,7 +1956,7 @@ void TiVomDNSRegister(bool enable = true)
 	//	Host Videos._tivo-videos._tcp.local (192.168.50.25), port 9032, TXT data: ['platform=pc/pyTivo', 'protocol=http', 'path=/TiVoConnect?Command=QueryContainer&Container=Videos', 'tsn={a53d284e-81bf-441c-9d3c-8a3f903a53a0}']
 	// Interesting thing is that it seems that I put the keys in the oposite order that they get displayed by avahi-discover
 	//Service data for service 'WimSurface9' of type '_tivo-videos._tcp' in domain 'local' on 3.0:
-	//	Host WimSurface9.local (192.168.50.31), port 64321, TXT data: ['TSN={0850B36A-6F4B-442D-9C1F-026E48FB7C9F}', 'platform=pc/WinNT:10.0.22631', 'swversion=20231230214647', 'path=/TiVoConnect?Command=QueryContainer&Container=%2FNowPlaying', 'protocol=http']
+	//	Host WimSurface9.local (192.168.50.31), port 64321, TXT data: ['TSN={0850B36A-6F4B-442D-9C1F-026E48FB7C9F}', 'platform=pc/WinNT:10.0.22631', 'swversion=20240107225553', 'path=/TiVoConnect?Command=QueryContainer&Container=WimSurface9', 'protocol=http']
 
 	// machine=WimSurface9 address=192.168.50.32 identity={0850B36A-6F4B-442D-9C1F-026E48FB7C9F} method=broadcast platform=pc/WinNT:10.0.22631 services=TiVoMediaServer:61842/http swversion=20231222133941 tivoconnect=1
 
@@ -1993,8 +1977,8 @@ void TiVomDNSRegister(bool enable = true)
 			// Here I'm creating and destroying an instance just to test the function call.
 			std::wstring MyServiceName(L"._tivo-videos._tcp.local"); MyServiceName.insert(0, szHostName);
 			std::wstring MyHostName(L".local"); MyHostName.insert(0, szHostName);
-			std::wstring MyPath(L"/TiVoConnect?Command=QueryContainer&Container="); MyPath.append(szHostName);
-			//std::wstring MyPath(L"/TiVoConnect?Command=QueryContainer&Container=%2FTiVoNowPlaying");
+			//std::wstring MyPath(L"/TiVoConnect?Command=QueryContainer\&Container="); MyPath.append(szHostName);
+			std::wstring MyPath(L"/TiVoConnect?Command=QueryContainer\&Container=%2FNowPlaying");
 			std::wstring MyPlatform(std::wstring_convert<std::codecvt_utf8<wchar_t>>().from_bytes(myServer.m_platform));
 			std::wstring MyVersion(std::wstring_convert<std::codecvt_utf8<wchar_t>>().from_bytes(myServer.m_swversion));
 			std::wstring MyID(std::wstring_convert<std::codecvt_utf8<wchar_t>>().from_bytes(myServer.m_identity));
@@ -2005,6 +1989,7 @@ void TiVomDNSRegister(bool enable = true)
 			keys.push_back(L"path"); values.push_back(MyPath.c_str());
 			keys.push_back(L"swversion"); values.push_back(MyVersion.c_str());
 			keys.push_back(L"platform"); values.push_back(MyPlatform.c_str());
+			//keys.push_back(L"platform"); values.push_back(L"pc/WimTiVoServer");
 			keys.push_back(L"TSN"); values.push_back(MyID.c_str());
 			auto MyServiceInstancePtr = DnsServiceConstructInstance(
 				MyServiceName.c_str(),

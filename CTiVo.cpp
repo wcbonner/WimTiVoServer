@@ -538,7 +538,7 @@ void cTiVoFile::PopulateFromFFProbe(void)
  
 				//static const CString csFFMPEGPath(FindEXEFromPath(_T("ffmpeg.exe")));
 				CString csCommandLine(QuoteFileName(csFFProbePath));
-				csCommandLine.Append(_T(" -hide_banner -show_streams -show_format -print_format xml "));
+				csCommandLine.Append(_T(" -hide_banner -loglevel error -show_streams -show_format -print_format xml "));
 				csCommandLine.Append(QuoteFileName(m_csPathName));
 
 				std::cout << "[" << getTimeISO8601() << "] CreateProcess: ";
@@ -862,49 +862,103 @@ const CString & cTiVoFile::SetMAK(const CString & csMAK)
 	m_csMAK = csMAK;
 	return(csrVal);
 }
-void cTiVoFile::GetTiVoItem(CComPtr<IXmlWriter> & pWriter) const
+void cTiVoFile::GetTiVoItem(CComPtr<IXmlWriter> & pWriter, const bool bSimplifiedOutput) const
 {
-	pWriter->WriteStartElement(NULL, L"Item", NULL);
+	if (bSimplifiedOutput)
+	{ 
+		pWriter->WriteStartElement(NULL, L"Item", NULL);
 		pWriter->WriteStartElement(NULL, L"Details", NULL);
 			pWriter->WriteElementString(NULL, L"Title", NULL, m_Title.GetString());
-			//pWriter->WriteElementString(NULL, L"ContentType", NULL, L"x-tivo-container/tivo-videos");
-			//pWriter->WriteElementString(NULL, L"SourceFormat", NULL, L"x-tivo-container/folder");
-			//pWriter->WriteElementString(NULL, L"TotalItems", NULL, L"1");
-			if (!m_EpisodeTitle.IsEmpty()) pWriter->WriteElementString(NULL, L"EpisodeTitle", NULL, m_EpisodeTitle.GetString());
-			if (!m_Description.IsEmpty()) pWriter->WriteElementString(NULL, L"Description", NULL, m_Description.GetString());
-			if (!m_SourceStation.IsEmpty()) pWriter->WriteElementString(NULL, L"SourceStation", NULL, m_SourceStation.GetString());
-			if (!m_SourceChannel.IsEmpty()) pWriter->WriteElementString(NULL, L"SourceChannel", NULL, m_SourceChannel.GetString());
 			if (!m_ContentType.IsEmpty()) pWriter->WriteElementString(NULL, L"ContentType", NULL, m_ContentType.GetString());
-			//if (!m_ContentType.IsEmpty()) pWriter->WriteElementString(NULL, L"SourceFormat", NULL, m_ContentType.GetString());
 			if (!m_SourceFormat.IsEmpty()) pWriter->WriteElementString(NULL, L"SourceFormat", NULL, m_SourceFormat.GetString());
-			if (m_SourceSize > 0)
+			//pWriter->WriteElementString(NULL, L"ContentType", NULL, L"video/x-tivo-mpeg-ts");
+			//pWriter->WriteElementString(NULL, L"SourceFormat", NULL, L"video/x-tivo-mpeg-ts");
+			pWriter->WriteElementString(NULL, L"SourceSize", NULL, L"");
+			pWriter->WriteElementString(NULL, L"Duration", NULL, L"");
+			pWriter->WriteElementString(NULL, L"Description", NULL, L"");
+			pWriter->WriteElementString(NULL, L"SourceChannel", NULL, L"0");
+			pWriter->WriteElementString(NULL, L"SourceStation", NULL, L"");
+			pWriter->WriteElementString(NULL, L"SeriesId", NULL, L"");
+			pWriter->WriteElementString(NULL, L"ShowingBits", NULL, L"0");
 			{
-				std::wstringstream ss;
-				if (m_VideoHighDefinition)
-					ss << max(m_SourceSize, m_Duration * 10000);
-				else
-					ss << max(m_SourceSize, m_Duration * 1400);
-				pWriter->WriteElementString(NULL, L"SourceSize", NULL, ss.str().c_str());
+			CTime tempTime(m_CaptureDate);
+			const CTime UnixEpochTime(1970, 1, 1, 0, 0, 0);
+			_tzset();
+			long SecondsFromUTC;
+			_get_timezone(&SecondsFromUTC);
+			tempTime += CTimeSpan(SecondsFromUTC);	// the time difference was ~8 hours, which makes sense as the diff between UTC and local time.
+			CTimeSpan TimeDiff = tempTime - UnixEpochTime;
+			std::wstringstream ss(std::stringstream::in | std::stringstream::out);
+			ss << showbase << hex << TimeDiff.GetTotalSeconds();
+			pWriter->WriteElementString(NULL, L"CaptureDate", NULL, ss.str().c_str());
 			}
-			if (m_Duration > 0)
-			{
-				std::wstringstream ss(std::stringstream::in | std::stringstream::out);
-				ss << m_Duration;
-				pWriter->WriteElementString(NULL, L"Duration", NULL, ss.str().c_str());
-			}
-			//if (m_CaptureDate.IsValidFILETIME())
-			{
-				CTime tempTime(m_CaptureDate);
-				const CTime UnixEpochTime(1970,1,1,0,0,0);
-				_tzset();
-				long SecondsFromUTC;
-				_get_timezone(&SecondsFromUTC);
-				tempTime += CTimeSpan(SecondsFromUTC);	// the time difference was ~8 hours, which makes sense as the diff between UTC and local time.
-				CTimeSpan TimeDiff = tempTime - UnixEpochTime;
-				std::wstringstream ss(std::stringstream::in | std::stringstream::out);
-				ss << showbase << hex << TimeDiff.GetTotalSeconds();
-				pWriter->WriteElementString(NULL, L"CaptureDate", NULL, ss.str().c_str());
-			}
+		pWriter->WriteEndElement();	// Details
+		if (!m_ContentType.IsEmpty() && !GetURL().IsEmpty())
+		{
+			pWriter->WriteStartElement(NULL, L"Links", NULL);
+			pWriter->WriteStartElement(NULL, L"Content", NULL);
+			pWriter->WriteElementString(NULL, L"ContentType", NULL, m_ContentType.GetString());
+			pWriter->WriteElementString(NULL, L"Url", NULL, GetURL().GetString());
+			pWriter->WriteEndElement();	// Content
+			pWriter->WriteStartElement(NULL, L"CustomIcon", NULL);
+			pWriter->WriteElementString(NULL, L"ContentType", NULL, L"image/*");
+			pWriter->WriteElementString(NULL, L"AcceptsParams", NULL, L"No");
+			pWriter->WriteElementString(NULL, L"Url", NULL, L"urn:tivo:image:save-until-i-delete-recording");
+			pWriter->WriteEndElement();	// CustomIcon
+			pWriter->WriteStartElement(NULL, L"TiVoVideoDetails", NULL);
+			pWriter->WriteElementString(NULL, L"ContentType", NULL, L"text/xml");
+			pWriter->WriteElementString(NULL, L"AcceptsParams", NULL, L"No");
+			CString DetailsURL(_T("/TiVoConnect?Command=TVBusQuery&Url="));
+			DetailsURL.Append(GetURL());
+			pWriter->WriteElementString(NULL, L"Url", NULL, DetailsURL.GetString());
+			pWriter->WriteEndElement();	// TiVoVideoDetails
+			pWriter->WriteEndElement();	// Links
+		}
+		pWriter->WriteEndElement();	// Item
+	}
+	else
+	{
+		pWriter->WriteStartElement(NULL, L"Item", NULL);
+		pWriter->WriteStartElement(NULL, L"Details", NULL);
+		pWriter->WriteElementString(NULL, L"Title", NULL, m_Title.GetString());
+		//pWriter->WriteElementString(NULL, L"ContentType", NULL, L"x-tivo-container/tivo-videos");
+		//pWriter->WriteElementString(NULL, L"SourceFormat", NULL, L"x-tivo-container/folder");
+		//pWriter->WriteElementString(NULL, L"TotalItems", NULL, L"1");
+		if (!m_EpisodeTitle.IsEmpty()) pWriter->WriteElementString(NULL, L"EpisodeTitle", NULL, m_EpisodeTitle.GetString());
+		if (!m_Description.IsEmpty()) pWriter->WriteElementString(NULL, L"Description", NULL, m_Description.GetString());
+		if (!m_SourceStation.IsEmpty()) pWriter->WriteElementString(NULL, L"SourceStation", NULL, m_SourceStation.GetString());
+		if (!m_SourceChannel.IsEmpty()) pWriter->WriteElementString(NULL, L"SourceChannel", NULL, m_SourceChannel.GetString());
+		if (!m_ContentType.IsEmpty()) pWriter->WriteElementString(NULL, L"ContentType", NULL, m_ContentType.GetString());
+		//if (!m_ContentType.IsEmpty()) pWriter->WriteElementString(NULL, L"SourceFormat", NULL, m_ContentType.GetString());
+		if (!m_SourceFormat.IsEmpty()) pWriter->WriteElementString(NULL, L"SourceFormat", NULL, m_SourceFormat.GetString());
+		if (m_SourceSize > 0)
+		{
+			std::wstringstream ss;
+			if (m_VideoHighDefinition)
+				ss << max(m_SourceSize, m_Duration * 10000);
+			else
+				ss << max(m_SourceSize, m_Duration * 1400);
+			pWriter->WriteElementString(NULL, L"SourceSize", NULL, ss.str().c_str());
+		}
+		if (m_Duration > 0)
+		{
+			std::wstringstream ss(std::stringstream::in | std::stringstream::out);
+			ss << m_Duration;
+			pWriter->WriteElementString(NULL, L"Duration", NULL, ss.str().c_str());
+		}
+		//if (m_CaptureDate.IsValidFILETIME())
+		{
+			CTime tempTime(m_CaptureDate);
+			const CTime UnixEpochTime(1970, 1, 1, 0, 0, 0);
+			_tzset();
+			long SecondsFromUTC;
+			_get_timezone(&SecondsFromUTC);
+			tempTime += CTimeSpan(SecondsFromUTC);	// the time difference was ~8 hours, which makes sense as the diff between UTC and local time.
+			CTimeSpan TimeDiff = tempTime - UnixEpochTime;
+			std::wstringstream ss(std::stringstream::in | std::stringstream::out);
+			ss << showbase << hex << TimeDiff.GetTotalSeconds();
+			pWriter->WriteElementString(NULL, L"CaptureDate", NULL, ss.str().c_str());
+		}
 		pWriter->WriteEndElement();	// Details
 		if (!m_ContentType.IsEmpty() && !GetURL().IsEmpty())
 		{
@@ -913,22 +967,23 @@ void cTiVoFile::GetTiVoItem(CComPtr<IXmlWriter> & pWriter) const
 					//pWriter->WriteElementString(NULL, L"ContentType", NULL, L"x-tivo-container/folder");
 					pWriter->WriteElementString(NULL, L"ContentType", NULL, m_ContentType.GetString());
 					pWriter->WriteElementString(NULL, L"Url", NULL, GetURL().GetString());
-				pWriter->WriteEndElement();
+				pWriter->WriteEndElement();	// Content
 				pWriter->WriteStartElement(NULL, L"CustomIcon", NULL);
 					pWriter->WriteElementString(NULL, L"ContentType", NULL, L"image/*");
 					pWriter->WriteElementString(NULL, L"AcceptsParams", NULL, L"No");
 					pWriter->WriteElementString(NULL, L"Url", NULL, L"urn:tivo:image:save-until-i-delete-recording");
-				pWriter->WriteEndElement();
+				pWriter->WriteEndElement();	// CustomIcon
 				pWriter->WriteStartElement(NULL, L"TiVoVideoDetails", NULL);
 					pWriter->WriteElementString(NULL, L"ContentType", NULL, L"text/xml");
 					pWriter->WriteElementString(NULL, L"AcceptsParams", NULL, L"No");
 					CString DetailsURL(_T("/TiVoConnect?Command=TVBusQuery&Url="));
 					DetailsURL.Append(GetURL());
 					pWriter->WriteElementString(NULL, L"Url", NULL, DetailsURL.GetString());
-				pWriter->WriteEndElement();
-			pWriter->WriteEndElement();
+				pWriter->WriteEndElement();	// TiVoVideoDetails
+			pWriter->WriteEndElement();	// Links
 		}
-	pWriter->WriteEndElement();	// Item
+		pWriter->WriteEndElement();	// Item
+	}
 }
 void cTiVoFile::GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const
 {
