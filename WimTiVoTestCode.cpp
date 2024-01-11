@@ -1,34 +1,6 @@
 ﻿#include "stdafx.h"
 using namespace std;
 
-static string timeToISO8601(const time_t & TheTime)
-{
-	ostringstream ISOTime;
-	time_t timer = TheTime;
-	struct tm * UTC = gmtime(&timer);
-	if (UTC != NULL)
-	{
-		ISOTime.fill('0');
-		ISOTime << UTC->tm_year+1900 << "-";
-		ISOTime.width(2);
-		ISOTime << UTC->tm_mon+1 << "-";
-		ISOTime.width(2);
-		ISOTime << UTC->tm_mday << "T";
-		ISOTime.width(2);
-		ISOTime << UTC->tm_hour << ":";
-		ISOTime.width(2);
-		ISOTime << UTC->tm_min << ":";
-		ISOTime.width(2);
-		ISOTime << UTC->tm_sec;
-	}
-	return(ISOTime.str());
-}
-static string getTimeISO8601(void)
-{
-	time_t timer;
-	time(&timer);
-	return(timeToISO8601(timer));
-}
 HRESULT WriteAttributes(IXmlReader* pReader) 
 { 
     const WCHAR* pwszPrefix; 

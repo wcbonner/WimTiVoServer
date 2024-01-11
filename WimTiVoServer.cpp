@@ -131,118 +131,6 @@ CString GetFileVersion(const CString & filename, const int digits = 4)
 	return(rval);
 }
 /////////////////////////////////////////////////////////////////////////////
-std::string timeToISO8601(const time_t& TheTime, const bool LocalTime = false)
-{
-	std::ostringstream ISOTime;
-	struct tm UTC;
-	struct tm* timecallresult(nullptr);
-	if (LocalTime)
-		#ifdef localtime_r
-		timecallresult = localtime_r(&TheTime, &UTC);
-		#else
-		timecallresult = localtime(&TheTime);
-		#endif
-	else
-		#ifdef gmtime_r
-		timecallresult = gmtime_r(&TheTime, &UTC);
-		#else
-		timecallresult = gmtime(&TheTime);
-		#endif
-	if (nullptr != timecallresult)
-	{
-		#ifndef gmtime_r
-		UTC = *timecallresult;
-		#endif // !gmtime_r
-
-		ISOTime.fill('0');
-		if (!((UTC.tm_year == 70) && (UTC.tm_mon == 0) && (UTC.tm_mday == 1)))
-		{
-			ISOTime << UTC.tm_year + 1900 << "-";
-			ISOTime.width(2);
-			ISOTime << UTC.tm_mon + 1 << "-";
-			ISOTime.width(2);
-			ISOTime << UTC.tm_mday << "T";
-		}
-		ISOTime.width(2);
-		ISOTime << UTC.tm_hour << ":";
-		ISOTime.width(2);
-		ISOTime << UTC.tm_min << ":";
-		ISOTime.width(2);
-		ISOTime << UTC.tm_sec;
-	}
-	return(ISOTime.str());
-}
-std::string timeToExcelDate(const time_t & TheTime)
-{
-	ostringstream ISOTime;
-	time_t timer = TheTime;
-	struct tm * UTC = gmtime(&timer);
-	if (UTC != NULL)
-	{
-		ISOTime.fill('0');
-		ISOTime << UTC->tm_year+1900 << "-";
-		ISOTime.width(2);
-		ISOTime << UTC->tm_mon+1 << "-";
-		ISOTime.width(2);
-		ISOTime << UTC->tm_mday << " ";
-		ISOTime.width(2);
-		ISOTime << UTC->tm_hour << ":";
-		ISOTime.width(2);
-		ISOTime << UTC->tm_min << ":";
-		ISOTime.width(2);
-		ISOTime << UTC->tm_sec;
-	}
-	return(ISOTime.str());
-}
-std::string getTimeISO8601(const bool LocalTime = false)
-{
-	time_t timer;
-	time(&timer);
-	std::string isostring(timeToISO8601(timer, LocalTime));
-	std::string rval;
-	rval.assign(isostring.begin(), isostring.end());
-	return(rval);
-}
-std::string getTimeRFC1123(void)
-{
-	//InternetTimeFromSystemTime(&sysTime, INTERNET_RFC1123_FORMAT, tchInternetTime, sizeof(tchInternetTime));
-	//HttpResponse << "Date: " << CStringA(CString(tchInternetTime)).GetString() << "\r\n";
-	time_t timer;
-	time(&timer);
-	std::string RFCTime(asctime(gmtime(&timer)));
-	RFCTime.pop_back();	// gets rid of the \n that asctime puts at the end of the line.
-	RFCTime.append(" GMT");
-	return(RFCTime);
-}
-time_t ISO8601totime(const std::string & ISOTime)
-{
-	struct tm UTC;
-	UTC.tm_year = atol(ISOTime.substr(0,4).c_str())-1900;
-	UTC.tm_mon = atol(ISOTime.substr(5,2).c_str())-1;
-	UTC.tm_mday = atol(ISOTime.substr(8,2).c_str());
-	UTC.tm_hour = atol(ISOTime.substr(11,2).c_str());
-	UTC.tm_min = atol(ISOTime.substr(14,2).c_str());
-	UTC.tm_sec = atol(ISOTime.substr(17,2).c_str());
-	#ifdef _MSC_VER
-	_tzset();
-	UTC.tm_isdst = _daylight;
-	#endif
-	time_t timer = mktime(&UTC);
-	#ifdef _MSC_VER
-	timer -= _timezone;
-	timer += _daylight*_dstbias;
-	#endif
-	return(timer);
-}
-/////////////////////////////////////////////////////////////////////////////
-std::wstring getwTimeISO8601(const bool LocalTime = false)
-{
-	std::string isostring(getTimeISO8601(LocalTime));
-	std::wstring rval;
-	rval.assign(isostring.begin(), isostring.end());
-
-	return(rval);
-}
 /////////////////////////////////////////////////////////////////////////////
 CString FindEXEFromPath(const CString & csEXE)
 {
@@ -357,7 +245,7 @@ void PopulateTiVoFileList(std::vector<cTiVoFile> & TiVoFileList, CCriticalSectio
 		csLocalSkipExtensions = CString(vData);
 	if (csLocalSkipExtensions.IsEmpty())
 	{
-		csLocalSkipExtensions = _T("txt;srt");
+		csLocalSkipExtensions = _T("txt;srt;nfo;sfv");
 		RegSetKeyValue(HKEY_LOCAL_MACHINE, csRegKey, _T("IgnoreExt"), REG_SZ, csLocalSkipExtensions.GetString(), csLocalSkipExtensions.GetLength() * sizeof(TCHAR) + 1);
 	}
 
@@ -653,12 +541,12 @@ UINT PopulateTiVoFileList(LPVOID lvp)
 int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 {
 	TRACE("%s %s\n", CStringA(CTime::GetCurrentTime().Format(_T("[%Y-%m-%dT%H:%M:%S]"))).GetString(), __FUNCTION__);
-	#ifdef _DEBUG
 	CStringA csInBuffer(InBuffer);
 	int pos = csInBuffer.FindOneOf("\r\n");
 	if (pos > 0)
 		csInBuffer.Delete(pos,csInBuffer.GetLength());
-	struct sockaddr_in adr_inet;/* AF_INET */  
+	#ifdef _DEBUG
+	struct sockaddr_in adr_inet;/* AF_INET */
 	int sa_len = sizeof(adr_inet);
 	getpeername(DataSocket, (struct sockaddr *)&adr_inet, &sa_len);
 	std::cout << "[" << getTimeISO8601() << "] "  << __FUNCTION__ << "\t" << inet_ntoa(adr_inet.sin_addr) << " " << csInBuffer.GetString() << endl;
@@ -682,13 +570,10 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 		CString csAnchorItem;
 		TiVoFileListSortOrder RequestedTiVoFileListSortOrder = CaptureDateReverse;
 		ccTiVoFileListCritSec.Lock();
-		if (!TiVoFileList.empty())
-			csAnchorItem = TiVoFileList.begin()->GetURL();
 		int iItemCount = TiVoFileList.size();
 		ccTiVoFileListCritSec.Unlock();
-		CStringA csCommand(InBuffer);
 		int curPos = 0;
-		CStringA csToken(csCommand.Tokenize("& ?",curPos));
+		CStringA csToken(csInBuffer.Tokenize("& ?",curPos));
 		while (csToken != "")
 		{
 			CStringA csKey(csToken.Left(csToken.Find("=")));
@@ -766,7 +651,7 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 				InternetCanonicalizeUrl(csAnchorItem.GetString(), lpszBuffer, &dwBufferLength, 0);
 				csAnchorItem = CString(lpszBuffer, dwBufferLength);
 			}
-			csToken = csCommand.Tokenize("& ?",curPos);
+			csToken = csInBuffer.Tokenize("& ?",curPos);
 		}
 		pWriter->SetOutput(spMemoryStream);
 		pWriter->SetProperty(XmlWriterProperty_Indent, TRUE);
@@ -800,7 +685,70 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 			else if (csContainer.Compare(csMyHostName) == 0)
 			{
 				CString csTemporary;
-				pWriter->WriteElementString(NULL, _T("ItemStart"), NULL, _T("0"));
+				ccTiVoFileListCritSec.Lock();
+				if (CurrentTiVoFileListSortOrder != RequestedTiVoFileListSortOrder)
+				{
+					switch (RequestedTiVoFileListSortOrder)
+					{
+					case Title:
+						std::sort(TiVoFileList.begin(), TiVoFileList.end(), cTiVoFileCompareTitle);
+						CurrentTiVoFileListSortOrder = Title;
+						break;
+					case TitleReverse:
+						std::sort(TiVoFileList.begin(), TiVoFileList.end(), cTiVoFileCompareTitle);
+						CurrentTiVoFileListSortOrder = TitleReverse;
+						break;
+					case CaptureDate:
+						std::sort(TiVoFileList.begin(), TiVoFileList.end(), cTiVoFileCompareDate);
+						CurrentTiVoFileListSortOrder = CaptureDate;
+						break;
+					default:
+					case CaptureDateReverse:
+						std::sort(TiVoFileList.begin(), TiVoFileList.end(), cTiVoFileCompareDateReverse);
+						CurrentTiVoFileListSortOrder = CaptureDateReverse;
+						break;
+					}
+				}
+				if (csAnchorItem.IsEmpty())
+					if (!TiVoFileList.empty())
+						csAnchorItem = TiVoFileList.begin()->GetURL();
+				auto pItem = TiVoFileList.begin();
+				int ItemStart = 0;
+				if (iItemCount > 0)
+				{
+					for (pItem = TiVoFileList.begin(); pItem != TiVoFileList.end(); pItem++)
+					{
+						if (!pItem->GetURL().CompareNoCase(csAnchorItem))
+						{
+							std::wcout << L"[                   ] Anchoritem Found: " << csAnchorItem.GetString() << std::endl;
+							break;
+						}
+						ItemStart++;
+					}
+					if (pItem == TiVoFileList.end())
+					{
+						std::wcout << L"[                   ] Anchoritem NOT Found: " << csAnchorItem.GetString() << std::endl;
+						pItem = TiVoFileList.begin();
+						ItemStart = 0;
+					}
+					while ((pItem != TiVoFileList.begin()) && (pItem != TiVoFileList.end()) && (iAnchorOffset != 0))
+						if (iAnchorOffset < 0)
+						{
+							pItem--;
+							ItemStart--;
+							if (pItem->GetDuration() > 1000)
+								iAnchorOffset++;
+						}
+						else
+						{
+							pItem++;
+							ItemStart++;
+							if (pItem->GetDuration() > 1000)
+								iAnchorOffset--;
+						}
+				}
+				csTemporary.Format(_T("%d"), ItemStart);
+				pWriter->WriteElementString(NULL, _T("ItemStart"), NULL, csTemporary.GetString());
 				csTemporary.Format(_T("%d"), min(iItemCount, TiVoFileList.size()));
 				pWriter->WriteElementString(NULL, _T("ItemCount"), NULL, csTemporary.GetString());
 				pWriter->WriteStartElement(NULL, _T("Details"), NULL);
@@ -812,13 +760,19 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 					std::wstring MyVersion(std::wstring_convert<std::codecvt_utf8<wchar_t>>().from_bytes(myServer.m_swversion));
 					pWriter->WriteElementString(NULL, _T("UniqueId"), NULL, MyVersion.c_str());
 				pWriter->WriteEndElement();	// Details
-				ccTiVoFileListCritSec.Lock();
-				for (auto& pItem : TiVoFileList)
+				while ((pItem != TiVoFileList.end()) && (iItemCount > 0))
 				{
-					if (iItemCount <= 0)
-						break;
-					pItem.GetTiVoItem(pWriter);
-					iItemCount--;
+					#ifdef DEBUG
+					std::wcout << L"[                   ] Item: " << pItem->GetURL().GetString() << L" " << pItem->GetPathName().GetString() << L" Duration: " << pItem->GetDuration() << std::endl;
+					#else
+					std::wcout << L"[                   ] Item: " << pItem->GetPathName().GetString() << L" Duration: " << pItem->GetDuration() << std::endl;
+					#endif // DEBUG
+					if (pItem->GetDuration() > 1000) // This might not work for .TiVo files, needs further checking
+					{
+						pItem->GetTiVoItem(pWriter);
+						iItemCount--;
+					}
+					pItem++;
 				}
 				ccTiVoFileListCritSec.Unlock();
 			}
@@ -954,34 +908,42 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 int GetTiVoTVBusQuery(SOCKET DataSocket, const char * InBuffer)
 {
 	TRACE("%s %s\n", CStringA(CTime::GetCurrentTime().Format(_T("[%Y-%m-%dT%H:%M:%S]"))).GetString(), __FUNCTION__);
-	#ifdef _DEBUG
 	CStringA csInBuffer(InBuffer);
 	int pos = csInBuffer.FindOneOf("\r\n");
 	if (pos > 0)
 		csInBuffer.Delete(pos,csInBuffer.GetLength());
-	struct sockaddr_in adr_inet;/* AF_INET */  
+	#ifdef _DEBUG
+	struct sockaddr_in adr_inet;/* AF_INET */
 	int sa_len = sizeof(adr_inet);
 	getpeername(DataSocket, (struct sockaddr *)&adr_inet, &sa_len);
 	std::cout << "[" << getTimeISO8601() << "] "  << __FUNCTION__ << "\t" << inet_ntoa(adr_inet.sin_addr) << " " << csInBuffer.GetString() << endl;
 	#endif
+	cTiVoFile TiVoFileToSend;
 	int rval = 0;
-	CString csUrl;
-	CString csCommand(InBuffer);
 	int curPos = 0;
-	CString csToken(csCommand.Tokenize(_T("& "),curPos));
-	while (csToken != _T(""))
+	CStringA csToken(csInBuffer.Tokenize("& ",curPos));
+	while (csToken != "")
 	{
-		if (!csToken.Left(4).CompareNoCase(_T("Url=")))
+		std::cout << "[                   ] " << csToken.GetString() << std::endl;
+		CStringA csKey(csToken.Left(csToken.Find("=")));
+		CStringA csValue(csToken.Right(csToken.GetLength() - (csToken.Find("=") + 1)));
+		if (!csKey.CompareNoCase("Url="))
 		{
-			csToken.Delete(0,4);
-			csUrl = csToken;
 			TCHAR lpszBuffer[_MAX_PATH];
 			DWORD dwBufferLength = sizeof(lpszBuffer) / sizeof(TCHAR);
-			InternetCanonicalizeUrl(csUrl.GetString(), lpszBuffer, &dwBufferLength, ICU_DECODE);
-			csUrl = CString(lpszBuffer, dwBufferLength);
-			break; // minor optimization that helps in debugging
+			InternetCanonicalizeUrl(CString(csValue).GetString(), lpszBuffer, &dwBufferLength, ICU_DECODE);
+			csValue = CString(lpszBuffer, dwBufferLength);
+			ccTiVoFileListCritSec.Lock();
+			for (auto& MyFile : TiVoFileList)
+				if (!MyFile.GetURL().CompareNoCase(CString(csValue)))
+				{
+					std::wcout << L"[                   ] Found File: " << MyFile.GetPathName().GetString() << std::endl;
+					TiVoFileToSend = MyFile;
+					break;
+				}
+			ccTiVoFileListCritSec.Unlock();
 		}
-		csToken = csCommand.Tokenize(_T("& "),curPos);
+		csToken = csInBuffer.Tokenize("& ",curPos);
 	}
 
 	char XMLDataBuff[1024 * 11] = { 0 };
@@ -1016,14 +978,7 @@ int GetTiVoTVBusQuery(SOCKET DataSocket, const char * InBuffer)
 			//pWriter->WriteAttributeString(L"xmlns", L"TvDbBitstreamFormat", NULL, L"http://tivo.com/developer/xml/idl/TvDbBitstreamFormat");
 			//pWriter->WriteAttributeString(L"xmlns", L"schemaLocation", NULL, L"http://tivo.com/developer/xml/idl/TvBusMarshalledStruct TvBusMarshalledStruct.xsd http://tivo.com/developer/xml/idl/TvPgdRecording TvPgdRecording.xsd http://tivo.com/developer/xml/idl/TvBusDuration TvBusDuration.xsd http://tivo.com/developer/xml/idl/TvPgdShowing TvPgdShowing.xsd http://tivo.com/developer/xml/idl/TvDbShowingBit TvDbShowingBit.xsd http://tivo.com/developer/xml/idl/TvBusDateTime TvBusDateTime.xsd http://tivo.com/developer/xml/idl/TvPgdProgram TvPgdProgram.xsd http://tivo.com/developer/xml/idl/TvDbColorCode TvDbColorCode.xsd http://tivo.com/developer/xml/idl/TvPgdSeries TvPgdSeries.xsd http://tivo.com/developer/xml/idl/TvDbShowType TvDbShowType.xsd http://tivo.com/developer/xml/idl/TvPgdChannel TvPgdChannel.xsd http://tivo.com/developer/xml/idl/TvDbTvRating TvDbTvRating.xsd http://tivo.com/developer/xml/idl/TvDbRecordQuality TvDbRecordQuality.xsd http://tivo.com/developer/xml/idl/TvDbBitstreamFormat TvDbBitstreamFormat.xsd");
 			//pWriter->WriteAttributeString(L"xmlns", L"type", NULL, L"TvPgdRecording:TvPgdRecording");
-			ccTiVoFileListCritSec.Lock();
-			for (auto & MyFile : TiVoFileList)
-				if (!MyFile.GetURL().CompareNoCase(csUrl))
-				{
-					MyFile.GetTvBusEnvelope(pWriter);
-					break;
-				}
-			ccTiVoFileListCritSec.Unlock();
+			TiVoFileToSend.GetTvBusEnvelope(pWriter);
 			//pWriter->WriteFullEndElement();
 		//pWriter->WriteComment(L" Copyright © 2013 William C Bonner ");
 		//pWriter->WriteEndDocument();

@@ -42,6 +42,9 @@
     <ClInclude Include="TiVoMAKDlg.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="WimISO8601.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="WimTiVoClient.cpp">
@@ -63,6 +66,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="TiVoMAKDlg.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="WimISO8601.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

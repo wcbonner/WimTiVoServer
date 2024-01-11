@@ -45,6 +45,9 @@
     <ClInclude Include="Dtwinver.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="WimISO8601.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -60,6 +63,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Dtwinver.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="WimISO8601.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

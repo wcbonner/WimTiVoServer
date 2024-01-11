@@ -36,31 +36,6 @@ BEGIN_MESSAGE_MAP(CWimTiVoClientDoc, CDocument)
 END_MESSAGE_MAP()
 
 // CWimTiVoClientDoc construction/destruction
-static std::string timeToISO8601(const time_t & TheTime)
-{
-	std::ostringstream ISOTime;
-	struct tm UTC;
-	gmtime_s(&UTC, &TheTime);
-	ISOTime.fill('0');
-	ISOTime << UTC.tm_year+1900 << "-";
-	ISOTime.width(2);
-	ISOTime << UTC.tm_mon+1 << "-";
-	ISOTime.width(2);
-	ISOTime << UTC.tm_mday << "T";
-	ISOTime.width(2);
-	ISOTime << UTC.tm_hour << ":";
-	ISOTime.width(2);
-	ISOTime << UTC.tm_min << ":";
-	ISOTime.width(2);
-	ISOTime << UTC.tm_sec;
-	return(ISOTime.str());
-}
-static std::string getTimeISO8601(void)
-{
-	time_t timer;
-	time(&timer);
-	return(timeToISO8601(timer));
-}
 CString FindEXEFromPath(const CString & csEXE)
 {
 	CString csFullPath;

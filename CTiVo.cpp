@@ -3,101 +3,6 @@
 #pragma comment(lib, "wininet") // For some reason InternetCanonicalizeUrl() wasn't linking without this.
 using namespace std;
 
-static std::string timeToISO8601(const time_t & TheTime)
-{
-	std::ostringstream ISOTime;
-	struct tm UTC;
-	gmtime_s(&UTC, &TheTime);
-	ISOTime.fill('0');
-	ISOTime << UTC.tm_year+1900 << "-";
-	ISOTime.width(2);
-	ISOTime << UTC.tm_mon+1 << "-";
-	ISOTime.width(2);
-	ISOTime << UTC.tm_mday << "T";
-	ISOTime.width(2);
-	ISOTime << UTC.tm_hour << ":";
-	ISOTime.width(2);
-	ISOTime << UTC.tm_min << ":";
-	ISOTime.width(2);
-	ISOTime << UTC.tm_sec;
-	return(ISOTime.str());
-}
-//static std::string timeToISO8601(const CTime & TheTime)
-//{
-//	time_t TheOtherTime;
-//	//mktime(
-//	//TheTime.
-//	return(timeToISO8601(TheOtherTime));
-//}
-static std::string timeToISO8601(const CTimeSpan & TheTimeSpan)
-{
-	std::ostringstream ISOTime;
-	ISOTime << "P";
-	if (TheTimeSpan.GetDays() > 0)
-		ISOTime << TheTimeSpan.GetDays() << "D";
-	ISOTime << "T";
-	if (TheTimeSpan.GetHours() > 0)
-		ISOTime << TheTimeSpan.GetHours() << "H";
-	if (TheTimeSpan.GetMinutes() > 0)
-		ISOTime << TheTimeSpan.GetMinutes() << "M";
-	if (TheTimeSpan.GetSeconds() > 0)
-		ISOTime << TheTimeSpan.GetSeconds() << "S";
-	return(ISOTime.str());
-}
-static std::string timeToExcelDate(const time_t & TheTime)
-{
-	std::ostringstream ISOTime;
-	struct tm UTC;
-	gmtime_s(&UTC, &TheTime);
-	ISOTime.fill('0');
-	ISOTime << UTC.tm_year+1900 << "-";
-	ISOTime.width(2);
-	ISOTime << UTC.tm_mon+1 << "-";
-	ISOTime.width(2);
-	ISOTime << UTC.tm_mday << " ";
-	ISOTime.width(2);
-	ISOTime << UTC.tm_hour << ":";
-	ISOTime.width(2);
-	ISOTime << UTC.tm_min << ":";
-	ISOTime.width(2);
-	ISOTime << UTC.tm_sec;
-	return(ISOTime.str());
-}
-static std::string getTimeISO8601(void)
-{
-	time_t timer;
-	time(&timer);
-	return(timeToISO8601(timer));
-}
-static time_t ISO8601totime(const std::string & ISOTime)
-{
-	struct tm UTC;
-	UTC.tm_year = atol(ISOTime.substr(0,4).c_str())-1900;
-	UTC.tm_mon = atol(ISOTime.substr(5,2).c_str())-1;
-	UTC.tm_mday = atol(ISOTime.substr(8,2).c_str());
-	UTC.tm_hour = atol(ISOTime.substr(11,2).c_str());
-	UTC.tm_min = atol(ISOTime.substr(14,2).c_str());
-	UTC.tm_sec = atol(ISOTime.substr(17,2).c_str());
-	#ifdef _MSC_VER
-	_tzset();
-	int hours = 0;
-	if (0 != _get_daylight(&hours))
-		hours = 0;
-	long SecondsFromUTC = 0;
-	if (0 != _get_timezone(&SecondsFromUTC))
-		SecondsFromUTC = 0;
-	long dstbias = 0;
-	if (0 != _get_dstbias(&dstbias))
-		dstbias = 0;
-	UTC.tm_isdst = hours;
-	#endif
-	time_t timer = mktime(&UTC);
-	#ifdef _MSC_VER
-	timer -= SecondsFromUTC;
-	timer -= hours * dstbias;
-	#endif
-	return(timer);
-}
 /////////////////////////////////////////////////////////////////////////////
 static const CString QuoteFileName(const CString & Original)
 {
@@ -540,7 +445,7 @@ void cTiVoFile::PopulateFromFFProbe(void)
 				csCommandLine.Append(_T(" -hide_banner -loglevel error -show_streams -show_format -print_format xml "));
 				csCommandLine.Append(QuoteFileName(m_csPathName));
 
-				std::cout << "[" << getTimeISO8601() << "] CreateProcess: ";
+				std::cout << "[" << getTimeISO8601(true) << "] CreateProcess: ";
 				std::wcout << csCommandLine.GetString() << std::endl;
 				TRACE(_T("CreateProcess: %s\n"), csCommandLine.GetString());
 				// Create the child process.
