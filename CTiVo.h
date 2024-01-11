@@ -99,7 +99,7 @@ public:
 	const CString & GetSourceFormat(void) const { return(m_SourceFormat); }
 	const unsigned long long & GetDuration(void) const { return(m_Duration); }
 	const unsigned long long & GetSourceSize(void) const { return(m_SourceSize); }
-	void GetTiVoItem(CComPtr<IXmlWriter> & pWriter, const bool bSimplifiedOutput = false) const;
+	void GetTiVoItem(CComPtr<IXmlWriter> & pWriter) const;
 	void GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const;
 	const CString GetFFMPEGCommandLine(const CString & csFFMPEGPath = _T("ffmpeg.exe"), const bool bForceSubtitles = false) const;
 #ifdef CACHE_FILE
@@ -109,7 +109,6 @@ public:
 };
 bool cTiVoFileCompareDate(const cTiVoFile & a, const cTiVoFile & b);
 bool cTiVoFileCompareDateReverse(const cTiVoFile & a, const cTiVoFile & b);
-extern const CString csUrlPrefix;
 /////////////////////////////////////////////////////////////////////////////
 bool XML_Parse_TiVoNowPlaying(CComPtr<IStream> &spStream, const CString & csMAK, std::vector<cTiVoFile> & TiVoFileList, std::vector<CTiVoContainer> & TiVoTiVoContainers);
 bool XML_Parse_TiVoNowPlaying(const CString & Source, const CString & csMAK, std::vector<cTiVoFile> & TiVoFileList, std::vector<CTiVoContainer> & TiVoTiVoContainers);

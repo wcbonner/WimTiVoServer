@@ -221,7 +221,6 @@ bool cTiVoFile::operator==(const cTiVoFile & other) const
 		m_csPathName == other.m_csPathName
 		);
 }
-const CString csUrlPrefix(_T("/TiVoConnect/TivoNowPlaying/"));
 // This function is called from WimTiVoClient (2023-12-17)
 void cTiVoFile::SetPathName(const CString csNewPath)
 {
@@ -833,9 +832,9 @@ const CString cTiVoFile::GetURL(void) const
 										DWORD dwBufferLength = sizeof(lpszBuffer) / sizeof(TCHAR);
 										if (CryptBinaryToStringW(pbHash, cbHash, CRYPT_STRING_HEX | CRYPT_STRING_NOCRLF, lpszBuffer, &dwBufferLength))
 										{
-											csrVal = csUrlPrefix;
-											csrVal.Append(CString(lpszBuffer, dwBufferLength));
+											csrVal = CString(lpszBuffer, dwBufferLength);
 											csrVal.Replace(_T(" "), _T(""));
+											csrVal.Insert(0, _T("/"));
 										}
 									}
 								}
@@ -862,68 +861,12 @@ const CString & cTiVoFile::SetMAK(const CString & csMAK)
 	m_csMAK = csMAK;
 	return(csrVal);
 }
-void cTiVoFile::GetTiVoItem(CComPtr<IXmlWriter> & pWriter, const bool bSimplifiedOutput) const
+void cTiVoFile::GetTiVoItem(CComPtr<IXmlWriter> & pWriter) const
 {
-	if (bSimplifiedOutput)
-	{ 
-		pWriter->WriteStartElement(NULL, L"Item", NULL);
-		pWriter->WriteStartElement(NULL, L"Details", NULL);
-			pWriter->WriteElementString(NULL, L"Title", NULL, m_Title.GetString());
-			if (!m_ContentType.IsEmpty()) pWriter->WriteElementString(NULL, L"ContentType", NULL, m_ContentType.GetString());
-			if (!m_SourceFormat.IsEmpty()) pWriter->WriteElementString(NULL, L"SourceFormat", NULL, m_SourceFormat.GetString());
-			//pWriter->WriteElementString(NULL, L"ContentType", NULL, L"video/x-tivo-mpeg-ts");
-			//pWriter->WriteElementString(NULL, L"SourceFormat", NULL, L"video/x-tivo-mpeg-ts");
-			pWriter->WriteElementString(NULL, L"SourceSize", NULL, L"");
-			pWriter->WriteElementString(NULL, L"Duration", NULL, L"");
-			pWriter->WriteElementString(NULL, L"Description", NULL, L"");
-			pWriter->WriteElementString(NULL, L"SourceChannel", NULL, L"0");
-			pWriter->WriteElementString(NULL, L"SourceStation", NULL, L"");
-			pWriter->WriteElementString(NULL, L"SeriesId", NULL, L"");
-			pWriter->WriteElementString(NULL, L"ShowingBits", NULL, L"0");
-			{
-			CTime tempTime(m_CaptureDate);
-			const CTime UnixEpochTime(1970, 1, 1, 0, 0, 0);
-			_tzset();
-			long SecondsFromUTC;
-			_get_timezone(&SecondsFromUTC);
-			tempTime += CTimeSpan(SecondsFromUTC);	// the time difference was ~8 hours, which makes sense as the diff between UTC and local time.
-			CTimeSpan TimeDiff = tempTime - UnixEpochTime;
-			std::wstringstream ss(std::stringstream::in | std::stringstream::out);
-			ss << showbase << hex << TimeDiff.GetTotalSeconds();
-			pWriter->WriteElementString(NULL, L"CaptureDate", NULL, ss.str().c_str());
-			}
-		pWriter->WriteEndElement();	// Details
-		if (!m_ContentType.IsEmpty() && !GetURL().IsEmpty())
-		{
-			pWriter->WriteStartElement(NULL, L"Links", NULL);
-			pWriter->WriteStartElement(NULL, L"Content", NULL);
-			pWriter->WriteElementString(NULL, L"ContentType", NULL, m_ContentType.GetString());
-			pWriter->WriteElementString(NULL, L"Url", NULL, GetURL().GetString());
-			pWriter->WriteEndElement();	// Content
-			pWriter->WriteStartElement(NULL, L"CustomIcon", NULL);
-			pWriter->WriteElementString(NULL, L"ContentType", NULL, L"image/*");
-			pWriter->WriteElementString(NULL, L"AcceptsParams", NULL, L"No");
-			pWriter->WriteElementString(NULL, L"Url", NULL, L"urn:tivo:image:save-until-i-delete-recording");
-			pWriter->WriteEndElement();	// CustomIcon
-			pWriter->WriteStartElement(NULL, L"TiVoVideoDetails", NULL);
-			pWriter->WriteElementString(NULL, L"ContentType", NULL, L"text/xml");
-			pWriter->WriteElementString(NULL, L"AcceptsParams", NULL, L"No");
-			CString DetailsURL(_T("/TiVoConnect?Command=TVBusQuery&Url="));
-			DetailsURL.Append(GetURL());
-			pWriter->WriteElementString(NULL, L"Url", NULL, DetailsURL.GetString());
-			pWriter->WriteEndElement();	// TiVoVideoDetails
-			pWriter->WriteEndElement();	// Links
-		}
-		pWriter->WriteEndElement();	// Item
-	}
-	else
-	{
 		pWriter->WriteStartElement(NULL, L"Item", NULL);
 		pWriter->WriteStartElement(NULL, L"Details", NULL);
 		pWriter->WriteElementString(NULL, L"Title", NULL, m_Title.GetString());
-		//pWriter->WriteElementString(NULL, L"ContentType", NULL, L"x-tivo-container/tivo-videos");
-		//pWriter->WriteElementString(NULL, L"SourceFormat", NULL, L"x-tivo-container/folder");
-		//pWriter->WriteElementString(NULL, L"TotalItems", NULL, L"1");
+
 		if (!m_EpisodeTitle.IsEmpty()) pWriter->WriteElementString(NULL, L"EpisodeTitle", NULL, m_EpisodeTitle.GetString());
 		if (!m_Description.IsEmpty()) pWriter->WriteElementString(NULL, L"Description", NULL, m_Description.GetString());
 		if (!m_SourceStation.IsEmpty()) pWriter->WriteElementString(NULL, L"SourceStation", NULL, m_SourceStation.GetString());
@@ -983,15 +926,49 @@ void cTiVoFile::GetTiVoItem(CComPtr<IXmlWriter> & pWriter, const bool bSimplifie
 			pWriter->WriteEndElement();	// Links
 		}
 		pWriter->WriteEndElement();	// Item
-	}
 }
 void cTiVoFile::GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const
 {
-	if (!m_TvBusEnvelope.IsEmpty())
+	if (m_csPathName.Right(6).CompareNoCase(_T(".tivo")) == 0)
+	{
+#ifdef HandleTiVoFiles
+		// This is just demo code making sure I can create a temporary file properly for future use with tdcat or tivodecode
+		TCHAR lpTempPathBuffer[MAX_PATH];
+		DWORD dwRetVal = GetTempPath(MAX_PATH, lpTempPathBuffer);
+		if (dwRetVal > MAX_PATH || (dwRetVal == 0))
+		{
+			std::cout << "[" << getTimeISO8601() << "] GetTempPath failed" << endl;
+			_tcscpy(lpTempPathBuffer, _T("."));
+		}
+		//  Generates a temporary file name. 
+		TCHAR szTempFileName[MAX_PATH];
+		UINT uRetVal = GetTempFileName(lpTempPathBuffer, // directory for tmp files
+			AfxGetAppName(),	// temp file name prefix 
+			0,					// create unique name 
+			szTempFileName);	// buffer for name 
+		if (uRetVal == 0)
+			std::cout << "[" << getTimeISO8601() << "] GetTempFileName failed" << endl;
+		else
+		{
+			wcout << L"[                   ]  GetTempFileName: " << szTempFileName << endl;
+			if (-1 == _tspawnlp(_P_WAIT, _T("tdcat.exe"), _T("tdcat.exe"), _T("--mak"), _T("1760168186"), _T("--out"), szTempFileName, _T("--chunk-2"), m_csPathName.GetString(), NULL))
+				std::cout << "[" << getTimeISO8601() << "] _tspawnlp failed: " << _sys_errlist[errno] << endl;
+			std::ifstream FileToTransfer;
+			FileToTransfer.open(CStringA(CString(szTempFileName)).GetString(), ios_base::in | ios_base::binary);
+			char XMLDataBuff[1024 * 11] = { 0 };
+			if (FileToTransfer.good())
+				FileToTransfer.read(XMLDataBuff, sizeof(XMLDataBuff) - 1);
+			DeleteFile(szTempFileName);	// I must delete this file because the zero in the unique field up above causes a file to be created.
+			pWriter->WriteRaw(CString(XMLDataBuff));
+		}
+#endif // HandleTiVoFiles
+	}
+	else if (!m_TvBusEnvelope.IsEmpty())
 		pWriter->WriteRaw(m_TvBusEnvelope.GetString());
 	else
 	{
-		pWriter->WriteRaw(L"<TvBusMarshalledStruct:TvBusEnvelope xmlns:xs=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:TvBusMarshalledStruct=\"http://tivo.com/developer/xml/idl/TvBusMarshalledStruct\" xmlns:TvPgdRecording=\"http://tivo.com/developer/xml/idl/TvPgdRecording\" xmlns:TvBusDuration=\"http://tivo.com/developer/xml/idl/TvBusDuration\" xmlns:TvPgdShowing=\"http://tivo.com/developer/xml/idl/TvPgdShowing\" xmlns:TvDbShowingBit=\"http://tivo.com/developer/xml/idl/TvDbShowingBit\" xmlns:TvBusDateTime=\"http://tivo.com/developer/xml/idl/TvBusDateTime\" xmlns:TvPgdProgram=\"http://tivo.com/developer/xml/idl/TvPgdProgram\" xmlns:TvDbColorCode=\"http://tivo.com/developer/xml/idl/TvDbColorCode\" xmlns:TvPgdSeries=\"http://tivo.com/developer/xml/idl/TvPgdSeries\" xmlns:TvDbShowType=\"http://tivo.com/developer/xml/idl/TvDbShowType\" xmlns:TvPgdBookmark=\"http://tivo.com/developer/xml/idl/TvPgdBookmark\" xmlns:TvPgdChannel=\"http://tivo.com/developer/xml/idl/TvPgdChannel\" xmlns:TvDbBitstreamFormat=\"http://tivo.com/developer/xml/idl/TvDbBitstreamFormat\" xs:schemaLocation=\"http://tivo.com/developer/xml/idl/TvBusMarshalledStruct TvBusMarshalledStruct.xsd http://tivo.com/developer/xml/idl/TvPgdRecording TvPgdRecording.xsd http://tivo.com/developer/xml/idl/TvBusDuration TvBusDuration.xsd http://tivo.com/developer/xml/idl/TvPgdShowing TvPgdShowing.xsd http://tivo.com/developer/xml/idl/TvDbShowingBit TvDbShowingBit.xsd http://tivo.com/developer/xml/idl/TvBusDateTime TvBusDateTime.xsd http://tivo.com/developer/xml/idl/TvPgdProgram TvPgdProgram.xsd http://tivo.com/developer/xml/idl/TvDbColorCode TvDbColorCode.xsd http://tivo.com/developer/xml/idl/TvPgdSeries TvPgdSeries.xsd http://tivo.com/developer/xml/idl/TvDbShowType TvDbShowType.xsd http://tivo.com/developer/xml/idl/TvPgdBookmark TvPgdBookmark.xsd http://tivo.com/developer/xml/idl/TvPgdChannel TvPgdChannel.xsd http://tivo.com/developer/xml/idl/TvDbBitstreamFormat TvDbBitstreamFormat.xsd\" xs:type=\"TvPgdRecording:TvPgdRecording\">");
+		//pWriter->WriteRaw(L"<TvBusMarshalledStruct:TvBusEnvelope xmlns:xs=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:TvBusMarshalledStruct=\"http://tivo.com/developer/xml/idl/TvBusMarshalledStruct\" xmlns:TvPgdRecording=\"http://tivo.com/developer/xml/idl/TvPgdRecording\" xmlns:TvBusDuration=\"http://tivo.com/developer/xml/idl/TvBusDuration\" xmlns:TvPgdShowing=\"http://tivo.com/developer/xml/idl/TvPgdShowing\" xmlns:TvDbShowingBit=\"http://tivo.com/developer/xml/idl/TvDbShowingBit\" xmlns:TvBusDateTime=\"http://tivo.com/developer/xml/idl/TvBusDateTime\" xmlns:TvPgdProgram=\"http://tivo.com/developer/xml/idl/TvPgdProgram\" xmlns:TvDbColorCode=\"http://tivo.com/developer/xml/idl/TvDbColorCode\" xmlns:TvPgdSeries=\"http://tivo.com/developer/xml/idl/TvPgdSeries\" xmlns:TvDbShowType=\"http://tivo.com/developer/xml/idl/TvDbShowType\" xmlns:TvPgdBookmark=\"http://tivo.com/developer/xml/idl/TvPgdBookmark\" xmlns:TvPgdChannel=\"http://tivo.com/developer/xml/idl/TvPgdChannel\" xmlns:TvDbBitstreamFormat=\"http://tivo.com/developer/xml/idl/TvDbBitstreamFormat\" xs:schemaLocation=\"http://tivo.com/developer/xml/idl/TvBusMarshalledStruct TvBusMarshalledStruct.xsd http://tivo.com/developer/xml/idl/TvPgdRecording TvPgdRecording.xsd http://tivo.com/developer/xml/idl/TvBusDuration TvBusDuration.xsd http://tivo.com/developer/xml/idl/TvPgdShowing TvPgdShowing.xsd http://tivo.com/developer/xml/idl/TvDbShowingBit TvDbShowingBit.xsd http://tivo.com/developer/xml/idl/TvBusDateTime TvBusDateTime.xsd http://tivo.com/developer/xml/idl/TvPgdProgram TvPgdProgram.xsd http://tivo.com/developer/xml/idl/TvDbColorCode TvDbColorCode.xsd http://tivo.com/developer/xml/idl/TvPgdSeries TvPgdSeries.xsd http://tivo.com/developer/xml/idl/TvDbShowType TvDbShowType.xsd http://tivo.com/developer/xml/idl/TvPgdBookmark TvPgdBookmark.xsd http://tivo.com/developer/xml/idl/TvPgdChannel TvPgdChannel.xsd http://tivo.com/developer/xml/idl/TvDbBitstreamFormat TvDbBitstreamFormat.xsd\" xs:type=\"TvPgdRecording:TvPgdRecording\">");
+		pWriter->WriteRaw(L"<TvBusMarshalledStruct:TvBusEnvelope xmlns:xs=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:TvBusMarshalledStruct=\"http://tivo.com/developer/xml/idl/TvBusMarshalledStruct\" xmlns:TvPgdRecording=\"http://tivo.com/developer/xml/idl/TvPgdRecording\" xmlns:TvBusDuration=\"http://tivo.com/developer/xml/idl/TvBusDuration\" xmlns:TvPgdShowing=\"http://tivo.com/developer/xml/idl/TvPgdShowing\" xmlns:TvDbShowingBit=\"http://tivo.com/developer/xml/idl/TvDbShowingBit\" xmlns:TvBusDateTime=\"http://tivo.com/developer/xml/idl/TvBusDateTime\" xmlns:TvPgdProgram=\"http://tivo.com/developer/xml/idl/TvPgdProgram\" xmlns:TvDbColorCode=\"http://tivo.com/developer/xml/idl/TvDbColorCode\" xmlns:TvPgdSeries=\"http://tivo.com/developer/xml/idl/TvPgdSeries\" xmlns:TvDbShowType=\"http://tivo.com/developer/xml/idl/TvDbShowType\" xmlns:TvPgdChannel=\"http://tivo.com/developer/xml/idl/TvPgdChannel\" xmlns:TvDbTvRating=\"http://tivo.com/developer/xml/idl/TvDbTvRating\" xmlns:TvDbRecordQuality=\"http://tivo.com/developer/xml/idl/TvDbRecordQuality\" xmlns:TvDbBitstreamFormat=\"http://tivo.com/developer/xml/idl/TvDbBitstreamFormat\" xs:schemaLocation=\"http://tivo.com/developer/xml/idl/TvBusMarshalledStruct TvBusMarshalledStruct.xsd http://tivo.com/developer/xml/idl/TvPgdRecording TvPgdRecording.xsd http://tivo.com/developer/xml/idl/TvBusDuration TvBusDuration.xsd http://tivo.com/developer/xml/idl/TvPgdShowing TvPgdShowing.xsd http://tivo.com/developer/xml/idl/TvDbShowingBit TvDbShowingBit.xsd http://tivo.com/developer/xml/idl/TvBusDateTime TvBusDateTime.xsd http://tivo.com/developer/xml/idl/TvPgdProgram TvPgdProgram.xsd http://tivo.com/developer/xml/idl/TvDbColorCode TvDbColorCode.xsd http://tivo.com/developer/xml/idl/TvPgdSeries TvPgdSeries.xsd http://tivo.com/developer/xml/idl/TvDbShowType TvDbShowType.xsd http://tivo.com/developer/xml/idl/TvPgdChannel TvPgdChannel.xsd http://tivo.com/developer/xml/idl/TvDbTvRating TvDbTvRating.xsd http://tivo.com/developer/xml/idl/TvDbRecordQuality TvDbRecordQuality.xsd http://tivo.com/developer/xml/idl/TvDbBitstreamFormat TvDbBitstreamFormat.xsd\" xs:type=\"TvPgdRecording:TvPgdRecording\">");
 		pWriter->WriteElementString(NULL, L"recordedDuration", NULL, CString(timeToISO8601(CTimeSpan(m_Duration/1000)).c_str()).GetString()); // This is ISO8601 Format for Duration
 		pWriter->WriteStartElement(NULL, L"vActualShowing", NULL);pWriter->WriteEndElement();
 		pWriter->WriteStartElement(NULL, L"vBookmark", NULL);pWriter->WriteEndElement();
