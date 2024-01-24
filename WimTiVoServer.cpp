@@ -73,8 +73,6 @@ bool pauseService = false;
 CWinThread * threadHandle = NULL;
 SOCKET ControlSocket = INVALID_SOCKET;
 bool bConsoleExists = false;
-bool bUDPTiVoBeacon = true;
-bool bZeroConf = false;
 HANDLE ApplicationLogHandle = NULL;
 cTiVoServer myServer;
 CCriticalSection ccTiVoFileListCritSec;
@@ -345,17 +343,18 @@ void printerr(TCHAR * errormsg)
 }
 int GetTiVoQueryFormats(SOCKET DataSocket, const char * InBuffer)
 {
-	#ifdef _DEBUG
 	TRACE("%s %s\n", CStringA(CTime::GetCurrentTime().Format(_T("[%Y-%m-%dT%H:%M:%S]"))).GetString(), __FUNCTION__);
-	CStringA csInBuffer(InBuffer);
-	int pos = csInBuffer.FindOneOf("\r\n");
-	if (pos > 0)
-		csInBuffer.Delete(pos,csInBuffer.GetLength());
-	struct sockaddr_in adr_inet;/* AF_INET */  
-	int sa_len = sizeof(adr_inet);
-	getpeername(DataSocket, (struct sockaddr *)&adr_inet, &sa_len);
-	std::cout << "[" << getTimeISO8601() << "] "  << __FUNCTION__ << "\t" << inet_ntoa(adr_inet.sin_addr) << " " << csInBuffer.GetString() << endl;
-	#endif
+	if (bConsoleExists)
+	{
+		CStringA csInBuffer(InBuffer);
+		int pos = csInBuffer.FindOneOf("\r\n");
+		if (pos > 0)
+			csInBuffer.Delete(pos, csInBuffer.GetLength());
+		struct sockaddr_in adr_inet;/* AF_INET */
+		int sa_len = sizeof(adr_inet);
+		getpeername(DataSocket, (struct sockaddr*)&adr_inet, &sa_len);
+		std::cout << "[" << getTimeISO8601(true) << "] " << __FUNCTION__ << "\t" << inet_ntoa(adr_inet.sin_addr) << " " << csInBuffer.GetString() << endl;
+	}
 	int rval = 0;
 	char MyHostName[255] = {0}; // winsock hostname used for data recordkeeping
 	gethostname(MyHostName,sizeof(MyHostName)); 
@@ -406,13 +405,18 @@ int GetTiVoQueryFormats(SOCKET DataSocket, const char * InBuffer)
 	/* Create HTTP Header */
 	std::stringstream HttpResponse;
 	HttpResponse << "HTTP/1.1 200 OK\r\n";
-	HttpResponse << "Content-Type: text/xml\r\n";
-	HttpResponse << "Connection: close\r\n";
+	HttpResponse << "Server: WimTiVoServer/1.0\r\n";
 	HttpResponse << "Date: " << getTimeRFC1123() << "\r\n";
+	HttpResponse << "Content-Type: text/xml\r\n";
 	HttpResponse << "Content-Length: " << strlen(XMLDataBuff) << "\r\n";
+	HttpResponse << "Connection: close\r\n";
 	HttpResponse << "\r\n";
 	send(DataSocket, HttpResponse.str().c_str(), HttpResponse.str().length(),0);
 	send(DataSocket, XMLDataBuff, strlen(XMLDataBuff),0);
+#ifdef _DEBUG
+	std::cout << "[                   ] " << HttpResponse.str() << std::endl;
+	std::cout << "[                   ] " << XMLDataBuff << std::endl;
+#endif
 	return(0);
 }
 UINT PopulateTiVoFileList(LPVOID lvp)
@@ -545,12 +549,13 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 	int pos = csInBuffer.FindOneOf("\r\n");
 	if (pos > 0)
 		csInBuffer.Delete(pos,csInBuffer.GetLength());
-	#ifdef _DEBUG
-	struct sockaddr_in adr_inet;/* AF_INET */
-	int sa_len = sizeof(adr_inet);
-	getpeername(DataSocket, (struct sockaddr *)&adr_inet, &sa_len);
-	std::cout << "[" << getTimeISO8601() << "] "  << __FUNCTION__ << "\t" << inet_ntoa(adr_inet.sin_addr) << " " << csInBuffer.GetString() << endl;
-	#endif
+	if (bConsoleExists)
+	{
+		struct sockaddr_in adr_inet;/* AF_INET */
+		int sa_len = sizeof(adr_inet);
+		getpeername(DataSocket, (struct sockaddr*)&adr_inet, &sa_len);
+		std::cout << "[" << getTimeISO8601(true) << "] " << __FUNCTION__ << "\t" << inet_ntoa(adr_inet.sin_addr) << " " << csInBuffer.GetString() << endl;
+	}
 	int rval = 0;
 	const int XMLDataBuffSize = 1024;
 	char* XMLDataBuff = new char[XMLDataBuffSize];
@@ -580,7 +585,7 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 			CStringA csValue(csToken.Right(csToken.GetLength() - (csToken.Find("=")+1)));
 			if (!csKey.CompareNoCase("Container"))
 			{
-				std::cout << "[" << getTimeISO8601(true) << "] " << csToken.GetString() << std::endl;
+				std::cout << "[                   ] " << csToken.GetString() << std::endl;
 				csContainer = csValue;
 			}
 			else if (!csKey.CompareNoCase("Recurse"))
@@ -888,14 +893,18 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 	/* Create HTTP Header */
 	std::stringstream HttpResponse;
 	HttpResponse << "HTTP/1.1 200 OK\r\n";
-	HttpResponse << "Content-Type: text/xml\r\n";
-	HttpResponse << "Connection: close\r\n";
+	HttpResponse << "Server: WimTiVoServer/1.0\r\n";
 	HttpResponse << "Date: " << getTimeRFC1123() << "\r\n";
+	HttpResponse << "Content-Type: text/xml\r\n";
 	HttpResponse << "Content-Length: " << strlen(XMLDataBuff) << "\r\n";
+//	HttpResponse << "Connection: close\r\n";
+	HttpResponse << "Expires: 0\r\n";
+	HttpResponse << "Access-Control-Allow-Origin: *\r\n";
 	HttpResponse << "\r\n";
 	send(DataSocket, HttpResponse.str().c_str(), HttpResponse.str().length(),0);
 	send(DataSocket, XMLDataBuff, strlen(XMLDataBuff), 0);
 #ifdef _DEBUG
+	std::cout << "[                   ] " << HttpResponse.str() << std::endl;
 	std::cout << "[                   ] " << XMLDataBuff << std::endl;
 #endif
 	delete[] XMLDataBuff;
@@ -1080,6 +1089,9 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 		HttpResponse << "Connection: close\r\n";
 		HttpResponse << "\r\n";
 		send(DataSocket, HttpResponse.str().c_str(), HttpResponse.str().length(),0);
+#ifdef _DEBUG
+		std::cout << "[                   ] " << HttpResponse.str() << std::endl;
+#endif
 
 		if (0 == TiVoFileToSend.GetPathName().Right(5).CompareNoCase(_T(".tivo")))
 		{
@@ -1835,7 +1847,7 @@ void DnsServiceRegisterComplete(DWORD Status, PVOID pQueryContext,PDNS_SERVICE_I
 			}
 			auto index = pInstance->dwPropertyCount;
 			while (index-- > 0)
-				std::wcout << L"[                   ] pInstance->keys[" << index << L"]:pInstance->values[" << index << L"] " << pInstance->keys[index] << L"=" << pInstance->values[index] << std::endl;
+				std::wcout << L"[                   ] pInstance->keys[" << index << L"]=pInstance->values[" << index << L"] " << pInstance->keys[index] << L"=" << pInstance->values[index] << std::endl;
 		}
 	}
 	return;
@@ -1844,47 +1856,6 @@ void TiVomDNSRegister(bool enable = true)
 {
 	// The following link is an intersting book related to ZeroConf.
 	// https://flylib.com/books/en/2.94.1.53/1/
-
-	// Based on what the TiVo Roamio registers, I want to register several items:
-	// WimRomio._http._tcp.local
-	// WimRomio._tivo-remote._tcp.local
-	// WimRomio._tivo-device._tcp.local
-	// WimRomio._tivo-videos._tcp.local
-	// WimRomio._tivo-videostream._tcp.local
-	// WimRomio._tivo-mindrpc._tcp.local 
-
-	//Service data for service 'WimRomio' of type '_http._tcp' in domain 'local' on 3.0:
-	//	Host DVR-FFD0.local (192.168.50.43), port 80, TXT data: ['TSN=84600119023FFD0', 'platform=tcd/Series5', 'swversion=20.7.4d.RC15-846-6-846', 'path=/index.html']
-	//Service data for service 'WimBolt' of type '_http._tcp' in domain 'local' on 3.0:
-	//	Host DVR-4AC3.local (192.168.50.197), port 80, TXT data: ['TSN=8490001903F4AC3', 'platform=tcd/Series6', 'swversion=20.7.4d.RC15-USC-11-849', 'path=/index.html']
-	//Service data for service 'WimRomio' of type '_tivo-remote._tcp' in domain 'local' on 3.0:
-	//	Host DVR-FFD0.local (192.168.50.43), port 31339, TXT data: ['TSN=84600119023FFD0', 'platform=tcd/Series5', 'swversion=20.7.4d.RC15-846-6-846', 'path=/', 'protocol=tivo-remote']
-	//Service data for service 'WimBolt' of type '_tivo-remote._tcp' in domain 'local' on 3.0:
-	//	Host DVR-4AC3.local (192.168.50.197), port 31339, TXT data: ['TSN=8490001903F4AC3', 'platform=tcd/Series6', 'swversion=20.7.4d.RC15-USC-11-849', 'path=/', 'protocol=tivo-remote']
-	//Service data for service 'WimRomio' of type '_tivo-device._tcp' in domain 'local' on 3.0:
-	//	Host DVR-FFD0.local (192.168.50.43), port 80, TXT data: ['TSN=84600119023FFD0', 'platform=tcd/Series5', 'swversion=20.7.4d.RC15-846-6-846', 'platformName=TiVo Premiere', 'services=_tivo-mindrpc._tcp,_tivo-remote._tcp', 'path=/']
-	//Service data for service 'WimBolt' of type '_tivo-device._tcp' in domain 'local' on 3.0:
-	//	Host DVR-4AC3.local (192.168.50.197), port 80, TXT data: ['TSN=8490001903F4AC3', 'platform=tcd/Series6', 'swversion=20.7.4d.RC15-USC-11-849', 'platformName=TiVo Premiere', 'services=_tivo-mindrpc._tcp,_tivo-remote._tcp', 'path=/']
-	//Service data for service 'WimBolt' of type '_tivo-videos._tcp' in domain 'local' on 3.0:
-	//	Host DVR-4AC3.local (192.168.50.197), port 443, TXT data: ['TSN=8490001903F4AC3', 'platform=tcd/Series6', 'swversion=20.7.4d.RC15-USC-11-849', 'path=/TiVoConnect?Command=QueryContainer&Container=%2FNowPlaying', 'protocol=https']
-	//Service data for service 'WimRomio' of type '_tivo-videos._tcp' in domain 'local' on 3.0:
-	//	Host DVR-FFD0.local (192.168.50.43), port 443, TXT data: ['TSN=84600119023FFD0', 'platform=tcd/Series5', 'swversion=20.7.4d.RC15-846-6-846', 'path=/TiVoConnect?Command=QueryContainer&Container=%2FNowPlaying', 'protocol=https']
-	//Service data for service 'WimBolt' of type '_tivo-videostream._tcp' in domain 'local' on 3.0:
-	//	Host DVR-4AC3.local (192.168.50.197), port 443, TXT data: ['TSN=8490001903F4AC3', 'platform=tcd/Series6', 'swversion=20.7.4d.RC15-USC-11-849', 'path=/TiVoConnect?Command=QueryContainer&Container=%2FNowPlaying', 'protocol=https']
-	//Service data for service 'WimRomio' of type '_tivo-videostream._tcp' in domain 'local' on 3.0:
-	//	Host DVR-FFD0.local (192.168.50.43), port 443, TXT data: ['TSN=84600119023FFD0', 'platform=tcd/Series5', 'swversion=20.7.4d.RC15-846-6-846', 'path=/TiVoConnect?Command=QueryContainer&Container=%2FNowPlaying', 'protocol=https']
-	//Service data for service 'WimRomio' of type '_tivo-mindrpc._tcp' in domain 'local' on 3.0:
-	//	Host DVR-FFD0.local (192.168.50.43), port 1413, TXT data: ['TSN=84600119023FFD0', 'platform=tcd/Series5', 'swversion=20.7.4d.RC15-846-6-846', 'mindversion=7/25', 'path=/', 'protocol=tivo-mindrpc']
-	//Service data for service 'WimBolt' of type '_tivo-mindrpc._tcp' in domain 'local' on 3.0:
-	//	Host DVR-4AC3.local (192.168.50.197), port 1413, TXT data: ['TSN=8490001903F4AC3', 'platform=tcd/Series6', 'swversion=20.7.4d.RC15-USC-11-849', 'mindversion=7/25', 'path=/', 'protocol=tivo-mindrpc']
-	//Service data for service 'pyTivo Desktop' of type '_pytivo._tcp' in domain 'local' on 3.0:
-	//	Host pyTivo\032Desktop._pytivo._tcp.local (192.168.50.25), port 9032, TXT data: ['platform=pyTivo', 'protocol=http', 'path=/Desktop']
-	//Service data for service 'Videos' of type '_tivo-videos._tcp' in domain 'local' on 3.0:
-	//	Host Videos._tivo-videos._tcp.local (192.168.50.25), port 9032, TXT data: ['platform=pc/pyTivo', 'protocol=http', 'path=/TiVoConnect?Command=QueryContainer&Container=Videos', 'tsn={a53d284e-81bf-441c-9d3c-8a3f903a53a0}']
-	// Interesting thing is that it seems that I put the keys in the oposite order that they get displayed by avahi-discover
-	//Service data for service 'WimSurface9' of type '_tivo-videos._tcp' in domain 'local' on 3.0:
-	//	Host WimSurface9.local (192.168.50.31), port 64321, TXT data: ['TSN={0850B36A-6F4B-442D-9C1F-026E48FB7C9F}', 'platform=pc/WinNT:10.0.22631', 'swversion=20240107225553', 'path=/TiVoConnect?Command=QueryContainer&Container=WimSurface9', 'protocol=http']
-	// machine=WimSurface9 address=192.168.50.32 identity={0850B36A-6F4B-442D-9C1F-026E48FB7C9F} method=broadcast platform=pc/WinNT:10.0.22631 services=TiVoMediaServer:61842/http swversion=20231222133941 tivoconnect=1
 
 	if (ControlSocket != INVALID_SOCKET)
 	{
@@ -1904,7 +1875,6 @@ void TiVomDNSRegister(bool enable = true)
 			std::wstring MyServiceName(L"._tivo-videos._tcp.local"); MyServiceName.insert(0, szHostName);
 			std::wstring MyHostName(L".local"); MyHostName.insert(0, szHostName);
 			std::wstring MyPath(L"/TiVoConnect?Command=QueryContainer\&Container="); MyPath.append(szHostName);
-			//std::wstring MyPath(L"/TiVoConnect?Command=QueryContainer\&Container=%2FNowPlaying");
 			std::wstring MyPlatform(std::wstring_convert<std::codecvt_utf8<wchar_t>>().from_bytes(myServer.m_platform));
 			std::wstring MyVersion(std::wstring_convert<std::codecvt_utf8<wchar_t>>().from_bytes(myServer.m_swversion));
 			std::wstring MyID(std::wstring_convert<std::codecvt_utf8<wchar_t>>().from_bytes(myServer.m_identity));
@@ -1915,8 +1885,7 @@ void TiVomDNSRegister(bool enable = true)
 			keys.push_back(L"path"); values.push_back(MyPath.c_str());
 			keys.push_back(L"swversion"); values.push_back(MyVersion.c_str());
 			keys.push_back(L"platform"); values.push_back(MyPlatform.c_str());
-			//keys.push_back(L"platform"); values.push_back(L"pc/WimTiVoServer");
-			keys.push_back(L"TSN"); values.push_back(MyID.c_str());
+			keys.push_back(L"tsn"); values.push_back(MyID.c_str());	// 2024-01-24 If this is not lowercase the TiVo will reject the device as not in your TiVo account. (tivo.com/help/SH06)
 			auto MyServiceInstancePtr = DnsServiceConstructInstance(
 				MyServiceName.c_str(),
 				MyHostName.c_str(),
@@ -2247,25 +2216,20 @@ UINT TiVoBeaconSendThread(LPVOID lvp)
 		ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
 	}
 
-	if (bZeroConf)
-		TiVomDNSRegister(true);	// I'm attempting to register my server using mDNS/Bonjour (2023-12-21)
+	TiVomDNSRegister(true);	// I'm attempting to register my server using mDNS/Bonjour (2023-12-21)
 
 	do {
-		if (bUDPTiVoBeacon)
+		TiVoBeaconSend(myServer.WriteTXT('\n'));
+		#ifdef DEBUG
+		if (bConsoleExists)
 		{
-			TiVoBeaconSend(myServer.WriteTXT('\n'));
-			#ifdef DEBUG
-			if (bConsoleExists)
-			{
-				//std::cout << "[                   ] " << myServer.WriteTXT(' ') << "\r";
-				std::cout << "[" << getTimeISO8601() << "] " << myServer.WriteTXT(' ') << "\r";
-			}
-			#endif // DEBUG
+			//std::cout << "[                   ] " << myServer.WriteTXT(' ') << "\r";
+			std::cout << "[" << getTimeISO8601() << "] " << myServer.WriteTXT(' ') << "\r";
 		}
+		#endif // DEBUG
 	} while (WAIT_TIMEOUT == WaitForSingleObject(LocalTerminationEventHandle, 60*1000));
 
-	if (bZeroConf)
-		TiVomDNSRegister(false); // I'm attempting to deregister my server using mDNS/Bonjour (2023-12-21)
+	TiVomDNSRegister(false); // I'm attempting to deregister my server using mDNS/Bonjour (2023-12-21)
 
 	if (ApplicationLogHandle != NULL) 
 	{
@@ -2689,11 +2653,6 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 					Parameters = argv[--index];
 					if (Parameters.CompareNoCase(_T("-ForceSubtitles")) == 0)
 						bForceSubtitles = true;
-					if (Parameters.CompareNoCase(_T("-ZeroConf")) == 0)
-					{
-						bZeroConf = true;
-						bUDPTiVoBeacon = false;
-					}
 				}
 				#ifdef AVCODEC_AVCODEC_H
 				av_register_all(); // FFMPEG initialization
