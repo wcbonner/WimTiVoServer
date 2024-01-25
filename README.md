@@ -31,3 +31,5 @@ Important registry key that is visible but not modifiable from the interface, is
  
 # WimTiVoBeaconListener
 Windows command line program that listens on UDP Port 2190 for TiVo Beacon messages and displays them. Useful to make sure that your machine is recieving network packets from your TiVo or the WimTiVoServer itself. If messages aren't being recieved, they may be blocked by a firewall.
+
+The TiVo Bolt does not appear to broadcast UDP beacons even while running TiVo Experience 3. The listener has been updated to browse mDNS records _tivo-videos._tcp.local as well as listening for the UDP beacons.
