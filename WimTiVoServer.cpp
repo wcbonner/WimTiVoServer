@@ -593,7 +593,16 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 			else if (!csKey.CompareNoCase("DoGenres"))
 				std::cout << "[                   ] " << csToken.GetString() << std::endl;
 			else if (!csKey.CompareNoCase("SerialNum"))
-				std::cout << "[                   ] " << csToken.GetString() << std::endl;
+			{
+				std::cout << "[                   ] " << csToken.GetString();
+				if ((std::atoi(csValue.Left(1)) >= 6) && (0 != csValue.Left(3).Compare("649")))
+					std::cout << " (High Definition TiVo)";
+				if ((std::atoi(csValue.Left(1)) >= 7) || (0 == csValue.Left(3).Compare("663")))
+					std::cout << " (Tivos supports transport streams)";
+				if ((0 == csValue.Left(3).Compare("849")) || (0 == csValue.Left(3).Compare("8F9")))
+					std::cout << " (4K TiVo)";
+				std::cout << std::endl;
+			}
 			else if (!csKey.CompareNoCase("SortOrder"))
 			{
 				std::cout << "[                   ] " << csToken.GetString() << std::endl;
@@ -936,7 +945,7 @@ int GetTiVoTVBusQuery(SOCKET DataSocket, const char * InBuffer)
 		std::cout << "[                   ] " << csToken.GetString() << std::endl;
 		CStringA csKey(csToken.Left(csToken.Find("=")));
 		CStringA csValue(csToken.Right(csToken.GetLength() - (csToken.Find("=") + 1)));
-		if (!csKey.CompareNoCase("Url="))
+		if (!csKey.CompareNoCase("Url"))
 		{
 			TCHAR lpszBuffer[_MAX_PATH];
 			DWORD dwBufferLength = sizeof(lpszBuffer) / sizeof(TCHAR);
@@ -1169,7 +1178,17 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 				char           filetype[4];       /* the string 'TiVo' */
 				/* all fields are in network byte order */
 				unsigned short dummy_0004;
-				unsigned short dummy_0006;
+				unsigned short flags;	// See: https://github.com/wmcbrine/tivodecode-ng/blob/master/TiVo-Decrypt-Notes.md
+				// flags & 0x80 is always zero (10000000)
+				// flags & 0x40 == 0x40 (01000000) seems to mean NZ/AUS file.
+				// flags & 0x40 == 0x00 seems to mean US file.
+				// flags & 0x20 == 0x20 (00100000) seems to mean TS file.
+				// flags & 0x20 == 0x00 seems to mean PS file.
+				// flags & 0x10 == 0x10 (00010000) seems to mean HD file.
+				// flags & 0x10 == 0x00 seems to mean SD file.
+				// flags & 0x0F == 0x0D (00001101) seems to mean Series3 unit.
+				// flags & 0x05 == 0x05 (00000101) seems to mean DVD capable unit.
+				// flags & 0x05 == 0x01 (00000001) seems to mean Series2 unit.
 				unsigned short dummy_0008;
 				unsigned int   mpeg_offset;   /* 0-based offset of MPEG stream */
 				unsigned short chunks;        /* Number of metadata chunks */
@@ -1177,10 +1196,11 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 			ASSERT(sizeof(tivo_stream_header) == SIZEOF_STREAM_HEADER);
 			std::string("TiVo").copy(tivo_stream_header.filetype, 4);
 			tivo_stream_header.dummy_0004 = htons(4);
-			if (0 == TiVoFileToSend.GetContentType().Compare(_T("video/x-tivo-mpeg")))
-				tivo_stream_header.dummy_0006 = htons(13); // mime = video/x-tivo-mpeg so flag is 13. If mime = video/x-tivo-mpeg-ts, flag would be 45
-			else
-				tivo_stream_header.dummy_0006 = htons(45); // mime = video/x-tivo-mpeg so flag is 13. If mime = video/x-tivo-mpeg-ts, flag would be 45
+			tivo_stream_header.flags = 0x0D00;	// mime = video/x-tivo-mpeg so flag is 13 (0x0D). If mime = video/x-tivo-mpeg-ts, flag would be 45
+			if (TiVoFileToSend.GetVideoHighDefinition())
+				tivo_stream_header.flags |= 0x1000;	// (00010000)
+			if (0 == TiVoFileToSend.GetContentType().Compare(_T("video/x-tivo-mpeg-ts")))
+				tivo_stream_header.flags |= 0x2000;	// (00100000)
 			tivo_stream_header.dummy_0008 = htons(0);
 			tivo_stream_header.mpeg_offset = htonl(padding + chunklen);
 			tivo_stream_header.chunks = htons(2);

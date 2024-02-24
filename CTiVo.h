@@ -45,7 +45,7 @@ private:
 	CString m_vProgramGenre;
 	CString m_vActor;
 	unsigned long long m_SourceSize;
-    unsigned long long m_Duration;
+	unsigned long long m_Duration;
 	CTime m_CaptureDate;
 	CTime m_LastWriteTime;
 	CString m_csMAK;
@@ -57,48 +57,49 @@ private:
 	int m_VideoHeight;
 	CString m_TvBusEnvelope;
 public:
-	cTiVoFile() : 
-	m_EpisodeNumber(0),
-	m_AudioCompatible(false),
-	m_VideoCompatible(false),
-	m_VideoHighDefinition(false),
-	m_VideoWidth(0),
-	m_VideoHeight(0),
-	m_SourceSize(0),
-    m_Duration(0)
+	cTiVoFile() :
+		m_EpisodeNumber(0),
+		m_AudioCompatible(false),
+		m_VideoCompatible(false),
+		m_VideoHighDefinition(false),
+		m_VideoWidth(0),
+		m_VideoHeight(0),
+		m_SourceSize(0),
+		m_Duration(0)
 	{
 	}
-	bool operator==(const cTiVoFile & other) const;
+	bool operator==(const cTiVoFile& other) const;
 	// Simple Sorting Routines
-	friend bool cTiVoFileCompareDate(const cTiVoFile & a, const cTiVoFile & b);
-	friend bool cTiVoFileCompareDateReverse(const cTiVoFile & a, const cTiVoFile & b);
-	friend bool cTiVoFileComparePath(const cTiVoFile & a, const cTiVoFile & b);
-	friend bool cTiVoFileComparePathReverse(const cTiVoFile & a, const cTiVoFile & b);
-	friend bool cTiVoFileCompareSize(const cTiVoFile & a, const cTiVoFile & b);
-	friend bool cTiVoFileCompareSizeReverse(const cTiVoFile & a, const cTiVoFile & b);
-	friend bool cTiVoFileCompareTitle(const cTiVoFile & a, const cTiVoFile & b);
-	friend bool cTiVoFileCompareTitleReverse(const cTiVoFile & a, const cTiVoFile & b);
+	friend bool cTiVoFileCompareDate(const cTiVoFile& a, const cTiVoFile& b);
+	friend bool cTiVoFileCompareDateReverse(const cTiVoFile& a, const cTiVoFile& b);
+	friend bool cTiVoFileComparePath(const cTiVoFile& a, const cTiVoFile& b);
+	friend bool cTiVoFileComparePathReverse(const cTiVoFile& a, const cTiVoFile& b);
+	friend bool cTiVoFileCompareSize(const cTiVoFile& a, const cTiVoFile& b);
+	friend bool cTiVoFileCompareSizeReverse(const cTiVoFile& a, const cTiVoFile& b);
+	friend bool cTiVoFileCompareTitle(const cTiVoFile& a, const cTiVoFile& b);
+	friend bool cTiVoFileCompareTitleReverse(const cTiVoFile& a, const cTiVoFile& b);
 	// Access Routines
 	void SetPathName(const CString csNewPath);
-	void SetPathName(const CFileFind & csNewPath);
-	const CString & GetPathName(void) const { return(m_csPathName); }
-	void SetFromTiVoItem(const CString &csTitle, const CString &csEpisodeTitle, const CString &csDescription, const CString &csSourceStation, const CString &csContentURL, const CTime &ctCaptureDate, const CTimeSpan &ctsDuration, const CString & csMAK, const unsigned long long llSourceSize = 0);
-	#ifdef AVCODEC_AVCODEC_H
+	void SetPathName(const CFileFind& csNewPath);
+	const CString& GetPathName(void) const { return(m_csPathName); }
+	void SetFromTiVoItem(const CString& csTitle, const CString& csEpisodeTitle, const CString& csDescription, const CString& csSourceStation, const CString& csContentURL, const CTime& ctCaptureDate, const CTimeSpan& ctsDuration, const CString& csMAK, const unsigned long long llSourceSize = 0);
+#ifdef AVCODEC_AVCODEC_H
 	void PopulateFromFFMPEG(void);
-	#endif
+#endif
 	void PopulateFromFFProbe(void);
 	const CString GetURL(void) const;
-	const CString & GetTitle(void) const { return(m_Title); }
-	const CString & GetEpisodeTitle(void) const { return(m_EpisodeTitle); }
-	const CString & GetDescription(void) const { return(m_Description); }
-	const CTime & GetCaptureDate(void) const { return(m_CaptureDate); }
-	const CTime & GetLastWriteTime(void) const { return(m_LastWriteTime); }
-	const CString & SetMAK(const CString & csMAK);
-	const CString & GetMAK(void) const { return(m_csMAK); }
-	const CString & GetContentType(void) const { return(m_ContentType); }
-	const CString & GetSourceFormat(void) const { return(m_SourceFormat); }
-	const unsigned long long & GetDuration(void) const { return(m_Duration); }
-	const unsigned long long & GetSourceSize(void) const { return(m_SourceSize); }
+	const CString& GetTitle(void) const { return(m_Title); }
+	const CString& GetEpisodeTitle(void) const { return(m_EpisodeTitle); }
+	const CString& GetDescription(void) const { return(m_Description); }
+	const CTime& GetCaptureDate(void) const { return(m_CaptureDate); }
+	const CTime& GetLastWriteTime(void) const { return(m_LastWriteTime); }
+	const CString& SetMAK(const CString& csMAK);
+	const CString& GetMAK(void) const { return(m_csMAK); }
+	const CString& GetContentType(void) const { return(m_ContentType); }
+	const CString& GetSourceFormat(void) const { return(m_SourceFormat); }
+	const unsigned long long& GetDuration(void) const { return(m_Duration); }
+	const unsigned long long& GetSourceSize(void) const { return(m_SourceSize); }
+	const bool GetVideoHighDefinition(void) const { return(m_VideoHighDefinition); }
 	void GetTiVoItem(CComPtr<IXmlWriter> & pWriter) const;
 	void GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const;
 	const CString GetFFMPEGCommandLine(const CString & csFFMPEGPath = _T("ffmpeg.exe"), const bool bForceSubtitles = false) const;

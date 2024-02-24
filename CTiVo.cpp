@@ -538,6 +538,8 @@ void cTiVoFile::PopulateFromFFProbe(void)
 														bVideoStreamInfoNeeded = false;
 														if (!cs_codec_name.Compare(_T("mpeg2video")))
 															m_VideoCompatible = true;
+														//if (!cs_codec_name.Compare(_T("h264")))
+														//	m_VideoCompatible = true;
 														m_SourceFormat = cs_codec_type + CString(_T("/")) + cs_codec_name;
 														int width = 0;
 														std::wstringstream ss;
@@ -1012,7 +1014,7 @@ const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath, cons
 		//rval.Append(_T(" -map 0:v -map 0:a?")); // copy all audio streams Added 2020-04-04
 		rval.Append(_T(" -map_metadata -1"));
 		if (m_VideoCompatible)
-			rval.Append(_T(" -vcodec copy"));
+			rval.Append(_T(" -vcodec copy -bsf:v h264_mp4toannexb"));	// https://ffmpeg.org/ffmpeg-bitstream-filters.html#h264_005fmp4toannexb
 		else
 		{
 			// quick and dirty addition to support subtitles
@@ -1025,7 +1027,13 @@ const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath, cons
 			if ((m_VideoWidth > 1920) || (m_VideoHeight > 1080))
 				rval.Append(_T(" -s 1920x1080"));
 		}
-		rval.Append(_T(" -b:v 16384k -maxrate 30000k -bufsize 4096k -ab 448k -ar 48000"));
+		//rval.Append(_T(" -b:v 16384k -maxrate 30000k -bufsize 4096k -ab 448k -ar 48000"));
+		// -ar[:stream_specifier] freq (input/output,per-stream)
+		//    Set the audio sampling frequency.For output streams it is set by default to the frequency of the corresponding input stream.For input streams this option only makes sense for audio grabbing devices and raw demuxers and is mapped to the corresponding demuxer options.
+		// for SD set video maxrate to  4096K and buffsize to 1024k
+		// For HD set video maxrate to 16384K and buffsize to 4096k
+		// For 4k set video maxrate to 30000k and buffsize to 8192k
+		rval.Append(_T(" -b:v 30000k -maxrate 30000k -bufsize 8192k -b:a 448k -ar 48000"));
 		if (m_AudioCompatible)
 			rval.Append(_T(" -acodec copy"));
 		else
