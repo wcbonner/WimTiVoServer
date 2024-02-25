@@ -84,6 +84,7 @@ enum TiVoFileListSortOrder {
 	TitleReverse
 };
 TiVoFileListSortOrder CurrentTiVoFileListSortOrder = CaptureDateReverse;
+std::map<std::string, std::string> TiVoSerialMap;
 /////////////////////////////////////////////////////////////////////////////
 #pragma comment(lib, "version")
 CString GetFileVersion(const CString & filename, const int digits = 4)
@@ -128,7 +129,6 @@ CString GetFileVersion(const CString & filename, const int digits = 4)
 	}
 	return(rval);
 }
-/////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////
 CString FindEXEFromPath(const CString & csEXE)
 {
@@ -343,6 +343,9 @@ void printerr(TCHAR * errormsg)
 }
 int GetTiVoQueryFormats(SOCKET DataSocket, const char* InBuffer)
 {
+	// 4.4.6 QueryFormats
+	// This command returns meta-data describing all the formats in which the Server is able to provide a particular type of data, and uses the following URL syntax.
+	// http://{machine}/TiVoConnect?Command=QueryFormats&SourceFormat={mime-type}
 	TRACE("%s %s\n", CStringA(CTime::GetCurrentTime().Format(_T("[%Y-%m-%dT%H:%M:%S]"))).GetString(), __FUNCTION__);
 	if (bConsoleExists)
 	{
@@ -547,6 +550,9 @@ UINT PopulateTiVoFileList(LPVOID lvp)
 }
 int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 {
+	// 4.4.4 QueryContainer
+	// This command returns meta-data describing the contents of one of the containers available from the Server, and uses the following URL syntax.
+	// http://{machine}/TiVoConnect?Command=QueryContainer
 	TRACE("%s %s\n", CStringA(CTime::GetCurrentTime().Format(_T("[%Y-%m-%dT%H:%M:%S]"))).GetString(), __FUNCTION__);
 	CStringA csInBuffer(InBuffer);
 	int pos = csInBuffer.FindOneOf("\r\n");
@@ -588,11 +594,22 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 			CStringA csValue(csToken.Right(csToken.GetLength() - (csToken.Find("=")+1)));
 			if (!csKey.CompareNoCase("Container"))
 			{
+				// 4.4.4.1 Container
+				// This optional parameter may be set to the relative path of a container available from the Server, as shown here (assume "Foo" is a valid container).
+				// http://{machine}/TiVoConnect?Command=QueryContainer&Container=/Foo
+				// In this example, meta-data describing the contents of the container named "Foo" would be returned.
+				// When the Container parameter is missing, the default value is "/", which corresponds to the Server's "root container".
 				std::cout << "[                   ] " << csToken.GetString() << std::endl;
 				csContainer = csValue;
 			}
 			else if (!csKey.CompareNoCase("Recurse"))
+			{
+				// 4.4.4.2 Recurse
+				// This optional parameter indicates whether or not the meta-data should contain only the items immediately within the container, or also every item contained within all "descendent" containers.
+				// http://{machine}/TiVoConnect?Command=QueryContainer&Recurse={flag}
+				// The value of {flag} is either "Yes" or "No". When the Recurse parameter is missing, the default value is "No".
 				std::cout << "[                   ] " << csToken.GetString() << std::endl;
+			}
 			else if (!csKey.CompareNoCase("DoGenres"))
 				std::cout << "[                   ] " << csToken.GetString() << std::endl;
 			else if (!csKey.CompareNoCase("SerialNum"))
@@ -608,6 +625,20 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 			}
 			else if (!csKey.CompareNoCase("SortOrder"))
 			{
+				// 4.4.4.3 SortOrder
+				// This optional parameter indicates the order in which items should appear in the meta-data.
+				// http://{machine}/TiVoConnect?Command=QueryContainer&SortOrder={order}
+				// {order} is a comma-delimited list of sort criteria, indicating the level(s) of sorting desired. Items are sorted according to the first entry in this list, then by the second, then by the third, and so on.
+				// Possible values for the construction of {order} are:
+				// • Type – Items appear in an order based on their general type. All containers sort before non-container items. Containers representing folders sort before those representing playlists.
+				// • Title – Items appear alphabetically based on the text contained in their associated Item.Details.Title element (described in section 5.7.1.1).
+				// • CreationDate – Items appear sorted from oldest the newest based on an appropriate "creation" date (for example, the capture date of an image). If no such date is available, the creation date of the file containing the item's data is used instead.
+				// • LastChangeDate – Items appear sorted from most- to least-recently modified.
+				// • Random – Items appear in "randomized" order based on a "seed" supplied by the Client (described in section 4.4.4.4). This value may not be used with any other.
+				// Any entry in the list can be prefixed with an exclamation point (!) to request sorting in the opposite direction at the corresponding level. For example, "!Date,Title" sorts from newest to oldest and then alphabetically.
+				// With "SortOrder=Random", note that randomization occurs across the entire sequence of items returned in the meta-data.
+				// When the SortOrder parameter is missing, items appear in the container's "native" order. For a music playlist, for example, the items would appear in the order authored. For a file system folder, items would appear potentially "at random" according to how the file system is feeling.
+				// When "streaming" sorted meta-data using multiple QueryContainer commands, Clients should specify the same {order} in each command.
 				std::cout << "[                   ] " << csToken.GetString() << std::endl;
 				if (!csValue.CompareNoCase("!CaptureDate"))
 					RequestedTiVoFileListSortOrder = CaptureDateReverse;
@@ -619,27 +650,66 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 					RequestedTiVoFileListSortOrder = TitleReverse;
 			}
 			else if (!csKey.CompareNoCase("RandomSeed"))
+			{
+				// 4.4.4.4 RandomSeed
+				// This parameter is required when the SortOrder parameter is “Random”.
+				// http://{machine}/TiVoConnect?Command=QueryContainer&SortOrder=Random&RandomSeed={seed}
+				// {seed} can be any positive, non-zero, 32-bit unsigned integer value chosen by the Client (0-4294967295). Different values result in different item orderings. However, the same {seed} always produces the same ordering (assuming an unchanging set of items).
+				// When "streaming" randomized meta-data using multiple QueryContainer commands, Clients should specify the same {seed} in each command.
+				// This parameter is ignored unless the SortOrder parameter is "Random”.
 				std::cout << "[                   ] " << csToken.GetString() << std::endl;
+			}
 			else if (!csKey.CompareNoCase("RandomStart"))
+			{
+				// 4.4.4.5 RandomStart
+				// This optional parameter indicates which item should appear first in otherwise randomized metadata.
+				// http://{machine}/TiVoConnect?Command=QueryContainer&SortOrder={order}&RandomSeed={seed}&RandomStart={url}
+				// When "streaming" randomized meta-data using multiple QueryContainer commands, Clients should specify the same {url} in each command.
+				// This parameter is ignored unless the SortOrder parameter is "Random”.
 				std::cout << "[                   ] " << csToken.GetString() << std::endl;
+			}
 			else if (!csKey.CompareNoCase("AnchorOffset"))
 			{
+				// 4.4.4.8 AnchorOffset
+				// This optional parameter supplies an "offset" to be applied to the location of the anchor, changing its effective location.
+				// http://{machine}/TiVoConnect?Command=QueryContainer&AnchorItem={url}&AnchorOffset={offset}
+				// {offset} is a positive or negative integer. When {offset} is positive, the effective location of the anchor is shifted downwards. When {offset} is negative, the location is shifted upwards.
+				// When the AnchorOffset parameter is missing, no offset is applied to the anchor.
 				std::cout << "[                   ] " << csToken.GetString() << std::endl;
 				iAnchorOffset = atoi(csValue.GetString());
 				iAnchorOffset++; // Simplify for the -1 offset that the TiVo actually uses.
 			}
 			else if (!csKey.CompareNoCase("Filter"))
 			{
+				// 4.4.4.10 Filter
+				// This optional parameter limits the types of items that appear in the meta-data.
+				// http://{machine}/TiVoConnect?Command=QueryContainer&Filter={filter}
+				// {filter} is a comma-delimited list of MIME types, indicating the desired value(s) for the Details.ContentType element of each item.
+				// Any entry can contain a wildcard (*) in place of the "major" or "minor" portion of the MIME type. For example, "image/*" would match any item with a general MIME type of "image".
+				// Any entry in the list also can be prefixed with an exclamation point (!) to limit the items returned to those NOT of the specified type.
+				// When the Filter parameter is missing, the default value is "*/*". This will result in no restriction of the types of items appearing in the meta - data.
 				csToken.Replace("%2F","/");
 				std::cout << "[                   ] " << csToken.GetString() << std::endl;
 			}
 			else if (!csKey.CompareNoCase("ItemCount"))
 			{
+				// 4.4.4.6 ItemCount
+				// This optional parameter indicates the maximum number of items that should be described in the meta-data, relative to the "anchor" (described in section 4.4.4.7).
+				// http://{machine}/TiVoConnect?Command=QueryContainer&ItemCount={count}
+				// {count} is a positive or negative integer. When {count} is positive, the items immediately following the anchor are described. When {count} is negative, the items immediately preceding the anchor are described. However, for the remaining discussion, assume {count} refers only to the absolute (non-negative magnitude) integer value.
+				// If the container holds more than {count} items, "partial" meta-data is returned. Note that the meta-data will have fewer than {count} items if the container itself has fewer.
+				// When the ItemCount parameter is missing, all items (preceding or following the anchor) are described.
 				std::cout << "[                   ] " << csToken.GetString() << std::endl;
 				iItemCount = min(iItemCount, atoi(CStringA(csValue).GetString()));
 			}
 			else if (!csKey.CompareNoCase("AnchorItem"))
 			{
+				// 4.4.4.7 AnchorItem
+				// This optional parameter supplies the URL of the item that should precede (or follow) the first (or last) item described in the meta-data, if possible. This item is known as the "anchor" and its exact meaning depends on the value of the ItemCount parameter (described in section 4.4.4.4).
+				// http://{machine}/TiVoConnect?Command=QueryContainer&AnchorItem={url}
+				// When the AnchorItem parameter is missing or ignored, the anchor is the imaginary item that precedes (or follows) the first (or last) item in the container.
+				// If the item identified by {url} no longer exists, then the item immediately following (or preceding) the position in the container the missing item would have occupied is used as the anchor instead. If this position cannot be determined, the AnchorItem parameter is ignored.
+				// Note that {url} must be escaped as described in section 4.4.1.
 				std::cout << "[                   ] " << csToken.GetString() << std::endl;
 				csAnchorItem = csValue;
 				TCHAR lpszBuffer[_MAX_PATH];
@@ -1183,8 +1253,8 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 			std::string("TiVo").copy(tivo_stream_header.filetype, 4);
 			tivo_stream_header.dummy_0004 = htons(4);
 			tivo_stream_header.flags = 0x0D00;	// mime = video/x-tivo-mpeg so flag is 13 (0x0D). If mime = video/x-tivo-mpeg-ts, flag would be 45
-			if (TiVoFileToSend.GetVideoHighDefinition())
-				tivo_stream_header.flags |= 0x1000;	// (00010000)
+			//if (TiVoFileToSend.GetVideoHighDefinition())
+			//	tivo_stream_header.flags |= 0x1000;	// (00010000)
 			if (0 == TiVoFileToSend.GetContentType().Compare(_T("video/x-tivo-mpeg-ts")))
 				tivo_stream_header.flags |= 0x2000;	// (00100000)
 			tivo_stream_header.dummy_0008 = htons(0);

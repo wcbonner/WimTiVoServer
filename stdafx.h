@@ -36,6 +36,7 @@
 #include <locale>
 #include <iomanip>
 #include <fstream>
+#include <map>
 #include <sstream>
 #include <vector>
 #include <queue>

@@ -964,7 +964,10 @@ void cTiVoFile::GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const
 const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath, const bool bForceSubtitles) const
 {
 	CString rval(QuoteFileName(csFFMPEGPath));
-	rval.Append(_T(" -hide_banner -forced_subs_only 1 -i "));
+	rval.Append(_T(" -hide_banner"));
+	if (bForceSubtitles)
+		rval.Append(_T(" -forced_subs_only 1"));
+	rval.Append(_T(" -i "));
 	rval.Append(QuoteFileName(m_csPathName));
 	#ifdef _DEBUG
 	rval.Append(_T(" -report"));
@@ -1013,7 +1016,9 @@ const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath, cons
 		//rval.Append(_T(" -map 0:v -map 0:a?")); // copy all audio streams Added 2020-04-04
 		rval.Append(_T(" -map_metadata -1"));
 		if (m_VideoCompatible)
+		{
 			rval.Append(_T(" -vcodec copy -bsf:v h264_mp4toannexb"));	// https://ffmpeg.org/ffmpeg-bitstream-filters.html#h264_005fmp4toannexb
+		}
 		else
 		{
 			// quick and dirty addition to support subtitles
