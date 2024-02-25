@@ -930,12 +930,13 @@ int GetTiVoTVBusQuery(SOCKET DataSocket, const char * InBuffer)
 	int pos = csInBuffer.FindOneOf("\r\n");
 	if (pos > 0)
 		csInBuffer.Delete(pos,csInBuffer.GetLength());
-	#ifdef _DEBUG
-	struct sockaddr_in adr_inet;/* AF_INET */
-	int sa_len = sizeof(adr_inet);
-	getpeername(DataSocket, (struct sockaddr *)&adr_inet, &sa_len);
-	std::cout << "[" << getTimeISO8601() << "] "  << __FUNCTION__ << "\t" << inet_ntoa(adr_inet.sin_addr) << " " << csInBuffer.GetString() << endl;
-	#endif
+	if (bConsoleExists)
+	{
+		struct sockaddr_in adr_inet;/* AF_INET */
+		int sa_len = sizeof(adr_inet);
+		getpeername(DataSocket, (struct sockaddr*)&adr_inet, &sa_len);
+		std::cout << "[" << getTimeISO8601(true) << "] " << __FUNCTION__ << "\t" << inet_ntoa(adr_inet.sin_addr) << " " << csInBuffer.GetString() << endl;
+	}
 	cTiVoFile TiVoFileToSend;
 	int rval = 0;
 	int curPos = 0;
@@ -1027,8 +1028,11 @@ int GetTiVoTVBusQuery(SOCKET DataSocket, const char * InBuffer)
 	send(DataSocket, HttpResponse.str().c_str(), HttpResponse.str().length(),0);
 	send(DataSocket, XMLDataBuff, strlen(XMLDataBuff),0);
 	#ifdef _DEBUG
-	std::cout << "[                   ] " << XMLDataBuff << std::endl;
-	std::cout << "[" << getTimeISO8601() << "] "  << __FUNCTION__ << "\t" << inet_ntoa(adr_inet.sin_addr) << " Content-Length: " << strlen(XMLDataBuff) << endl;
+	if (bConsoleExists)
+	{
+		std::cout << "[                   ] " << XMLDataBuff << std::endl;
+		std::cout << "[" << getTimeISO8601(true) << "] " << __FUNCTION__ << "\t" << " Content-Length: " << strlen(XMLDataBuff) << endl;
+	}
 	#endif
 	return(0);
 }
@@ -1036,17 +1040,17 @@ static bool bForceSubtitles(false);
 int GetFile(SOCKET DataSocket, const char * InBuffer)
 {
 	TRACE("%s %s\n", CStringA(CTime::GetCurrentTime().Format(_T("[%Y-%m-%dT%H:%M:%S]"))).GetString(), __FUNCTION__);
-	#ifdef _DEBUG
-	CStringA csInBuffer(InBuffer);
-	int pos = csInBuffer.FindOneOf("\r\n");
-	if (pos > 0)
-		csInBuffer.Delete(pos,csInBuffer.GetLength());
-	struct sockaddr_in adr_inet;/* AF_INET */  
-	int sa_len = sizeof(adr_inet);
-	getpeername(DataSocket, (struct sockaddr *)&adr_inet, &sa_len);
-	std::cout << "[" << getTimeISO8601() << "] "  << __FUNCTION__ << "\t" << inet_ntoa(adr_inet.sin_addr) << " " << csInBuffer.GetString() << endl;
-	// GET /TiVoConnect/TivoNowPlaying/c649de2a0acc35fe3d172aa032dc679938e9fa7b22f06cd78ee9acaad6cc141b?Format=video%2Fx-tivo-mpeg HTTP/1.1
-	#endif
+	if (bConsoleExists)
+	{
+		CStringA csInBuffer(InBuffer);
+		int pos = csInBuffer.FindOneOf("\r\n");
+		if (pos > 0)
+			csInBuffer.Delete(pos, csInBuffer.GetLength());
+		struct sockaddr_in adr_inet;/* AF_INET */
+		int sa_len = sizeof(adr_inet);
+		getpeername(DataSocket, (struct sockaddr*)&adr_inet, &sa_len);
+		std::cout << "[" << getTimeISO8601(true) << "] " << __FUNCTION__ << "\t" << inet_ntoa(adr_inet.sin_addr) << " " << csInBuffer.GetString() << endl;
+	}
 	int rval = 0;
 
 	cTiVoFile TiVoFileToSend;
