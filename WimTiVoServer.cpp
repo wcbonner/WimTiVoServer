@@ -341,7 +341,7 @@ void printerr(TCHAR * errormsg)
 		ReportEvent(ApplicationLogHandle, EVENTLOG_INFORMATION_TYPE, 0, WIMSWORLD_EVENT_GENERIC, NULL, 1, 0, lpStrings, NULL);
 	}
 }
-int GetTiVoQueryFormats(SOCKET DataSocket, const char * InBuffer)
+int GetTiVoQueryFormats(SOCKET DataSocket, const char* InBuffer)
 {
 	TRACE("%s %s\n", CStringA(CTime::GetCurrentTime().Format(_T("[%Y-%m-%dT%H:%M:%S]"))).GetString(), __FUNCTION__);
 	if (bConsoleExists)
@@ -356,43 +356,43 @@ int GetTiVoQueryFormats(SOCKET DataSocket, const char * InBuffer)
 		std::cout << "[" << getTimeISO8601(true) << "] " << __FUNCTION__ << "\t" << inet_ntoa(adr_inet.sin_addr) << " " << csInBuffer.GetString() << endl;
 	}
 	int rval = 0;
-	char MyHostName[255] = {0}; // winsock hostname used for data recordkeeping
-	gethostname(MyHostName,sizeof(MyHostName)); 
-	char XMLDataBuff[1024*11];
+	char MyHostName[255] = { 0 }; // winsock hostname used for data recordkeeping
+	gethostname(MyHostName, sizeof(MyHostName));
+	char XMLDataBuff[1024 * 11];
 	CComPtr<IStream> spMemoryStream(::SHCreateMemStream(NULL, 0));
 	CComPtr<IXmlWriter> pWriter;
-	if (SUCCEEDED(CreateXmlWriter(__uuidof(IXmlWriter), (void**) &pWriter, NULL))) 
+	if (SUCCEEDED(CreateXmlWriter(__uuidof(IXmlWriter), (void**)&pWriter, NULL)))
 	{
 		pWriter->SetOutput(spMemoryStream);
 		pWriter->SetProperty(XmlWriterProperty_Indent, TRUE);
 		pWriter->WriteStartDocument(XmlStandalone_Omit);
-		pWriter->WriteStartElement(NULL,_T("TiVoFormats"),NULL);
-			pWriter->WriteStartElement(NULL,_T("Format"),NULL);
-				pWriter->WriteElementString(NULL, _T("ContentType"), NULL, _T("video/x-tivo-mpeg"));
-				pWriter->WriteElementString(NULL, _T("Description"), NULL, _T("TiVo Recording"));
-			pWriter->WriteEndElement();
-			//pWriter->WriteStartElement(NULL,_T("Format"),NULL);
-			//	pWriter->WriteElementString(NULL, _T("ContentType"), NULL, _T("video/mpeg"));
-			//	pWriter->WriteElementString(NULL, _T("Description"), NULL, _T("MPEG-2 Video"));
-			//pWriter->WriteEndElement();
-			pWriter->WriteStartElement(NULL,_T("Format"),NULL);
-				pWriter->WriteElementString(NULL, _T("ContentType"), NULL, _T("video/x-tivo-mpeg-ts"));
-				pWriter->WriteElementString(NULL, _T("Description"), NULL, _T("TiVo TS Recording"));
-			pWriter->WriteEndElement();
-			//pWriter->WriteStartElement(NULL,_T("Format"),NULL);
-			//	pWriter->WriteElementString(NULL, _T("ContentType"), NULL, _T("video/x-tivo-raw-tts"));
-			//	pWriter->WriteElementString(NULL, _T("Description"), NULL, NULL);
-			//pWriter->WriteEndElement();
+		pWriter->WriteStartElement(NULL, _T("TiVoFormats"), NULL);
+		pWriter->WriteStartElement(NULL, _T("Format"), NULL);
+		pWriter->WriteElementString(NULL, _T("ContentType"), NULL, _T("video/x-tivo-mpeg"));
+		pWriter->WriteElementString(NULL, _T("Description"), NULL, _T("TiVo Recording"));
+		pWriter->WriteEndElement();
+		//pWriter->WriteStartElement(NULL,_T("Format"),NULL);
+		//	pWriter->WriteElementString(NULL, _T("ContentType"), NULL, _T("video/mpeg"));
+		//	pWriter->WriteElementString(NULL, _T("Description"), NULL, _T("MPEG-2 Video"));
+		//pWriter->WriteEndElement();
+		pWriter->WriteStartElement(NULL, _T("Format"), NULL);
+		pWriter->WriteElementString(NULL, _T("ContentType"), NULL, _T("video/x-tivo-mpeg-ts"));
+		pWriter->WriteElementString(NULL, _T("Description"), NULL, _T("TiVo TS Recording"));
+		pWriter->WriteEndElement();
+		//pWriter->WriteStartElement(NULL,_T("Format"),NULL);
+		//	pWriter->WriteElementString(NULL, _T("ContentType"), NULL, _T("video/x-tivo-raw-tts"));
+		//	pWriter->WriteElementString(NULL, _T("Description"), NULL, NULL);
+		//pWriter->WriteEndElement();
 		pWriter->WriteFullEndElement();
 		pWriter->WriteComment(L" Copyright © 2023 William C Bonner ");
 		pWriter->WriteEndDocument();
 		pWriter->Flush();
 		// Allocates enough memeory for the xml content.
-		STATSTG ssStreamData = {0};
+		STATSTG ssStreamData = { 0 };
 		spMemoryStream->Stat(&ssStreamData, STATFLAG_NONAME);
 		SIZE_T cbSize = ssStreamData.cbSize.LowPart;
 		if (cbSize >= sizeof(XMLDataBuff))
-			cbSize = sizeof(XMLDataBuff)-1;
+			cbSize = sizeof(XMLDataBuff) - 1;
 		// Copies the content from the stream to the buffer.
 		LARGE_INTEGER position;
 		position.QuadPart = 0;
@@ -411,12 +411,15 @@ int GetTiVoQueryFormats(SOCKET DataSocket, const char * InBuffer)
 	HttpResponse << "Content-Length: " << strlen(XMLDataBuff) << "\r\n";
 	HttpResponse << "Connection: close\r\n";
 	HttpResponse << "\r\n";
-	send(DataSocket, HttpResponse.str().c_str(), HttpResponse.str().length(),0);
-	send(DataSocket, XMLDataBuff, strlen(XMLDataBuff),0);
-#ifdef _DEBUG
-	std::cout << "[                   ] " << HttpResponse.str() << std::endl;
-	std::cout << "[                   ] " << XMLDataBuff << std::endl;
-#endif
+	send(DataSocket, HttpResponse.str().c_str(), HttpResponse.str().length(), 0);
+	send(DataSocket, XMLDataBuff, strlen(XMLDataBuff), 0);
+	#ifdef _DEBUG
+	if (bConsoleExists)
+	{
+		std::cout << "[                   ] " << HttpResponse.str() << std::endl;
+		std::cout << "[                   ] " << XMLDataBuff << std::endl;
+	}
+	#endif
 	return(0);
 }
 UINT PopulateTiVoFileList(LPVOID lvp)
@@ -977,30 +980,9 @@ int GetTiVoTVBusQuery(SOCKET DataSocket, const char * InBuffer)
 		pWriter->SetOutput(spMemoryStream);
 		pWriter->SetProperty(XmlWriterProperty_Indent, FALSE);
 		pWriter->WriteStartDocument(XmlStandalone_Omit);
-			//pWriter->WriteStartElement(NULL, L"TvBusEnvelope", L"http://tivo.com/developer/xml/idl/TvBusMarshalledStruct");
-			//if (FAILED(hr = pWriter->WriteStartElement(L"TvBusMarshalledStruct", L"TvBusEnvelope", L"http://tivo.com/developer/xml/idl/TvBusMarshalledStruct TvBusMarshalledStruct.xsd")))
-			//	std::cout << "Error, Method: WriteStartElement, error is " << hex << hr << dec <<std::endl;
-			//pWriter->WriteAttributeString(L"xmlns", L"xs", NULL, L"http://www.w3.org/2001/XMLSchema-instance");
-			//pWriter->WriteAttributeString(L"xmlns", L"TvBusMarshalledStruct", NULL, L"http://tivo.com/developer/xml/idl/TvBusMarshalledStruct");
-			//pWriter->WriteAttributeString(L"xmlns", L"TvPgdRecording", NULL, L"http://tivo.com/developer/xml/idl/TvPgdRecording");
-			//pWriter->WriteAttributeString(L"xmlns", L"TvBusDuration", NULL, L"http://tivo.com/developer/xml/idl/TvBusDuration");
-			//pWriter->WriteAttributeString(L"xmlns", L"TvPgdShowing", NULL, L"http://tivo.com/developer/xml/idl/TvPgdShowing");
-			//pWriter->WriteAttributeString(L"xmlns", L"TvDbShowingBit", NULL, L"http://tivo.com/developer/xml/idl/TvDbShowingBit");
-			//pWriter->WriteAttributeString(L"xmlns", L"TvBusDateTime", NULL, L"http://tivo.com/developer/xml/idl/TvBusDateTime");
-			//pWriter->WriteAttributeString(L"xmlns", L"TvPgdProgram", NULL, L"http://tivo.com/developer/xml/idl/TvPgdProgram");
-			//pWriter->WriteAttributeString(L"xmlns", L"TvDbColorCode", NULL, L"http://tivo.com/developer/xml/idl/TvDbColorCode");
-			//pWriter->WriteAttributeString(L"xmlns", L"TvPgdSeries", NULL, L"http://tivo.com/developer/xml/idl/TvPgdSeries");
-			//pWriter->WriteAttributeString(L"xmlns", L"TvDbShowType", NULL, L"http://tivo.com/developer/xml/idl/TvDbShowType");
-			//pWriter->WriteAttributeString(L"xmlns", L"TvPgdChannel", NULL, L"http://tivo.com/developer/xml/idl/TvPgdChannel");
-			//pWriter->WriteAttributeString(L"xmlns", L"TvDbTvRating", NULL, L"http://tivo.com/developer/xml/idl/TvDbTvRating");
-			//pWriter->WriteAttributeString(L"xmlns", L"TvDbRecordQuality", NULL, L"http://tivo.com/developer/xml/idl/TvDbRecordQuality");
-			//pWriter->WriteAttributeString(L"xmlns", L"TvDbBitstreamFormat", NULL, L"http://tivo.com/developer/xml/idl/TvDbBitstreamFormat");
-			//pWriter->WriteAttributeString(L"xmlns", L"schemaLocation", NULL, L"http://tivo.com/developer/xml/idl/TvBusMarshalledStruct TvBusMarshalledStruct.xsd http://tivo.com/developer/xml/idl/TvPgdRecording TvPgdRecording.xsd http://tivo.com/developer/xml/idl/TvBusDuration TvBusDuration.xsd http://tivo.com/developer/xml/idl/TvPgdShowing TvPgdShowing.xsd http://tivo.com/developer/xml/idl/TvDbShowingBit TvDbShowingBit.xsd http://tivo.com/developer/xml/idl/TvBusDateTime TvBusDateTime.xsd http://tivo.com/developer/xml/idl/TvPgdProgram TvPgdProgram.xsd http://tivo.com/developer/xml/idl/TvDbColorCode TvDbColorCode.xsd http://tivo.com/developer/xml/idl/TvPgdSeries TvPgdSeries.xsd http://tivo.com/developer/xml/idl/TvDbShowType TvDbShowType.xsd http://tivo.com/developer/xml/idl/TvPgdChannel TvPgdChannel.xsd http://tivo.com/developer/xml/idl/TvDbTvRating TvDbTvRating.xsd http://tivo.com/developer/xml/idl/TvDbRecordQuality TvDbRecordQuality.xsd http://tivo.com/developer/xml/idl/TvDbBitstreamFormat TvDbBitstreamFormat.xsd");
-			//pWriter->WriteAttributeString(L"xmlns", L"type", NULL, L"TvPgdRecording:TvPgdRecording");
 			TiVoFileToSend.GetTvBusEnvelope(pWriter);
-			//pWriter->WriteFullEndElement();
-		//pWriter->WriteComment(L" Copyright © 2013 William C Bonner ");
-		//pWriter->WriteEndDocument();
+		pWriter->WriteComment(L" Copyright © 2025 William C Bonner ");
+		pWriter->WriteEndDocument();
 		pWriter->Flush();
 
 		// Allocates enough memeory for the xml content.
