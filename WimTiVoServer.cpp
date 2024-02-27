@@ -84,7 +84,7 @@ enum TiVoFileListSortOrder {
 	TitleReverse
 };
 TiVoFileListSortOrder CurrentTiVoFileListSortOrder = CaptureDateReverse;
-std::map<std::string, std::string> TiVoSerialMap;
+std::map<std::string, CString> TiVoSerialMap;
 /////////////////////////////////////////////////////////////////////////////
 #pragma comment(lib, "version")
 CString GetFileVersion(const CString & filename, const int digits = 4)
@@ -558,13 +558,13 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 	int pos = csInBuffer.FindOneOf("\r\n");
 	if (pos > 0)
 		csInBuffer.Delete(pos,csInBuffer.GetLength());
+	struct sockaddr_in adr_inet;/* AF_INET */
+	int sa_len = sizeof(adr_inet);
+	getpeername(DataSocket, (struct sockaddr*)&adr_inet, &sa_len);
+	char TiVoAddress[NI_MAXHOST];
+	getnameinfo((struct sockaddr*)&adr_inet, sizeof(struct sockaddr), TiVoAddress, NI_MAXHOST, nullptr, NULL, NI_NUMERICHOST);
 	if (bConsoleExists)
-	{
-		struct sockaddr_in adr_inet;/* AF_INET */
-		int sa_len = sizeof(adr_inet);
-		getpeername(DataSocket, (struct sockaddr*)&adr_inet, &sa_len);
-		std::cout << "[" << getTimeISO8601(true) << "] " << __FUNCTION__ << "\t" << inet_ntoa(adr_inet.sin_addr) << " " << csInBuffer.GetString() << endl;
-	}
+		std::cout << "[" << getTimeISO8601(true) << "] " << __FUNCTION__ << "\t" << TiVoAddress << " " << csInBuffer.GetString() << endl;
 	int rval = 0;
 	const int XMLDataBuffSize = 1024;
 	char* XMLDataBuff = new char[XMLDataBuffSize];
@@ -615,6 +615,7 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 			else if (!csKey.CompareNoCase("SerialNum"))
 			{
 				std::cout << "[                   ] " << csToken.GetString();
+				TiVoSerialMap[TiVoAddress] = CString(csValue);
 				if ((std::atoi(csValue.Left(1)) >= 6) && (0 != csValue.Left(3).Compare("649")))
 					std::cout << " (High Definition TiVo)";
 				if ((std::atoi(csValue.Left(1)) >= 7) || (0 == csValue.Left(3).Compare("663")))
@@ -856,7 +857,7 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 					#endif // DEBUG
 					if (pItem->GetDuration() > 1000) // This might not work for .TiVo files, needs further checking
 					{
-						pItem->GetTiVoItem(pWriter);
+						pItem->GetTiVoItem(pWriter, TiVoSerialMap[TiVoAddress]);
 						iItemCount--;
 					}
 					pItem++;
@@ -943,7 +944,7 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 					#endif // DEBUG
 					if (pItem->GetDuration() > 1000) // This might not work for .TiVo files, needs further checking
 					{
-						pItem->GetTiVoItem(pWriter);
+						pItem->GetTiVoItem(pWriter, TiVoSerialMap[TiVoAddress]);
 						iItemCount--;
 					}
 					pItem++;
@@ -1092,16 +1093,18 @@ static bool bForceSubtitles(false);
 int GetFile(SOCKET DataSocket, const char * InBuffer)
 {
 	TRACE("%s %s\n", CStringA(CTime::GetCurrentTime().Format(_T("[%Y-%m-%dT%H:%M:%S]"))).GetString(), __FUNCTION__);
+	struct sockaddr_in adr_inet;/* AF_INET */
+	int sa_len = sizeof(adr_inet);
+	getpeername(DataSocket, (struct sockaddr*)&adr_inet, &sa_len);
+	char TiVoAddress[NI_MAXHOST];
+	getnameinfo((struct sockaddr*)&adr_inet, sizeof(struct sockaddr), TiVoAddress, NI_MAXHOST, nullptr, NULL, NI_NUMERICHOST);
 	if (bConsoleExists)
 	{
 		CStringA csInBuffer(InBuffer);
 		int pos = csInBuffer.FindOneOf("\r\n");
 		if (pos > 0)
 			csInBuffer.Delete(pos, csInBuffer.GetLength());
-		struct sockaddr_in adr_inet;/* AF_INET */
-		int sa_len = sizeof(adr_inet);
-		getpeername(DataSocket, (struct sockaddr*)&adr_inet, &sa_len);
-		std::cout << "[" << getTimeISO8601(true) << "] " << __FUNCTION__ << "\t" << inet_ntoa(adr_inet.sin_addr) << " " << csInBuffer.GetString() << endl;
+		std::cout << "[" << getTimeISO8601(true) << "] " << __FUNCTION__ << "\t" << TiVoAddress << " " << csInBuffer.GetString() << endl;
 	}
 	int rval = 0;
 
@@ -1110,7 +1113,7 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 	CString csCommand(InBuffer);
 	if (0 < csCommand.FindOneOf(_T("\r\n")))
 		csCommand.Delete(csCommand.FindOneOf(_T("\r\n")),csCommand.GetLength());
-
+	// GetFile   192.168.50.197 GET /5979bb28cf2811e9488d84e9e869c479a373d5b37aa46fe4f1d77b7a06f3e3d6?Format=video%2Fx-tivo-mpeg-ts HTTP/1.1
 	int curPos = 0;
 	CString csToken(csCommand.Tokenize(_T("&? "),curPos));
 	while (csToken != _T(""))
@@ -1150,7 +1153,7 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 		HttpResponse << "Date: " << getTimeRFC1123() << "\r\n";
 		HttpResponse << "Transfer-Encoding: chunked\r\n";
 		if (TiVoFileToSend.GetDuration() > 0) HttpResponse << "TiVo-Estimated-Length: " << max(TiVoFileToSend.GetSourceSize(), (TiVoFileToSend.GetDuration() * 1024)) << "\r\n"; // Since the Duration is 1/1000 of a second, and at least one example I transferred came in at roughly this multiple, 700bytes for every millisecond, worth a try.
-		HttpResponse << "Content-Type: " << CStringA(TiVoFileToSend.GetContentType()).GetString() << "\r\n";
+		HttpResponse << "Content-Type: " << CStringA(TiVoFileToSend.GetContentType(TiVoSerialMap[TiVoAddress])).GetString() << "\r\n";
 		HttpResponse << "Connection: close\r\n";
 		HttpResponse << "\r\n";
 		send(DataSocket, HttpResponse.str().c_str(), HttpResponse.str().length(),0);
@@ -1195,7 +1198,7 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 		}
 		else
 		{
-			if (0 == TiVoFileToSend.GetContentType().Compare(_T("video/x-tivo-mpeg")))
+			if (0 == TiVoFileToSend.GetContentType(TiVoSerialMap[TiVoAddress]).Compare(_T("video/x-tivo-mpeg")))
 			{
 				// 2024-02-26 I finally figured out that when sending video/x-tivo-mpeg-ts format to the TiVo I need to not send the TiVo Header that I was sending with video/x-tivo-mpeg format files.
 				// More investigation needs to be done to figure out when I need to send it and when i avoid it. For my purposes, I'm simply running to a Bolt and sending TS format for h264 files is so much faster it's being hard coded for now.
@@ -1349,7 +1352,7 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 					siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
  
 					static const CString csFFMPEGPath(FindEXEFromPath(_T("ffmpeg.exe")));
-					CString csCommandLine(TiVoFileToSend.GetFFMPEGCommandLine(csFFMPEGPath, bForceSubtitles));
+					CString csCommandLine(TiVoFileToSend.GetFFMPEGCommandLine(csFFMPEGPath, bForceSubtitles, TiVoSerialMap[TiVoAddress]));
 					TRACE(_T("CreateProcess: %s\n"), csCommandLine.GetString());
 					if (ApplicationLogHandle != NULL) 
 					{

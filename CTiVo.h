@@ -38,7 +38,6 @@ private:
 	CString m_EpisodeTitle;
 	int m_EpisodeNumber;
 	CString m_Description;
-	CString m_ContentType;
 	CString m_SourceFormat;
 	CString m_SourceStation;
 	CString m_SourceChannel;
@@ -95,12 +94,12 @@ public:
 	const CTime& GetLastWriteTime(void) const { return(m_LastWriteTime); }
 	const CString& SetMAK(const CString& csMAK);
 	const CString& GetMAK(void) const { return(m_csMAK); }
-	const CString& GetContentType(void) const { return(m_ContentType); }
+	const CString GetContentType(const CString& TSN = _T("")) const;
 	const CString& GetSourceFormat(void) const { return(m_SourceFormat); }
 	const unsigned long long& GetDuration(void) const { return(m_Duration); }
 	const unsigned long long& GetSourceSize(void) const { return(m_SourceSize); }
 	const bool GetVideoHighDefinition(void) const { return(m_VideoHighDefinition); }
-	void GetTiVoItem(CComPtr<IXmlWriter> & pWriter) const;
+	void GetTiVoItem(CComPtr<IXmlWriter> & pWriter, const CString& TSN = _T("")) const;
 	void GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const;
 	const CString GetFFMPEGCommandLine(const CString & csFFMPEGPath = _T("ffmpeg.exe"), const bool bForceSubtitles = false, const CString& TSN = _T("")) const;
 #ifdef CACHE_FILE

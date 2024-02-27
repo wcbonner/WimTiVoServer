@@ -163,16 +163,10 @@ void cTiVoFile::SetPathName(const CString csNewPath)
 			m_Title.Replace(_T("_"), _T(" ")); // replace underscore with spaces as on 2019-12-09
 		}
 	}
-	if (!m_SourceFormat.IsEmpty() && m_VideoCompatible)
-		m_ContentType = _T("video/x-tivo-mpeg-ts");
-	else
-		m_ContentType = _T("video/x-tivo-mpeg");
-	//m_ContentType = _T("video/x-tivo-mpeg-ts");
 	// Final Output of object values
 	wcout << L"[                   ] " << setw(20) << right << L"m_Title" << L" : " << m_Title.GetString() << endl;
 	wcout << L"[                   ] " << setw(20) << right << L"m_EpisodeTitle" << L" : " << m_EpisodeTitle.GetString() << endl;
 	wcout << L"[                   ] " << setw(20) << right << L"m_Description" << L" : " << m_Description.GetString() << endl;
-	wcout << L"[                   ] " << setw(20) << right << L"m_ContentType" << L" : " << m_ContentType.GetString() << endl;
 	wcout << L"[                   ] " << setw(20) << right << L"m_SourceFormat" << L" : " << m_SourceFormat.GetString() << endl;
 	//wcout << L"[                   ] " << setw(20) << right << L"LastChangeDate" << L" : " << LastChangeDate.GetString() << endl;
 	wcout << L"[                   ] " << setw(20) << right << L"m_SourceSize" << L" : " << m_SourceSize << endl;
@@ -213,10 +207,6 @@ void cTiVoFile::SetPathName(const CFileFind & csNewPath)
 		#endif
 		PopulateFromFFProbe();
 	}
-	if (!m_SourceFormat.IsEmpty() && m_VideoCompatible)
-		m_ContentType = _T("video/x-tivo-mpeg-ts");
-	else
-		m_ContentType = _T("video/x-tivo-mpeg");
 	if (m_SourceSize == 0)
 		m_SourceSize = csNewPath.GetLength();
 	// Final Output of object values
@@ -700,6 +690,15 @@ void cTiVoFile::PopulateFromFFProbe(void)
 }
 #define NT_SUCCESS(Status)          (((NTSTATUS)(Status)) >= 0)
 #define STATUS_UNSUCCESSFUL         ((NTSTATUS)0xC0000001L)
+const CString cTiVoFile::GetContentType(const CString& TSN) const
+{
+	if (m_VideoCompatible && (0 == TSN.Left(3).Compare(_T("663"))))
+		return(_T("video/x-tivo-mpeg-ts"));
+	else if (m_VideoCompatible && (std::atol(CStringA(TSN).Left(1).GetString()) >= 7))
+		return(_T("video/x-tivo-mpeg-ts"));
+	else 
+		return(_T("video/x-tivo-mpeg"));
+}
 static const BYTE rgbMsg[] = { 0x61, 0x62, 0x63 }; 
 const CString cTiVoFile::GetURL(void) const
 {
@@ -773,7 +772,7 @@ const CString & cTiVoFile::SetMAK(const CString & csMAK)
 	m_csMAK = csMAK;
 	return(csrVal);
 }
-void cTiVoFile::GetTiVoItem(CComPtr<IXmlWriter> & pWriter) const
+void cTiVoFile::GetTiVoItem(CComPtr<IXmlWriter> & pWriter, const CString& TSN) const
 {
 		pWriter->WriteStartElement(NULL, L"Item", NULL);
 		pWriter->WriteStartElement(NULL, L"Details", NULL);
@@ -783,8 +782,7 @@ void cTiVoFile::GetTiVoItem(CComPtr<IXmlWriter> & pWriter) const
 		if (!m_Description.IsEmpty()) pWriter->WriteElementString(NULL, L"Description", NULL, m_Description.GetString());
 		if (!m_SourceStation.IsEmpty()) pWriter->WriteElementString(NULL, L"SourceStation", NULL, m_SourceStation.GetString());
 		if (!m_SourceChannel.IsEmpty()) pWriter->WriteElementString(NULL, L"SourceChannel", NULL, m_SourceChannel.GetString());
-		if (!m_ContentType.IsEmpty()) pWriter->WriteElementString(NULL, L"ContentType", NULL, m_ContentType.GetString());
-		//if (!m_ContentType.IsEmpty()) pWriter->WriteElementString(NULL, L"SourceFormat", NULL, m_ContentType.GetString());
+		if (!m_SourceFormat.IsEmpty()) pWriter->WriteElementString(NULL, L"ContentType", NULL, GetContentType(TSN));
 		if (!m_SourceFormat.IsEmpty()) pWriter->WriteElementString(NULL, L"SourceFormat", NULL, m_SourceFormat.GetString());
 		if (m_SourceSize > 0)
 		{
@@ -815,12 +813,12 @@ void cTiVoFile::GetTiVoItem(CComPtr<IXmlWriter> & pWriter) const
 			pWriter->WriteElementString(NULL, L"CaptureDate", NULL, ss.str().c_str());
 		}
 		pWriter->WriteEndElement();	// Details
-		if (!m_ContentType.IsEmpty() && !GetURL().IsEmpty())
+		if (!m_SourceFormat.IsEmpty() && !GetURL().IsEmpty())
 		{
 			pWriter->WriteStartElement(NULL, L"Links", NULL);
 				pWriter->WriteStartElement(NULL, L"Content", NULL);
 					//pWriter->WriteElementString(NULL, L"ContentType", NULL, L"x-tivo-container/folder");
-					pWriter->WriteElementString(NULL, L"ContentType", NULL, m_ContentType.GetString());
+					pWriter->WriteElementString(NULL, L"ContentType", NULL, GetContentType(TSN));
 					pWriter->WriteElementString(NULL, L"Url", NULL, GetURL().GetString());
 				pWriter->WriteEndElement();	// Content
 				pWriter->WriteStartElement(NULL, L"CustomIcon", NULL);
@@ -977,7 +975,7 @@ const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath, cons
 	#ifdef _DEBUG
 	rval.Append(_T(" -report"));
 	#endif
-	if (0 == GetContentType().Compare(_T("video/x-tivo-mpeg")))
+	if (0 == GetContentType(TSN).Compare(_T("video/x-tivo-mpeg")))
 	{
 		//rval.Append(_T(" -map 0:v -map 0:a?")); // copy all audio streams Added 2020-04-04
 		rval.Append(_T(" -map_metadata -1"));
