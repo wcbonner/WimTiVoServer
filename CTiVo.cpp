@@ -966,7 +966,7 @@ void cTiVoFile::GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const
 		pWriter->WriteRaw(L"</TvBusMarshalledStruct:TvBusEnvelope>");
 	}
 }
-const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath, const bool bForceSubtitles) const
+const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath, const bool bForceSubtitles, const CString& TSN) const
 {
 	CString rval(QuoteFileName(csFFMPEGPath));
 	rval.Append(_T(" -hide_banner"));

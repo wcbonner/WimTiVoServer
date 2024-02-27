@@ -1157,7 +1157,7 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 #ifdef _DEBUG
 		std::cout << "[                   ] " << HttpResponse.str() << std::endl;
 #endif
-
+		std::stringstream ssChunkHeader;
 		if (0 == TiVoFileToSend.GetPathName().Right(5).CompareNoCase(_T(".tivo")))
 		{
 			// this block is run if I'm transferring a file with a .tivo extension
@@ -1171,7 +1171,6 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 				bool bSoFarSoGood = true;
 				long long bytessent = 0;
 				char * RAWDataBuff = new char[0x400000];
-				std::stringstream ssChunkHeader;
 				while (!FileToTransfer.eof() && (bSoFarSoGood))
 				{
 					FileToTransfer.read(RAWDataBuff, 0x400000);
@@ -1196,127 +1195,124 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 		}
 		else
 		{
-			// 2024-02-26 I finally figured out that when sending video/x-tivo-mpeg-ts format to the TiVo I need to not send the TiVo Header that I was sending with video/x-tivo-mpeg format files.
-			// More investigation needs to be done to figure out when I need to send it and when i avoid it. For my purposes, I'm simply running to a Bolt and sending TS format for h264 files is so much faster it's being hard coded for now.
-#ifdef SEND_TIVO_HEADER
-			char XMLDataBuff[1024*11] = {0};
-			CComPtr<IXmlWriter> pWriter;
-			CreateXmlWriter(__uuidof(IXmlWriter), reinterpret_cast<void**>(&pWriter), NULL);
-			CComPtr<IStream> spMemoryStream(::SHCreateMemStream(NULL, 0));
-			if ((pWriter != NULL) && (spMemoryStream != NULL))
+			if (0 == TiVoFileToSend.GetContentType().Compare(_T("video/x-tivo-mpeg")))
 			{
-				pWriter->SetProperty(XmlWriterProperty_ConformanceLevel, XmlConformanceLevel_Fragment);
-				pWriter->SetOutput(spMemoryStream);
-				pWriter->SetProperty(XmlWriterProperty_Indent, FALSE);
-				pWriter->WriteStartDocument(XmlStandalone_Omit);
-				TiVoFileToSend.GetTvBusEnvelope(pWriter);
-				pWriter->Flush();
+				// 2024-02-26 I finally figured out that when sending video/x-tivo-mpeg-ts format to the TiVo I need to not send the TiVo Header that I was sending with video/x-tivo-mpeg format files.
+				// More investigation needs to be done to figure out when I need to send it and when i avoid it. For my purposes, I'm simply running to a Bolt and sending TS format for h264 files is so much faster it's being hard coded for now.
+				char XMLDataBuff[1024 * 11] = { 0 };
+				CComPtr<IXmlWriter> pWriter;
+				CreateXmlWriter(__uuidof(IXmlWriter), reinterpret_cast<void**>(&pWriter), NULL);
+				CComPtr<IStream> spMemoryStream(::SHCreateMemStream(NULL, 0));
+				if ((pWriter != NULL) && (spMemoryStream != NULL))
+				{
+					pWriter->SetProperty(XmlWriterProperty_ConformanceLevel, XmlConformanceLevel_Fragment);
+					pWriter->SetOutput(spMemoryStream);
+					pWriter->SetProperty(XmlWriterProperty_Indent, FALSE);
+					pWriter->WriteStartDocument(XmlStandalone_Omit);
+					TiVoFileToSend.GetTvBusEnvelope(pWriter);
+					pWriter->Flush();
 
-				// Allocates enough memeory for the xml content.
-				STATSTG ssStreamData = {0};
-				spMemoryStream->Stat(&ssStreamData, STATFLAG_NONAME);
-				SIZE_T cbSize = ssStreamData.cbSize.LowPart;
-				if (cbSize >= sizeof(XMLDataBuff))
-					cbSize = sizeof(XMLDataBuff)-1;
-				// Copies the content from the stream to the buffer.
-				LARGE_INTEGER position;
-				position.QuadPart = 0;
-				spMemoryStream->Seek(position, STREAM_SEEK_SET, NULL);
-				ULONG cbRead;
-				spMemoryStream->Read(XMLDataBuff, cbSize, &cbRead);
-				XMLDataBuff[cbSize] = '\0';
+					// Allocates enough memeory for the xml content.
+					STATSTG ssStreamData = { 0 };
+					spMemoryStream->Stat(&ssStreamData, STATFLAG_NONAME);
+					SIZE_T cbSize = ssStreamData.cbSize.LowPart;
+					if (cbSize >= sizeof(XMLDataBuff))
+						cbSize = sizeof(XMLDataBuff) - 1;
+					// Copies the content from the stream to the buffer.
+					LARGE_INTEGER position;
+					position.QuadPart = 0;
+					spMemoryStream->Seek(position, STREAM_SEEK_SET, NULL);
+					ULONG cbRead;
+					spMemoryStream->Read(XMLDataBuff, cbSize, &cbRead);
+					XMLDataBuff[cbSize] = '\0';
+				}
+				#pragma pack(show)
+				#pragma pack(2)
+				#pragma pack(show)
+				auto ld = strlen(XMLDataBuff);
+				auto chunklen = ld * 2 + 44;
+				auto padding = 2048 - chunklen % 1024;
+				#define SIZEOF_STREAM_HEADER 16
+				struct {
+					char           filetype[4];       /* the string 'TiVo' */
+					/* all fields are in network byte order */
+					unsigned short dummy_0004;
+					unsigned short flags;	// See: https://github.com/wmcbrine/tivodecode-ng/blob/master/TiVo-Decrypt-Notes.md
+					// flags & 0x80 is always zero (10000000)
+					// flags & 0x40 == 0x40 (01000000) seems to mean NZ/AUS file.
+					// flags & 0x40 == 0x00 seems to mean US file.
+					// flags & 0x20 == 0x20 (00100000) seems to mean TS file.
+					// flags & 0x20 == 0x00 seems to mean PS file.
+					// flags & 0x10 == 0x10 (00010000) seems to mean HD file.
+					// flags & 0x10 == 0x00 seems to mean SD file.
+					// flags & 0x0F == 0x0D (00001101) seems to mean Series3 unit.
+					// flags & 0x05 == 0x05 (00000101) seems to mean DVD capable unit.
+					// flags & 0x05 == 0x01 (00000001) seems to mean Series2 unit.
+					unsigned short dummy_0008;
+					unsigned int   mpeg_offset;   /* 0-based offset of MPEG stream */
+					unsigned short chunks;        /* Number of metadata chunks */
+				} tivo_stream_header;
+				ASSERT(sizeof(tivo_stream_header) == SIZEOF_STREAM_HEADER);
+				std::string("TiVo").copy(tivo_stream_header.filetype, 4);
+				tivo_stream_header.dummy_0004 = htons(4);
+				tivo_stream_header.flags = 0x0D00;	// mime = video/x-tivo-mpeg so flag is 13 (0x0D). If mime = video/x-tivo-mpeg-ts, flag would be 45 (0x2D)
+				//if (TiVoFileToSend.GetVideoHighDefinition())
+				//	tivo_stream_header.flags |= 0x1000;	// (00010000)
+				if (0 == TiVoFileToSend.GetContentType().Compare(_T("video/x-tivo-mpeg-ts")))
+					tivo_stream_header.flags |= 0x2000;	// (00100000)
+				tivo_stream_header.dummy_0008 = htons(0);
+				tivo_stream_header.mpeg_offset = htonl(padding + chunklen);
+				tivo_stream_header.chunks = htons(2);
+				#define SIZEOF_STREAM_CHUNK 12
+				struct {
+					unsigned int   chunk_size;    /* Size of chunk */
+					unsigned int   data_size;     /* Length of the payload */
+					unsigned short id;            /* Chunk ID */
+					unsigned short type;          /* Subtype */
+					//unsigned char  data[1];       /* Variable length data */
+				} tivo_stream_chunk;
+				ASSERT(sizeof(tivo_stream_chunk) == SIZEOF_STREAM_CHUNK);
+				tivo_stream_chunk.chunk_size = htonl(ld + sizeof(tivo_stream_chunk) + 4);
+				tivo_stream_chunk.data_size = htonl(ld);
+				tivo_stream_chunk.id = htons(1);
+				tivo_stream_chunk.type = htons(0);
+				struct {
+					unsigned int   chunk_size;    /* Size of chunk */
+					unsigned int   data_size;     /* Length of the payload */
+					unsigned short id;            /* Chunk ID */
+					unsigned short type;          /* Subtype */
+					//unsigned char  data[1];       /* Variable length data */
+				} tivo_stream_chunk2;
+				ASSERT(sizeof(tivo_stream_chunk) == SIZEOF_STREAM_CHUNK);
+				tivo_stream_chunk2.chunk_size = htonl(ld + sizeof(tivo_stream_chunk2) + 7);
+				tivo_stream_chunk2.data_size = htonl(ld);
+				tivo_stream_chunk2.id = htons(2);
+				tivo_stream_chunk2.type = htons(0);
+				auto TiVoChunkBufferSize = sizeof(tivo_stream_header) + sizeof(tivo_stream_chunk) + strlen(XMLDataBuff) + 4 + sizeof(tivo_stream_chunk2) + strlen(XMLDataBuff) + padding;
+				char* TiVoChunkBuffer = new char[TiVoChunkBufferSize];
+				char* pTiVoChunkBuffer = TiVoChunkBuffer;
+				memcpy(pTiVoChunkBuffer, &tivo_stream_header, sizeof(tivo_stream_header));
+				pTiVoChunkBuffer += sizeof(tivo_stream_header);
+				memcpy(pTiVoChunkBuffer, &tivo_stream_chunk, sizeof(tivo_stream_chunk));
+				pTiVoChunkBuffer += sizeof(tivo_stream_chunk);
+				memcpy(pTiVoChunkBuffer, XMLDataBuff, strlen(XMLDataBuff));
+				pTiVoChunkBuffer += strlen(XMLDataBuff);
+				for (auto index = 0; index < 4; index++)
+					*(++pTiVoChunkBuffer) = '\0';
+				memcpy(pTiVoChunkBuffer, &tivo_stream_chunk2, sizeof(tivo_stream_chunk2));
+				pTiVoChunkBuffer += sizeof(tivo_stream_chunk2);
+				memcpy(pTiVoChunkBuffer, XMLDataBuff, strlen(XMLDataBuff));
+				pTiVoChunkBuffer += strlen(XMLDataBuff);
+				for (auto index = 1; index < padding; index++)
+					*(++pTiVoChunkBuffer) = '\0';
+				ssChunkHeader << hex << TiVoChunkBufferSize << "\r\n";
+				send(DataSocket, ssChunkHeader.str().c_str(), ssChunkHeader.str().length(), 0);
+				send(DataSocket, TiVoChunkBuffer, TiVoChunkBufferSize, 0);
+				send(DataSocket, "\r\n", 2, 0);	// Chunk Footer
+				delete[] TiVoChunkBuffer;
+				#pragma pack()
+				#pragma pack(show)
 			}
-#pragma pack(show)
-#pragma pack(2)
-#pragma pack(show)
-			auto ld = strlen(XMLDataBuff);
-			auto chunklen = ld * 2 + 44;
-			auto padding = 2048 - chunklen % 1024;
-			#define SIZEOF_STREAM_HEADER 16
-			struct {
-				char           filetype[4];       /* the string 'TiVo' */
-				/* all fields are in network byte order */
-				unsigned short dummy_0004;
-				unsigned short flags;	// See: https://github.com/wmcbrine/tivodecode-ng/blob/master/TiVo-Decrypt-Notes.md
-				// flags & 0x80 is always zero (10000000)
-				// flags & 0x40 == 0x40 (01000000) seems to mean NZ/AUS file.
-				// flags & 0x40 == 0x00 seems to mean US file.
-				// flags & 0x20 == 0x20 (00100000) seems to mean TS file.
-				// flags & 0x20 == 0x00 seems to mean PS file.
-				// flags & 0x10 == 0x10 (00010000) seems to mean HD file.
-				// flags & 0x10 == 0x00 seems to mean SD file.
-				// flags & 0x0F == 0x0D (00001101) seems to mean Series3 unit.
-				// flags & 0x05 == 0x05 (00000101) seems to mean DVD capable unit.
-				// flags & 0x05 == 0x01 (00000001) seems to mean Series2 unit.
-				unsigned short dummy_0008;
-				unsigned int   mpeg_offset;   /* 0-based offset of MPEG stream */
-				unsigned short chunks;        /* Number of metadata chunks */
-			} tivo_stream_header;
-			ASSERT(sizeof(tivo_stream_header) == SIZEOF_STREAM_HEADER);
-			std::string("TiVo").copy(tivo_stream_header.filetype, 4);
-			tivo_stream_header.dummy_0004 = htons(4);
-			tivo_stream_header.flags = 0x0D00;	// mime = video/x-tivo-mpeg so flag is 13 (0x0D). If mime = video/x-tivo-mpeg-ts, flag would be 45 (0x2D)
-			//if (TiVoFileToSend.GetVideoHighDefinition())
-			//	tivo_stream_header.flags |= 0x1000;	// (00010000)
-			if (0 == TiVoFileToSend.GetContentType().Compare(_T("video/x-tivo-mpeg-ts")))
-				tivo_stream_header.flags |= 0x2000;	// (00100000)
-			tivo_stream_header.dummy_0008 = htons(0);
-			tivo_stream_header.mpeg_offset = htonl(padding + chunklen);
-			tivo_stream_header.chunks = htons(2);
-			#define SIZEOF_STREAM_CHUNK 12
-			struct {
-				unsigned int   chunk_size;    /* Size of chunk */
-				unsigned int   data_size;     /* Length of the payload */
-				unsigned short id;            /* Chunk ID */
-				unsigned short type;          /* Subtype */
-				//unsigned char  data[1];       /* Variable length data */
-			} tivo_stream_chunk;
-			ASSERT(sizeof(tivo_stream_chunk) == SIZEOF_STREAM_CHUNK);
-			tivo_stream_chunk.chunk_size = htonl(ld + sizeof(tivo_stream_chunk) + 4);
-			tivo_stream_chunk.data_size = htonl(ld);
-			tivo_stream_chunk.id = htons(1);
-			tivo_stream_chunk.type = htons(0);
-			struct {
-				unsigned int   chunk_size;    /* Size of chunk */
-				unsigned int   data_size;     /* Length of the payload */
-				unsigned short id;            /* Chunk ID */
-				unsigned short type;          /* Subtype */
-				//unsigned char  data[1];       /* Variable length data */
-			} tivo_stream_chunk2;
-			ASSERT(sizeof(tivo_stream_chunk) == SIZEOF_STREAM_CHUNK);
-			tivo_stream_chunk2.chunk_size = htonl(ld + sizeof(tivo_stream_chunk2) + 7);
-			tivo_stream_chunk2.data_size = htonl(ld);
-			tivo_stream_chunk2.id = htons(2);
-			tivo_stream_chunk2.type = htons(0);
-			auto TiVoChunkBufferSize = sizeof(tivo_stream_header) + sizeof(tivo_stream_chunk) + strlen(XMLDataBuff) + 4 + sizeof(tivo_stream_chunk2) + strlen(XMLDataBuff) + padding;
-			char * TiVoChunkBuffer = new char[TiVoChunkBufferSize];
-			char * pTiVoChunkBuffer = TiVoChunkBuffer;
-			memcpy(pTiVoChunkBuffer, &tivo_stream_header, sizeof(tivo_stream_header));
-			pTiVoChunkBuffer += sizeof(tivo_stream_header);
-			memcpy(pTiVoChunkBuffer, &tivo_stream_chunk, sizeof(tivo_stream_chunk));
-			pTiVoChunkBuffer += sizeof(tivo_stream_chunk);
-			memcpy(pTiVoChunkBuffer, XMLDataBuff, strlen(XMLDataBuff));
-			pTiVoChunkBuffer += strlen(XMLDataBuff);
-			for (auto index = 0; index < 4; index++)
-				*(++pTiVoChunkBuffer) = '\0';
-			memcpy(pTiVoChunkBuffer, &tivo_stream_chunk2, sizeof(tivo_stream_chunk2));
-			pTiVoChunkBuffer += sizeof(tivo_stream_chunk2);
-			memcpy(pTiVoChunkBuffer, XMLDataBuff, strlen(XMLDataBuff));
-			pTiVoChunkBuffer += strlen(XMLDataBuff);
-			for (auto index = 1; index < padding; index++)
-				*(++pTiVoChunkBuffer) = '\0';
-			std::stringstream ssChunkHeader;
-			ssChunkHeader << hex << TiVoChunkBufferSize << "\r\n";
-			send(DataSocket, ssChunkHeader.str().c_str(), ssChunkHeader.str().length(), 0);
-			send(DataSocket, TiVoChunkBuffer, TiVoChunkBufferSize, 0);
-			send(DataSocket, "\r\n", 2, 0);	// Chunk Footer
-			delete[] TiVoChunkBuffer;
-#pragma pack()
-#pragma pack(show)
-#else	// SEND_TIVO_HEADER
-			std::stringstream ssChunkHeader;
-#endif	// SEND_TIVO_HEADER
-
 			// Set the bInheritHandle flag so pipe handles are inherited. 
 			SECURITY_ATTRIBUTES saAttr;  
 			saAttr.nLength = sizeof(SECURITY_ATTRIBUTES); 

@@ -102,7 +102,7 @@ public:
 	const bool GetVideoHighDefinition(void) const { return(m_VideoHighDefinition); }
 	void GetTiVoItem(CComPtr<IXmlWriter> & pWriter) const;
 	void GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const;
-	const CString GetFFMPEGCommandLine(const CString & csFFMPEGPath = _T("ffmpeg.exe"), const bool bForceSubtitles = false) const;
+	const CString GetFFMPEGCommandLine(const CString & csFFMPEGPath = _T("ffmpeg.exe"), const bool bForceSubtitles = false, const CString& TSN = _T("")) const;
 #ifdef CACHE_FILE
 	void WriteToCache(CComPtr<IXmlWriter>& pWriter);
 	bool PopulateFromXML(CComPtr<IXmlReader>& pReader, CComPtr<IStream>& spStream);
