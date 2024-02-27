@@ -163,7 +163,10 @@ void cTiVoFile::SetPathName(const CString csNewPath)
 			m_Title.Replace(_T("_"), _T(" ")); // replace underscore with spaces as on 2019-12-09
 		}
 	}
-	m_ContentType = _T("video/x-tivo-mpeg");
+	if (!m_SourceFormat.IsEmpty() && m_VideoCompatible)
+		m_ContentType = _T("video/x-tivo-mpeg-ts");
+	else
+		m_ContentType = _T("video/x-tivo-mpeg");
 	//m_ContentType = _T("video/x-tivo-mpeg-ts");
 	// Final Output of object values
 	wcout << L"[                   ] " << setw(20) << right << L"m_Title" << L" : " << m_Title.GetString() << endl;
@@ -185,8 +188,6 @@ void cTiVoFile::SetPathName(const CFileFind & csNewPath)
 	m_Title = csNewPath.GetFileTitle();
 	m_Title.Replace(_T("."), _T(" ")); // replace periods with spaces as on 2019-12-09
 	m_Title.Replace(_T("_"), _T(" ")); // replace underscore with spaces as on 2019-12-09
-	m_ContentType = _T("video/x-tivo-mpeg");
-	//m_ContentType = _T("video/x-tivo-mpeg-ts");
 	csNewPath.GetLastWriteTime(m_LastWriteTime);
 	csNewPath.GetLastWriteTime(m_CaptureDate);
 	CFile XMLFile;
@@ -212,6 +213,10 @@ void cTiVoFile::SetPathName(const CFileFind & csNewPath)
 		#endif
 		PopulateFromFFProbe();
 	}
+	if (!m_SourceFormat.IsEmpty() && m_VideoCompatible)
+		m_ContentType = _T("video/x-tivo-mpeg-ts");
+	else
+		m_ContentType = _T("video/x-tivo-mpeg");
 	if (m_SourceSize == 0)
 		m_SourceSize = csNewPath.GetLength();
 	// Final Output of object values
@@ -538,8 +543,8 @@ void cTiVoFile::PopulateFromFFProbe(void)
 														bVideoStreamInfoNeeded = false;
 														if (!cs_codec_name.Compare(_T("mpeg2video")))
 															m_VideoCompatible = true;
-														//if (!cs_codec_name.Compare(_T("h264")))
-														//	m_VideoCompatible = true;
+														if (!cs_codec_name.Compare(_T("h264")))
+															m_VideoCompatible = true;
 														m_SourceFormat = cs_codec_type + CString(_T("/")) + cs_codec_name;
 														int width = 0;
 														std::wstringstream ss;
@@ -1014,7 +1019,7 @@ const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath, cons
 	else
 	{
 		//rval.Append(_T(" -map 0:v -map 0:a?")); // copy all audio streams Added 2020-04-04
-		rval.Append(_T(" -map_metadata -1"));
+		//rval.Append(_T(" -map_metadata -1"));
 		if (m_VideoCompatible)
 		{
 			rval.Append(_T(" -vcodec copy -bsf:v h264_mp4toannexb"));	// https://ffmpeg.org/ffmpeg-bitstream-filters.html#h264_005fmp4toannexb
@@ -1031,24 +1036,24 @@ const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath, cons
 			if ((m_VideoWidth > 1920) || (m_VideoHeight > 1080))
 				rval.Append(_T(" -s 1920x1080"));
 		}
+		// 2024-02-26 I finally was able to get pyTivo to show me it's ffmpeg command line: " -bufsize 8192k -c:v copy -bsf:v h264_mp4toannexb -c:a ac3 -copyts -b:a 448k -ar 48000 -map 0:0 -map 0:1 -report -f mpegts -"
 		//rval.Append(_T(" -b:v 16384k -maxrate 30000k -bufsize 4096k -ab 448k -ar 48000"));
 		// -ar[:stream_specifier] freq (input/output,per-stream)
 		//    Set the audio sampling frequency.For output streams it is set by default to the frequency of the corresponding input stream.For input streams this option only makes sense for audio grabbing devices and raw demuxers and is mapped to the corresponding demuxer options.
 		// for SD set video maxrate to  4096K and buffsize to 1024k
 		// For HD set video maxrate to 16384K and buffsize to 4096k
 		// For 4k set video maxrate to 30000k and buffsize to 8192k
-		rval.Append(_T(" -b:v 30000k -maxrate 30000k -bufsize 8192k -b:a 448k -ar 48000"));
+		rval.Append(_T(" -b:v 30000k -maxrate 30000k -bufsize 8192k"));
 		if (m_AudioCompatible)
 			rval.Append(_T(" -acodec copy"));
 		else
 			rval.Append(_T(" -acodec ac3"));
+		rval.Append(_T(" -b:a 448k -ar 48000"));
 
 		//rval.Append(_T(" -map 0")); // attempt to copy all streams 2023-05-20
 
 		rval.Append(_T(" -f mpegts -")); // 2023-05-20
 	}
-
-	//rval.Append(_T(" -f mpegts -")); // use mpegts as output Added 2020-04-04
 	return(rval);
 }
 /////////////////////////////////////////////////////////////////////////////

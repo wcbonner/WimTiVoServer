@@ -1196,6 +1196,9 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 		}
 		else
 		{
+			// 2024-02-26 I finally figured out that when sending video/x-tivo-mpeg-ts format to the TiVo I need to not send the TiVo Header that I was sending with video/x-tivo-mpeg format files.
+			// More investigation needs to be done to figure out when I need to send it and when i avoid it. For my purposes, I'm simply running to a Bolt and sending TS format for h264 files is so much faster it's being hard coded for now.
+#ifdef SEND_TIVO_HEADER
 			char XMLDataBuff[1024*11] = {0};
 			CComPtr<IXmlWriter> pWriter;
 			CreateXmlWriter(__uuidof(IXmlWriter), reinterpret_cast<void**>(&pWriter), NULL);
@@ -1252,7 +1255,7 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 			ASSERT(sizeof(tivo_stream_header) == SIZEOF_STREAM_HEADER);
 			std::string("TiVo").copy(tivo_stream_header.filetype, 4);
 			tivo_stream_header.dummy_0004 = htons(4);
-			tivo_stream_header.flags = 0x0D00;	// mime = video/x-tivo-mpeg so flag is 13 (0x0D). If mime = video/x-tivo-mpeg-ts, flag would be 45
+			tivo_stream_header.flags = 0x0D00;	// mime = video/x-tivo-mpeg so flag is 13 (0x0D). If mime = video/x-tivo-mpeg-ts, flag would be 45 (0x2D)
 			//if (TiVoFileToSend.GetVideoHighDefinition())
 			//	tivo_stream_header.flags |= 0x1000;	// (00010000)
 			if (0 == TiVoFileToSend.GetContentType().Compare(_T("video/x-tivo-mpeg-ts")))
@@ -1310,6 +1313,9 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 			delete[] TiVoChunkBuffer;
 #pragma pack()
 #pragma pack(show)
+#else	// SEND_TIVO_HEADER
+			std::stringstream ssChunkHeader;
+#endif	// SEND_TIVO_HEADER
 
 			// Set the bInheritHandle flag so pipe handles are inherited. 
 			SECURITY_ATTRIBUTES saAttr;  
