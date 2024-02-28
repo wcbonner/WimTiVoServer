@@ -1114,16 +1114,23 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 	if (0 < csCommand.FindOneOf(_T("\r\n")))
 		csCommand.Delete(csCommand.FindOneOf(_T("\r\n")),csCommand.GetLength());
 	// GetFile   192.168.50.197 GET /5979bb28cf2811e9488d84e9e869c479a373d5b37aa46fe4f1d77b7a06f3e3d6?Format=video%2Fx-tivo-mpeg-ts HTTP/1.1
+	CString csFormat(_T("video/x-tivo-mpeg")); // 2024-02-07 Default Format to send if not overridden in query from client 
 	int curPos = 0;
 	CString csToken(csCommand.Tokenize(_T("&? "),curPos));
 	while (csToken != _T(""))
 	{
+		CString csKey(csToken.Left(csToken.Find(_T("="))));
+		CString csValue(csToken.Right(csToken.GetLength() - (csToken.Find(_T("=")) + 1)));
 		if (csToken.Compare(_T("GET")) == 0)
 		{
 			std::wcout << L"[                   ] " << csToken.GetString() << std::endl;
 		}
-		else if (csToken.Left(7).Compare(_T("Format=")) == 0)
+		else if (csKey.Compare(_T("Format")) == 0)
 		{
+			TCHAR lpszBuffer[_MAX_PATH];
+			DWORD dwBufferLength = sizeof(lpszBuffer) / sizeof(TCHAR);
+			InternetCanonicalizeUrl(csValue.GetString(), lpszBuffer, &dwBufferLength, ICU_DECODE);
+			csFormat = CString(lpszBuffer, dwBufferLength);
 			std::wcout << L"[                   ] " << csToken.GetString() << std::endl;
 		}
 		else
@@ -1153,7 +1160,7 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 		HttpResponse << "Date: " << getTimeRFC1123() << "\r\n";
 		HttpResponse << "Transfer-Encoding: chunked\r\n";
 		if (TiVoFileToSend.GetDuration() > 0) HttpResponse << "TiVo-Estimated-Length: " << max(TiVoFileToSend.GetSourceSize(), (TiVoFileToSend.GetDuration() * 1024)) << "\r\n"; // Since the Duration is 1/1000 of a second, and at least one example I transferred came in at roughly this multiple, 700bytes for every millisecond, worth a try.
-		HttpResponse << "Content-Type: " << CStringA(TiVoFileToSend.GetContentType(TiVoSerialMap[TiVoAddress])).GetString() << "\r\n";
+		HttpResponse << "Content-Type: " << CStringA(csFormat).GetString() << "\r\n";
 		HttpResponse << "Connection: close\r\n";
 		HttpResponse << "\r\n";
 		send(DataSocket, HttpResponse.str().c_str(), HttpResponse.str().length(),0);
@@ -1198,7 +1205,7 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 		}
 		else
 		{
-			if (0 == TiVoFileToSend.GetContentType(TiVoSerialMap[TiVoAddress]).Compare(_T("video/x-tivo-mpeg")))
+			if (0 == csFormat.Compare(_T("video/x-tivo-mpeg")))
 			{
 				// 2024-02-26 I finally figured out that when sending video/x-tivo-mpeg-ts format to the TiVo I need to not send the TiVo Header that I was sending with video/x-tivo-mpeg format files.
 				// More investigation needs to be done to figure out when I need to send it and when i avoid it. For my purposes, I'm simply running to a Bolt and sending TS format for h264 files is so much faster it's being hard coded for now.
@@ -1352,7 +1359,7 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 					siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
  
 					static const CString csFFMPEGPath(FindEXEFromPath(_T("ffmpeg.exe")));
-					CString csCommandLine(TiVoFileToSend.GetFFMPEGCommandLine(csFFMPEGPath, bForceSubtitles, TiVoSerialMap[TiVoAddress]));
+					CString csCommandLine(TiVoFileToSend.GetFFMPEGCommandLine(csFFMPEGPath, bForceSubtitles, TiVoSerialMap[TiVoAddress], csFormat));
 					TRACE(_T("CreateProcess: %s\n"), csCommandLine.GetString());
 					if (ApplicationLogHandle != NULL) 
 					{

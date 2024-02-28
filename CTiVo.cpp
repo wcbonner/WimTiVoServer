@@ -964,18 +964,56 @@ void cTiVoFile::GetTvBusEnvelope(CComPtr<IXmlWriter> & pWriter) const
 		pWriter->WriteRaw(L"</TvBusMarshalledStruct:TvBusEnvelope>");
 	}
 }
-const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath, const bool bForceSubtitles, const CString& TSN) const
+const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath, const bool bForceSubtitles, const CString& TSN, const CString& csFormat) const
 {
 	CString rval(QuoteFileName(csFFMPEGPath));
+	#ifdef _DEBUG
+	rval.Append(_T(" -report"));
+	#endif
 	rval.Append(_T(" -hide_banner"));
 	if (bForceSubtitles)
 		rval.Append(_T(" -forced_subs_only 1"));
 	rval.Append(_T(" -i "));
 	rval.Append(QuoteFileName(m_csPathName));
-	#ifdef _DEBUG
-	rval.Append(_T(" -report"));
-	#endif
-	if (0 == GetContentType(TSN).Compare(_T("video/x-tivo-mpeg")))
+	if (0 == csFormat.Compare(_T("video/x-tivo-mpeg-ts")))
+	{
+		//rval.Append(_T(" -map 0:v -map 0:a?")); // copy all audio streams Added 2020-04-04
+		//rval.Append(_T(" -map_metadata -1"));
+		if (m_VideoCompatible)
+		{
+			rval.Append(_T(" -vcodec copy -bsf:v h264_mp4toannexb"));	// https://ffmpeg.org/ffmpeg-bitstream-filters.html#h264_005fmp4toannexb
+		}
+		else
+		{
+			// quick and dirty addition to support subtitles
+			//rval.Append(_T(" -vf subtitles="));
+			//rval.Append(QuoteFileName(m_csPathName));
+			//rval.Append(_T(" -vcodec mpeg2video"));
+			//rval.Append(_T(" -vcodec libx264 -coder 0 -level 41 -g 250 -subq 6 -me_range 16 -qmin 10 -qmax 50 -bufsize 14000k -b:v 2500k -maxrate 10000k -trellis 2 -mbd 1")); // 2023-05-20
+			rval.Append(_T(" -vcodec libx264")); // 2023-05-20
+
+			if ((m_VideoWidth > 1920) || (m_VideoHeight > 1080))
+				rval.Append(_T(" -s 1920x1080"));
+		}
+		// 2024-02-26 I finally was able to get pyTivo to show me it's ffmpeg command line: " -bufsize 8192k -c:v copy -bsf:v h264_mp4toannexb -c:a ac3 -copyts -b:a 448k -ar 48000 -map 0:0 -map 0:1 -report -f mpegts -"
+		//rval.Append(_T(" -b:v 16384k -maxrate 30000k -bufsize 4096k -ab 448k -ar 48000"));
+		// -ar[:stream_specifier] freq (input/output,per-stream)
+		//    Set the audio sampling frequency.For output streams it is set by default to the frequency of the corresponding input stream.For input streams this option only makes sense for audio grabbing devices and raw demuxers and is mapped to the corresponding demuxer options.
+		// for SD set video maxrate to  4096K and buffsize to 1024k
+		// For HD set video maxrate to 16384K and buffsize to 4096k
+		// For 4k set video maxrate to 30000k and buffsize to 8192k
+		rval.Append(_T(" -b:v 30000k -maxrate 30000k -bufsize 8192k"));
+		if (m_AudioCompatible)
+			rval.Append(_T(" -acodec copy"));
+		else
+			rval.Append(_T(" -acodec ac3"));
+		rval.Append(_T(" -b:a 448k -ar 48000"));
+
+		//rval.Append(_T(" -map 0")); // attempt to copy all streams 2023-05-20
+
+		rval.Append(_T(" -f mpegts -")); // 2023-05-20
+	}
+	else
 	{
 		//rval.Append(_T(" -map 0:v -map 0:a?")); // copy all audio streams Added 2020-04-04
 		rval.Append(_T(" -map_metadata -1"));
@@ -1013,44 +1051,6 @@ const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath, cons
 			rval.Append(_T(" -acodec ac3"));
 
 		rval.Append(_T(" -f vob -"));
-	}
-	else
-	{
-		//rval.Append(_T(" -map 0:v -map 0:a?")); // copy all audio streams Added 2020-04-04
-		//rval.Append(_T(" -map_metadata -1"));
-		if (m_VideoCompatible)
-		{
-			rval.Append(_T(" -vcodec copy -bsf:v h264_mp4toannexb"));	// https://ffmpeg.org/ffmpeg-bitstream-filters.html#h264_005fmp4toannexb
-		}
-		else
-		{
-			// quick and dirty addition to support subtitles
-			//rval.Append(_T(" -vf subtitles="));
-			//rval.Append(QuoteFileName(m_csPathName));
-			//rval.Append(_T(" -vcodec mpeg2video"));
-			//rval.Append(_T(" -vcodec libx264 -coder 0 -level 41 -g 250 -subq 6 -me_range 16 -qmin 10 -qmax 50 -bufsize 14000k -b:v 2500k -maxrate 10000k -trellis 2 -mbd 1")); // 2023-05-20
-			rval.Append(_T(" -vcodec libx264")); // 2023-05-20
-
-			if ((m_VideoWidth > 1920) || (m_VideoHeight > 1080))
-				rval.Append(_T(" -s 1920x1080"));
-		}
-		// 2024-02-26 I finally was able to get pyTivo to show me it's ffmpeg command line: " -bufsize 8192k -c:v copy -bsf:v h264_mp4toannexb -c:a ac3 -copyts -b:a 448k -ar 48000 -map 0:0 -map 0:1 -report -f mpegts -"
-		//rval.Append(_T(" -b:v 16384k -maxrate 30000k -bufsize 4096k -ab 448k -ar 48000"));
-		// -ar[:stream_specifier] freq (input/output,per-stream)
-		//    Set the audio sampling frequency.For output streams it is set by default to the frequency of the corresponding input stream.For input streams this option only makes sense for audio grabbing devices and raw demuxers and is mapped to the corresponding demuxer options.
-		// for SD set video maxrate to  4096K and buffsize to 1024k
-		// For HD set video maxrate to 16384K and buffsize to 4096k
-		// For 4k set video maxrate to 30000k and buffsize to 8192k
-		rval.Append(_T(" -b:v 30000k -maxrate 30000k -bufsize 8192k"));
-		if (m_AudioCompatible)
-			rval.Append(_T(" -acodec copy"));
-		else
-			rval.Append(_T(" -acodec ac3"));
-		rval.Append(_T(" -b:a 448k -ar 48000"));
-
-		//rval.Append(_T(" -map 0")); // attempt to copy all streams 2023-05-20
-
-		rval.Append(_T(" -f mpegts -")); // 2023-05-20
 	}
 	return(rval);
 }
