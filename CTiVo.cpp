@@ -535,6 +535,8 @@ void cTiVoFile::PopulateFromFFProbe(void)
 															m_VideoCompatible = true;
 														if (!cs_codec_name.Compare(_T("h264")))
 															m_VideoCompatible = true;
+														if (!cs_codec_name.Compare(_T("hevc")))
+															m_VideoCompatible = true;
 														m_SourceFormat = cs_codec_type + CString(_T("/")) + cs_codec_name;
 														int width = 0;
 														std::wstringstream ss;
