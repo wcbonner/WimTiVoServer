@@ -347,6 +347,7 @@ int GetTiVoQueryFormats(SOCKET DataSocket, const char* InBuffer)
 	// This command returns meta-data describing all the formats in which the Server is able to provide a particular type of data, and uses the following URL syntax.
 	// http://{machine}/TiVoConnect?Command=QueryFormats&SourceFormat={mime-type}
 	TRACE("%s %s\n", CStringA(CTime::GetCurrentTime().Format(_T("[%Y-%m-%dT%H:%M:%S]"))).GetString(), __FUNCTION__);
+	#ifdef DEBUG
 	if (bConsoleExists)
 	{
 		CStringA csInBuffer(InBuffer);
@@ -358,6 +359,7 @@ int GetTiVoQueryFormats(SOCKET DataSocket, const char* InBuffer)
 		getpeername(DataSocket, (struct sockaddr*)&adr_inet, &sa_len);
 		std::cout << "[" << getTimeISO8601(true) << "] " << __FUNCTION__ << "\t" << inet_ntoa(adr_inet.sin_addr) << " " << csInBuffer.GetString() << endl;
 	}
+	#endif // DEBUG
 	int rval = 0;
 	char MyHostName[255] = { 0 }; // winsock hostname used for data recordkeeping
 	gethostname(MyHostName, sizeof(MyHostName));
@@ -387,7 +389,7 @@ int GetTiVoQueryFormats(SOCKET DataSocket, const char* InBuffer)
 		//	pWriter->WriteElementString(NULL, _T("Description"), NULL, NULL);
 		//pWriter->WriteEndElement();
 		pWriter->WriteFullEndElement();
-		pWriter->WriteComment(L" Copyright © 2023 William C Bonner ");
+		pWriter->WriteComment(L" Copyright © 2024 William C Bonner ");
 		pWriter->WriteEndDocument();
 		pWriter->Flush();
 		// Allocates enough memeory for the xml content.
@@ -416,13 +418,13 @@ int GetTiVoQueryFormats(SOCKET DataSocket, const char* InBuffer)
 	HttpResponse << "\r\n";
 	send(DataSocket, HttpResponse.str().c_str(), HttpResponse.str().length(), 0);
 	send(DataSocket, XMLDataBuff, strlen(XMLDataBuff), 0);
-	#ifdef _DEBUG
+	#ifdef DEBUG
 	if (bConsoleExists)
 	{
 		std::cout << "[                   ] " << HttpResponse.str() << std::endl;
 		std::cout << "[                   ] " << XMLDataBuff << std::endl;
 	}
-	#endif
+	#endif // DEBUG
 	return(0);
 }
 UINT PopulateTiVoFileList(LPVOID lvp)
@@ -532,7 +534,7 @@ UINT PopulateTiVoFileList(LPVOID lvp)
 						ccTiVoFileListCritSec.Unlock();
 						pWriter->WriteEndElement();	// TiVoFileList
 						//pWriter->WriteFullEndElement();
-						pWriter->WriteComment(L" Copyright © 2022 William C Bonner ");
+						pWriter->WriteComment(L" Copyright © 2024 William C Bonner ");
 						pWriter->WriteEndDocument();
 						pWriter->Flush();
 					}
@@ -587,11 +589,15 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 		int iItemCount = TiVoFileList.size();
 		ccTiVoFileListCritSec.Unlock();
 		int curPos = 0;
-		CStringA csToken(csInBuffer.Tokenize("& ?",curPos));
+		CString csToken(csInBuffer.Tokenize("& ?",curPos));
 		while (csToken != "")
 		{
-			CStringA csKey(csToken.Left(csToken.Find("=")));
-			CStringA csValue(csToken.Right(csToken.GetLength() - (csToken.Find("=")+1)));
+			TCHAR lpszBuffer[_MAX_PATH];
+			DWORD dwBufferLength = sizeof(lpszBuffer) / sizeof(TCHAR);
+			InternetCanonicalizeUrl(csToken.GetString(), lpszBuffer, &dwBufferLength, ICU_DECODE);
+			csToken = CString(lpszBuffer, dwBufferLength);
+			CStringA csKey(csToken.Left(csToken.Find(_T("="))));
+			CStringA csValue(csToken.Right(csToken.GetLength() - (csToken.Find(_T("="))+1)));
 			if (!csKey.CompareNoCase("Container"))
 			{
 				// 4.4.4.1 Container
@@ -599,7 +605,7 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 				// http://{machine}/TiVoConnect?Command=QueryContainer&Container=/Foo
 				// In this example, meta-data describing the contents of the container named "Foo" would be returned.
 				// When the Container parameter is missing, the default value is "/", which corresponds to the Server's "root container".
-				std::cout << "[                   ] " << csToken.GetString() << std::endl;
+				std::wcout << L"[                   ] " << csToken.GetString() << std::endl;
 				csContainer = csValue;
 			}
 			else if (!csKey.CompareNoCase("Recurse"))
@@ -608,21 +614,21 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 				// This optional parameter indicates whether or not the meta-data should contain only the items immediately within the container, or also every item contained within all "descendent" containers.
 				// http://{machine}/TiVoConnect?Command=QueryContainer&Recurse={flag}
 				// The value of {flag} is either "Yes" or "No". When the Recurse parameter is missing, the default value is "No".
-				std::cout << "[                   ] " << csToken.GetString() << std::endl;
+				std::wcout << L"[                   ] " << csToken.GetString() << std::endl;
 			}
 			else if (!csKey.CompareNoCase("DoGenres"))
-				std::cout << "[                   ] " << csToken.GetString() << std::endl;
+				std::wcout << L"[                   ] " << csToken.GetString() << std::endl;
 			else if (!csKey.CompareNoCase("SerialNum"))
 			{
-				std::cout << "[                   ] " << csToken.GetString();
+				std::wcout << L"[                   ] " << csToken.GetString();
 				TiVoSerialMap[TiVoAddress] = CString(csValue);
 				if ((std::atoi(csValue.Left(1)) >= 6) && (0 != csValue.Left(3).Compare("649")))
-					std::cout << " (High Definition TiVo)";
+					std::wcout << L" (High Definition TiVo)";
 				if ((std::atoi(csValue.Left(1)) >= 7) || (0 == csValue.Left(3).Compare("663")))
-					std::cout << " (Tivos supports transport streams)";
+					std::wcout << L" (Tivos supports transport streams)";
 				if ((0 == csValue.Left(3).Compare("849")) || (0 == csValue.Left(3).Compare("8F9")))
-					std::cout << " (4K TiVo)";
-				std::cout << std::endl;
+					std::wcout << L" (4K TiVo)";
+				std::wcout << std::endl;
 			}
 			else if (!csKey.CompareNoCase("SortOrder"))
 			{
@@ -640,7 +646,7 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 				// With "SortOrder=Random", note that randomization occurs across the entire sequence of items returned in the meta-data.
 				// When the SortOrder parameter is missing, items appear in the container's "native" order. For a music playlist, for example, the items would appear in the order authored. For a file system folder, items would appear potentially "at random" according to how the file system is feeling.
 				// When "streaming" sorted meta-data using multiple QueryContainer commands, Clients should specify the same {order} in each command.
-				std::cout << "[                   ] " << csToken.GetString() << std::endl;
+				std::wcout << L"[                   ] " << csToken.GetString() << std::endl;
 				if (!csValue.CompareNoCase("!CaptureDate"))
 					RequestedTiVoFileListSortOrder = CaptureDateReverse;
 				else if (!csValue.CompareNoCase("Title"))
@@ -658,7 +664,7 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 				// {seed} can be any positive, non-zero, 32-bit unsigned integer value chosen by the Client (0-4294967295). Different values result in different item orderings. However, the same {seed} always produces the same ordering (assuming an unchanging set of items).
 				// When "streaming" randomized meta-data using multiple QueryContainer commands, Clients should specify the same {seed} in each command.
 				// This parameter is ignored unless the SortOrder parameter is "Random”.
-				std::cout << "[                   ] " << csToken.GetString() << std::endl;
+				std::wcout << L"[                   ] " << csToken.GetString() << std::endl;
 			}
 			else if (!csKey.CompareNoCase("RandomStart"))
 			{
@@ -667,7 +673,7 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 				// http://{machine}/TiVoConnect?Command=QueryContainer&SortOrder={order}&RandomSeed={seed}&RandomStart={url}
 				// When "streaming" randomized meta-data using multiple QueryContainer commands, Clients should specify the same {url} in each command.
 				// This parameter is ignored unless the SortOrder parameter is "Random”.
-				std::cout << "[                   ] " << csToken.GetString() << std::endl;
+				std::wcout << L"[                   ] " << csToken.GetString() << std::endl;
 			}
 			else if (!csKey.CompareNoCase("AnchorOffset"))
 			{
@@ -676,7 +682,7 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 				// http://{machine}/TiVoConnect?Command=QueryContainer&AnchorItem={url}&AnchorOffset={offset}
 				// {offset} is a positive or negative integer. When {offset} is positive, the effective location of the anchor is shifted downwards. When {offset} is negative, the location is shifted upwards.
 				// When the AnchorOffset parameter is missing, no offset is applied to the anchor.
-				std::cout << "[                   ] " << csToken.GetString() << std::endl;
+				std::wcout << L"[                   ] " << csToken.GetString() << std::endl;
 				iAnchorOffset = atoi(csValue.GetString());
 				iAnchorOffset++; // Simplify for the -1 offset that the TiVo actually uses.
 			}
@@ -689,8 +695,7 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 				// Any entry can contain a wildcard (*) in place of the "major" or "minor" portion of the MIME type. For example, "image/*" would match any item with a general MIME type of "image".
 				// Any entry in the list also can be prefixed with an exclamation point (!) to limit the items returned to those NOT of the specified type.
 				// When the Filter parameter is missing, the default value is "*/*". This will result in no restriction of the types of items appearing in the meta - data.
-				csToken.Replace("%2F","/");
-				std::cout << "[                   ] " << csToken.GetString() << std::endl;
+				std::wcout << L"[                   ] " << csToken.GetString() << std::endl;
 			}
 			else if (!csKey.CompareNoCase("ItemCount"))
 			{
@@ -700,7 +705,7 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 				// {count} is a positive or negative integer. When {count} is positive, the items immediately following the anchor are described. When {count} is negative, the items immediately preceding the anchor are described. However, for the remaining discussion, assume {count} refers only to the absolute (non-negative magnitude) integer value.
 				// If the container holds more than {count} items, "partial" meta-data is returned. Note that the meta-data will have fewer than {count} items if the container itself has fewer.
 				// When the ItemCount parameter is missing, all items (preceding or following the anchor) are described.
-				std::cout << "[                   ] " << csToken.GetString() << std::endl;
+				std::wcout << L"[                   ] " << csToken.GetString() << std::endl;
 				iItemCount = min(iItemCount, atoi(CStringA(csValue).GetString()));
 			}
 			else if (!csKey.CompareNoCase("AnchorItem"))
@@ -711,33 +716,8 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 				// When the AnchorItem parameter is missing or ignored, the anchor is the imaginary item that precedes (or follows) the first (or last) item in the container.
 				// If the item identified by {url} no longer exists, then the item immediately following (or preceding) the position in the container the missing item would have occupied is used as the anchor instead. If this position cannot be determined, the AnchorItem parameter is ignored.
 				// Note that {url} must be escaped as described in section 4.4.1.
-				std::cout << "[                   ] " << csToken.GetString() << std::endl;
+				std::wcout << L"[                   ] " << csToken.GetString() << std::endl;
 				csAnchorItem = csValue;
-				TCHAR lpszBuffer[_MAX_PATH];
-				DWORD dwBufferLength = sizeof(lpszBuffer) / sizeof(TCHAR);
-				InternetCanonicalizeUrl(csAnchorItem.GetString(), lpszBuffer, &dwBufferLength, ICU_DECODE | ICU_NO_ENCODE);
-				csAnchorItem = CString(lpszBuffer, dwBufferLength);
-				//URL_COMPONENTS crackedURL;
-				//crackedURL.dwStructSize = sizeof(URL_COMPONENTS);
-				//crackedURL.lpszScheme = NULL;			// pointer to scheme name
-				//crackedURL.dwSchemeLength = 0;			// length of scheme name
-				//crackedURL.nScheme;						// enumerated scheme type (if known)
-				//crackedURL.lpszHostName = NULL;			// pointer to host name
-				//crackedURL.dwHostNameLength = 0;		// length of host name
-				//crackedURL.nPort;						// converted port number
-				//crackedURL.lpszUserName = NULL;			// pointer to user name
-				//crackedURL.dwUserNameLength = 0;		// length of user name
-				//crackedURL.lpszPassword = NULL;			// pointer to password
-				//crackedURL.dwPasswordLength = 0;		// length of password
-				//crackedURL.lpszUrlPath = lpszBuffer;	// pointer to URL-path
-				//crackedURL.dwUrlPathLength = _MAX_PATH;	// length of URL-path
-				//crackedURL.lpszExtraInfo = NULL;		// pointer to extra information (e.g. ?foo or #foo)
-				//crackedURL.dwExtraInfoLength = 0;		// length of extra information
-				//InternetCrackUrl(csAnchorItem.GetString(),csAnchorItem.GetLength(),ICU_DECODE,&crackedURL);
-				//csAnchorItem = CString(lpszBuffer);
-				//dwBufferLength = sizeof(lpszBuffer) / sizeof(TCHAR);
-				InternetCanonicalizeUrl(csAnchorItem.GetString(), lpszBuffer, &dwBufferLength, 0);
-				csAnchorItem = CString(lpszBuffer, dwBufferLength);
 			}
 			csToken = csInBuffer.Tokenize("& ?",curPos);
 		}
@@ -1012,20 +992,19 @@ int GetTiVoTVBusQuery(SOCKET DataSocket, const char * InBuffer)
 		std::cout << "[" << getTimeISO8601(true) << "] " << __FUNCTION__ << "\t" << inet_ntoa(adr_inet.sin_addr) << " " << csInBuffer.GetString() << endl;
 	}
 	cTiVoFile TiVoFileToSend;
-	int rval = 0;
 	int curPos = 0;
-	CStringA csToken(csInBuffer.Tokenize("& ",curPos));
+	CString csToken(csInBuffer.Tokenize("& ?", curPos));
 	while (csToken != "")
 	{
-		std::cout << "[                   ] " << csToken.GetString() << std::endl;
-		CStringA csKey(csToken.Left(csToken.Find("=")));
-		CStringA csValue(csToken.Right(csToken.GetLength() - (csToken.Find("=") + 1)));
+		TCHAR lpszBuffer[_MAX_PATH];
+		DWORD dwBufferLength = sizeof(lpszBuffer) / sizeof(TCHAR);
+		InternetCanonicalizeUrl(csToken.GetString(), lpszBuffer, &dwBufferLength, ICU_DECODE);
+		csToken = CString(lpszBuffer, dwBufferLength);
+		CStringA csKey(csToken.Left(csToken.Find(_T("="))));
+		CStringA csValue(csToken.Right(csToken.GetLength() - (csToken.Find(_T("=")) + 1)));
+		std::wcout << L"[                   ] " << csToken.GetString() << std::endl;
 		if (!csKey.CompareNoCase("Url"))
 		{
-			TCHAR lpszBuffer[_MAX_PATH];
-			DWORD dwBufferLength = sizeof(lpszBuffer) / sizeof(TCHAR);
-			InternetCanonicalizeUrl(CString(csValue).GetString(), lpszBuffer, &dwBufferLength, ICU_DECODE);
-			csValue = CString(lpszBuffer, dwBufferLength);
 			ccTiVoFileListCritSec.Lock();
 			for (auto& MyFile : TiVoFileList)
 				if (!MyFile.GetURL().CompareNoCase(CString(csValue)))
@@ -1052,7 +1031,7 @@ int GetTiVoTVBusQuery(SOCKET DataSocket, const char * InBuffer)
 		pWriter->SetProperty(XmlWriterProperty_Indent, FALSE);
 		pWriter->WriteStartDocument(XmlStandalone_Omit);
 			TiVoFileToSend.GetTvBusEnvelope(pWriter);
-		pWriter->WriteComment(L" Copyright © 2025 William C Bonner ");
+		pWriter->WriteComment(L" Copyright © 2024 William C Bonner ");
 		pWriter->WriteEndDocument();
 		pWriter->Flush();
 
@@ -1113,12 +1092,15 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 	CString csCommand(InBuffer);
 	if (0 < csCommand.FindOneOf(_T("\r\n")))
 		csCommand.Delete(csCommand.FindOneOf(_T("\r\n")),csCommand.GetLength());
-	// GetFile   192.168.50.197 GET /5979bb28cf2811e9488d84e9e869c479a373d5b37aa46fe4f1d77b7a06f3e3d6?Format=video%2Fx-tivo-mpeg-ts HTTP/1.1
 	CString csFormat(_T("video/x-tivo-mpeg")); // 2024-02-07 Default Format to send if not overridden in query from client 
 	int curPos = 0;
 	CString csToken(csCommand.Tokenize(_T("&? "),curPos));
 	while (csToken != _T(""))
 	{
+		TCHAR lpszBuffer[_MAX_PATH];
+		DWORD dwBufferLength = sizeof(lpszBuffer) / sizeof(TCHAR);
+		InternetCanonicalizeUrl(csToken.GetString(), lpszBuffer, &dwBufferLength, ICU_DECODE);
+		csToken = CString(lpszBuffer, dwBufferLength);
 		CString csKey(csToken.Left(csToken.Find(_T("="))));
 		CString csValue(csToken.Right(csToken.GetLength() - (csToken.Find(_T("=")) + 1)));
 		if (csToken.Compare(_T("GET")) == 0)
@@ -1127,10 +1109,7 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 		}
 		else if (csKey.Compare(_T("Format")) == 0)
 		{
-			TCHAR lpszBuffer[_MAX_PATH];
-			DWORD dwBufferLength = sizeof(lpszBuffer) / sizeof(TCHAR);
-			InternetCanonicalizeUrl(csValue.GetString(), lpszBuffer, &dwBufferLength, ICU_DECODE);
-			csFormat = CString(lpszBuffer, dwBufferLength);
+			csFormat = csValue;
 			std::wcout << L"[                   ] " << csToken.GetString() << std::endl;
 		}
 		else
@@ -1882,7 +1861,9 @@ UINT HTTPMain(LPVOID lvp)
 							CWinThread * ChildThread = AfxBeginThread(HTTPChild, (LPVOID)remoteSocket, THREAD_PRIORITY_ABOVE_NORMAL, 0, CREATE_SUSPENDED);
 							ChildThread->m_bAutoDelete = FALSE;
 							ThreadPtrList.push(ChildThread);
+							#ifdef DEBUG
 							std::wcout << L"[" << getwTimeISO8601(true) << L"] ThreadList Size: " << ThreadPtrList.size() << std::endl;
+							#endif // DEBUG
 							ChildThread->ResumeThread();
 						}
 #endif // THREADTRACKING

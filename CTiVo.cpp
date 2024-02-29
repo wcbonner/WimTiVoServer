@@ -983,7 +983,11 @@ const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath, cons
 		//rval.Append(_T(" -map_metadata -1"));
 		if (m_VideoCompatible)
 		{
-			rval.Append(_T(" -vcodec copy -bsf:v h264_mp4toannexb"));	// https://ffmpeg.org/ffmpeg-bitstream-filters.html#h264_005fmp4toannexb
+			rval.Append(_T(" -vcodec copy"));
+			if (0 == GetSourceFormat().Compare(_T("video/h264")))
+				rval.Append(_T(" -bsf:v h264_mp4toannexb"));	// https://ffmpeg.org/ffmpeg-bitstream-filters.html#h264_005fmp4toannexb
+			else if (0 == GetSourceFormat().Compare(_T("video/hevc")))
+				rval.Append(_T(" -bsf:v hevc_mp4toannexb"));	// https://ffmpeg.org/ffmpeg-bitstream-filters.html#hevc_005fmp4toannexb
 		}
 		else
 		{

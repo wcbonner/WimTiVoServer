@@ -267,7 +267,7 @@ BEGIN
             VALUE "FileDescription", "WimTiVoClient"
             VALUE "FileVersion", "1.6.11.8"
             VALUE "InternalName", "WimTiVoClient.exe"
-            VALUE "LegalCopyright", "Copyright © 2021 William C Bonner.  All rights reserved."
+            VALUE "LegalCopyright", "Copyright © 2024 William C Bonner.  All rights reserved."
             VALUE "OriginalFilename", "WimTiVoClient.exe"
             VALUE "ProductName", "WimTiVoClient"
             VALUE "ProductVersion", "1.6.11.8"

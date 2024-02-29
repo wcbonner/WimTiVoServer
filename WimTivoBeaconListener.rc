@@ -71,7 +71,7 @@ BEGIN
             VALUE "FileDescription", "WimTivoBeaconListener"
             VALUE "FileVersion", "1.6.11.8"
             VALUE "InternalName", "WimTivoBeaconListener"
-            VALUE "LegalCopyright", "Copyright © 2021 William C Bonner.  All rights reserved."
+            VALUE "LegalCopyright", "Copyright © 2024 William C Bonner.  All rights reserved."
             VALUE "OriginalFilename", "WimTivoBeaconListener.exe"
             VALUE "ProductName", "WimTivoBeaconListener"
             VALUE "ProductVersion", "1.6.11.8"
