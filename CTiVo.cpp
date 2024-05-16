@@ -979,6 +979,8 @@ const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath, cons
 	rval.Append(QuoteFileName(m_csPathName));
 	if (0 == csFormat.Compare(_T("video/x-tivo-mpeg-ts")))
 	{
+		//rval.Append(_T(" -map 0:a?")); // copy all audio streams see https://superuser.com/questions/1273764/using-ffmpeg-on-how-do-i-copy-the-video-and-multiple-subtitle-streams-in-an-mkv Added 2022-02-28
+		rval.Append(_T(" -map 0:d?")); // copy all data streams see https://superuser.com/questions/1273764/using-ffmpeg-on-how-do-i-copy-the-video-and-multiple-subtitle-streams-in-an-mkv Added 2022-02-28
 		//rval.Append(_T(" -map 0:v -map 0:a?")); // copy all audio streams Added 2020-04-04
 		//rval.Append(_T(" -map_metadata -1"));
 		if (m_VideoCompatible)
@@ -1010,7 +1012,9 @@ const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath, cons
 		// For 4k set video maxrate to 30000k and buffsize to 8192k
 		rval.Append(_T(" -b:v 30000k -maxrate 30000k -bufsize 8192k"));
 		if (m_AudioCompatible)
+		{
 			rval.Append(_T(" -acodec copy"));
+		}
 		else
 			rval.Append(_T(" -acodec ac3"));
 		rval.Append(_T(" -b:a 448k -ar 48000"));
