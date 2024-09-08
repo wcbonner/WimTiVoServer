@@ -3,7 +3,7 @@ Module : Dtwinver.h
 Purpose: Declaration of a comprehensive class to perform OS version detection
 Created: PJN / 11-05-1996
 
-Copyright (c) 1997 - 2023 by PJ Naughter (Web: www.naughter.com, Email: pjna@naughter.com)
+Copyright (c) 1997 - 2024 by PJ Naughter (Web: www.naughter.com, Email: pjna@naughter.com)
 
 All rights reserved.
 
@@ -171,6 +171,8 @@ to maintain a single distribution point for the source code.
 #define COSVERSION_SUITE4_SERVER_FOR_SB_SOLUTIONS              0x00000080 //NOLINT(modernize-macro-to-enum)
 #define COSVERSION_SUITE4_SERVER_SOLUTIONS                     0x00000100 //NOLINT(modernize-macro-to-enum)
 #define COSVERSION_SUITE4_UNLICENSED                           0x00000200 //NOLINT(modernize-macro-to-enum)
+#define COSVERSION_SUITE4_AZURE_SERVER_AGENTBRIDGE             0x00000400 //NOLINT(modernize-macro-to-enum)
+#define COSVERSION_SUITE4_AZURE_SERVER_NANOHOST                0x00000800 //NOLINT(modernize-macro-to-enum)
 
 #ifndef _Success_
 #define _Success_(expr)
@@ -378,6 +380,7 @@ public:
   _Success_(return != FALSE) BOOL IsWindows11Version21H2(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
   _Success_(return != FALSE) BOOL IsWindows11Version22H2(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
   _Success_(return != FALSE) BOOL IsWindows11Version23H2(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
+  _Success_(return != FALSE) BOOL IsWindows11Version24H2(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
   _Success_(return != FALSE) BOOL IsWindows11ActiveDevelopmentBranch(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
 
   _Success_(return != FALSE) BOOL IsWebWindowsServer2003(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
@@ -444,6 +447,14 @@ public:
   _Success_(return != FALSE) BOOL IsDatacenterWindowsServer2022(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
   _Success_(return != FALSE) BOOL IsDomainControllerWindowsServer2022(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
   _Success_(return != FALSE) BOOL IsWindowsServer2022ActiveDevelopmentBranch(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
+  _Success_(return != FALSE) BOOL IsWindowsServerVersion23H2(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
+
+  _Success_(return != FALSE) BOOL IsWindowsServer2025(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
+  _Success_(return != FALSE) BOOL IsWebWindowsServer2025(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
+  _Success_(return != FALSE) BOOL IsStandardWindowsServer2025(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
+  _Success_(return != FALSE) BOOL IsEnterpriseWindowsServer2025(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
+  _Success_(return != FALSE) BOOL IsDatacenterWindowsServer2025(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
+  _Success_(return != FALSE) BOOL IsDomainControllerWindowsServer2025(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying);
 
   _Success_(return != FALSE) BOOL IsHomeBasic(_In_ LPCOS_VERSION_INFO lpVersionInformation);
   _Success_(return != FALSE) BOOL IsHomeBasicPremium(_In_ LPCOS_VERSION_INFO lpVersionInformation);
@@ -544,6 +555,8 @@ public:
   _Success_(return != FALSE) BOOL IsIoTEnterpriseEvaluation(_In_ LPCOS_VERSION_INFO lpVersionInformation);
   _Success_(return != FALSE) BOOL IsWNC(_In_ LPCOS_VERSION_INFO lpVersionInformation);
   _Success_(return != FALSE) BOOL IsValidation(_In_ LPCOS_VERSION_INFO lpVersionInformation);
+  _Success_(return != FALSE) BOOL IsAzureServerAgentBridge(_In_ LPCOS_VERSION_INFO lpVersionInformation);
+  _Success_(return != FALSE) BOOL IsAzureServerNanoHost(_In_ LPCOS_VERSION_INFO lpVersionInformation);
   _Success_(return != FALSE) BOOL IsWindows10X(_In_ LPCOS_VERSION_INFO lpVersionInformation);
   _Success_(return != FALSE) BOOL IsXBoxSystemOS(_In_ LPCOS_VERSION_INFO lpVersionInformation);
   _Success_(return != FALSE) BOOL IsXBoxNativeOS(_In_ LPCOS_VERSION_INFO lpVersionInformation);

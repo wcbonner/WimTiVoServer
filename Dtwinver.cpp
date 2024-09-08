@@ -495,8 +495,20 @@ History: PJN / 24-02-1997 A number of updates including support for NT 3.1,
                           2. Provided a new IsUnlicensed method.
                           3. Provided a new IsServerForSBSolutions method.
                           4. Provided a new IsServerSolutions method.
+         PJN / 04-01-2024 1. Updated copyright details.
+                          2. UBR number is now reported by test app on Windows 11 and Windows Server 2022
+                          3. Added support for the following product types: PRODUCT_AZURE_SERVER_AGENTBRIDGE
+                          & PRODUCT_AZURE_SERVER_NANOHOST.
+         PJN / 27-01-2024 1. Provided a new IsWindowsServerVersion23H2 method.
+                          2. Provided a new IsWindowsServer2025 method.
+                          3. Provided a new IsWebWindowsServer2025 method.
+                          4. Provided a new IsStandardWindowsServer2025 method.
+                          5. Provided a new IsEnterpriseWindowsServer2025 method.
+                          6. Provided a new IsDatacenterWindowsServer2025 method.
+                          7. Provided a new IsDomainControllerWindowsServer2025 method.
+         PJN / 07-04-2024 1. Provided a new IsWindows11Version24H2 method.
 
-Copyright (c) 1997 - 2023 by PJ Naughter (Web: www.naughter.com, Email: pjna@naughter.com)
+Copyright (c) 1997 - 2024 by PJ Naughter (Web: www.naughter.com, Email: pjna@naughter.com)
 
 All rights reserved.
 
@@ -1362,6 +1374,14 @@ to maintain a single distribution point for the source code.
 #ifndef PRODUCT_IOTENTERPRISESEVAL
 #define PRODUCT_IOTENTERPRISESEVAL 0x000000CF
 #endif //#ifndef PRODUCT_IOTENTERPRISESEVAL
+
+#ifndef PRODUCT_AZURE_SERVER_AGENTBRIDGE
+#define PRODUCT_AZURE_SERVER_AGENTBRIDGE 0x000000D0
+#endif //PRODUCT_AZURE_SERVER_AGENTBRIDGE
+
+#ifndef PRODUCT_AZURE_SERVER_NANOHOST
+#define PRODUCT_AZURE_SERVER_NANOHOST 0x000000D1
+#endif //#ifndef PRODUCT_AZURE_SERVER_NANOHOST
 
 #ifndef PRODUCT_WNC
 #define PRODUCT_WNC 0x000000D2
@@ -3846,6 +3866,18 @@ void COSVersion::GetProductInfo(_Inout_ LPOS_VERSION_INFO lpVersionInformation)
       lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_IOTENTERPRISE;
       break;
     }
+    case PRODUCT_AZURE_SERVER_AGENTBRIDGE:
+    {
+      lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_AZURE;
+      lpVersionInformation->dwSuiteMask4 |= COSVERSION_SUITE4_AZURE_SERVER_AGENTBRIDGE;
+      break;
+    }
+    case PRODUCT_AZURE_SERVER_NANOHOST:
+    {
+      lpVersionInformation->dwSuiteMask3 |= COSVERSION_SUITE3_AZURE;
+      lpVersionInformation->dwSuiteMask4 |= COSVERSION_SUITE4_AZURE_SERVER_NANOHOST;
+      break;
+    }
     case PRODUCT_WNC:
     {
       lpVersionInformation->dwSuiteMask4 |= COSVERSION_SUITE4_WNC;
@@ -4073,8 +4105,6 @@ _Success_(return != FALSE) BOOL COSVersion::GetDeviceFamilyInfo(_Inout_ LPOS_VER
 
   return TRUE;
 }
-
-
 
 _Success_(return != FALSE) BOOL COSVersion::GetWindows8Point1Or2012R2Update(_Inout_ LPOS_VERSION_INFO lpVersionInformation)
 {
@@ -4508,13 +4538,15 @@ _Success_(return != FALSE) BOOL COSVersion::IsWindows10OrWindowsServer2016(_In_ 
             ((lpVersionInformation->dwUnderlyingMajorVersion == 6) && lpVersionInformation->dwUnderlyingMinorVersion >= 4))) &&
             !IsWindowsServer2019(lpVersionInformation, bCheckUnderlying) &&
             !IsWindowsServer2022(lpVersionInformation, bCheckUnderlying) &&
+            !IsWindowsServer2025(lpVersionInformation, bCheckUnderlying) &&
             !IsWindows11(lpVersionInformation, bCheckUnderlying);
   else
     return ((lpVersionInformation->EmulatedPlatform == WindowsNT) &&
             ((lpVersionInformation->dwEmulatedMajorVersion > 6) ||
             ((lpVersionInformation->dwEmulatedMajorVersion == 6) && lpVersionInformation->dwEmulatedMinorVersion >= 4))) &&
             !IsWindowsServer2019(lpVersionInformation, bCheckUnderlying) &&
-            !IsWindowsServer2022(lpVersionInformation, bCheckUnderlying) && 
+            !IsWindowsServer2022(lpVersionInformation, bCheckUnderlying) &&
+            !IsWindowsServer2025(lpVersionInformation, bCheckUnderlying) &&
             !IsWindows11(lpVersionInformation, bCheckUnderlying);
 }
 
@@ -4594,22 +4626,46 @@ _Success_(return != FALSE) BOOL COSVersion::IsWindowsServer2022(_In_ LPCOS_VERSI
     return ((lpVersionInformation->UnderlyingPlatform == WindowsNT) &&
             ((lpVersionInformation->dwUnderlyingMajorVersion > 6) ||
             ((lpVersionInformation->dwUnderlyingMajorVersion == 6) && lpVersionInformation->dwUnderlyingMinorVersion >= 4)) &&
-            (lpVersionInformation->dwUnderlyingBuildNumber >= 19504) &&
+            ((lpVersionInformation->dwUnderlyingBuildNumber >= 19504) && (lpVersionInformation->dwUnderlyingBuildNumber < 25921)) &&
             ((lpVersionInformation->OSType == Server) || ((lpVersionInformation->OSType == DomainController))));
   else
     return ((lpVersionInformation->EmulatedPlatform == WindowsNT) &&
             ((lpVersionInformation->dwEmulatedMajorVersion > 6) ||
             ((lpVersionInformation->dwEmulatedMajorVersion == 6) && lpVersionInformation->dwEmulatedMinorVersion >= 4)) &&
-            (lpVersionInformation->dwEmulatedBuildNumber >= 19504) &&
+            ((lpVersionInformation->dwEmulatedBuildNumber >= 19504) && (lpVersionInformation->dwEmulatedBuildNumber < 25921)) &&
             ((lpVersionInformation->OSType == Server) || ((lpVersionInformation->OSType == DomainController))));
+}
+
+_Success_(return != FALSE) BOOL COSVersion::IsWindowsServerVersion23H2(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
+{
+  if (bCheckUnderlying)
+    return IsWindowsServer2022(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber == 25398) && !IsAzure(lpVersionInformation);
+  else
+    return IsWindowsServer2022(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber == 25398) && !IsAzure(lpVersionInformation);
 }
 
 _Success_(return != FALSE) BOOL COSVersion::IsWindowsServer2022ActiveDevelopmentBranch(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
 {
   if (bCheckUnderlying)
-    return IsWindowsServer2022(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber > 20348);
+    return IsWindowsServer2022(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber > 20348) && !IsWindowsServerVersion23H2(lpVersionInformation, bCheckUnderlying);
   else
-    return IsWindowsServer2022(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber > 20348);
+    return IsWindowsServer2022(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber > 20348) && !IsWindowsServerVersion23H2(lpVersionInformation, bCheckUnderlying);
+}
+
+_Success_(return != FALSE) BOOL COSVersion::IsWindowsServer2025(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
+{
+  if (bCheckUnderlying)
+    return ((lpVersionInformation->UnderlyingPlatform == WindowsNT) &&
+            ((lpVersionInformation->dwUnderlyingMajorVersion > 6) ||
+            ((lpVersionInformation->dwUnderlyingMajorVersion == 6) && lpVersionInformation->dwUnderlyingMinorVersion >= 4)) &&
+            (lpVersionInformation->dwUnderlyingBuildNumber >= 25921) &&
+            ((lpVersionInformation->OSType == Server) || ((lpVersionInformation->OSType == DomainController))));
+  else
+    return ((lpVersionInformation->EmulatedPlatform == WindowsNT) &&
+           ((lpVersionInformation->dwEmulatedMajorVersion > 6) ||
+           ((lpVersionInformation->dwEmulatedMajorVersion == 6) && lpVersionInformation->dwEmulatedMinorVersion >= 4)) &&
+           (lpVersionInformation->dwEmulatedBuildNumber >= 25921) &&
+           ((lpVersionInformation->OSType == Server) || ((lpVersionInformation->OSType == DomainController))));
 }
 
 _Success_(return != FALSE) BOOL COSVersion::IsWindows10(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
@@ -4781,12 +4837,20 @@ _Success_(return != FALSE) BOOL COSVersion::IsWindows11Version23H2(_In_ LPCOS_VE
     return IsWindows11(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber > 22621) && (lpVersionInformation->dwEmulatedBuildNumber <= 22631);
 }
 
+_Success_(return != FALSE) BOOL COSVersion::IsWindows11Version24H2(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
+{
+  if (bCheckUnderlying)
+    return IsWindows11(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber > 22631) && (lpVersionInformation->dwUnderlyingBuildNumber <= 26100);
+  else
+    return IsWindows11(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber > 22631) && (lpVersionInformation->dwEmulatedBuildNumber <= 26100);
+}
+
 _Success_(return != FALSE) BOOL COSVersion::IsWindows11ActiveDevelopmentBranch(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
 {
   if (bCheckUnderlying)
-    return IsWindows11(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber > 22631);
+    return IsWindows11(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwUnderlyingBuildNumber > 26100);
   else
-    return IsWindows11(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber > 22631);
+    return IsWindows11(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->dwEmulatedBuildNumber > 26100);
 }
 
 _Success_(return != FALSE) BOOL COSVersion::IsWindows8Point1(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
@@ -5261,6 +5325,31 @@ _Success_(return != FALSE) BOOL COSVersion::IsDomainControllerWindowsServer2022(
   return IsWindowsServer2022(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->OSType == DomainController);
 }
 
+_Success_(return != FALSE) BOOL COSVersion::IsWebWindowsServer2025(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
+{
+  return IsWindowsServer2025(lpVersionInformation, bCheckUnderlying) && ((lpVersionInformation->dwSuiteMask & COSVERSION_SUITE_WEBEDITION) != 0);
+}
+
+_Success_(return != FALSE) BOOL COSVersion::IsStandardWindowsServer2025(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
+{
+  return IsWindowsServer2025(lpVersionInformation, bCheckUnderlying) && ((lpVersionInformation->dwSuiteMask2 & COSVERSION_SUITE2_STANDARD) != 0);
+}
+
+_Success_(return != FALSE) BOOL COSVersion::IsEnterpriseWindowsServer2025(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
+{
+  return IsWindowsServer2025(lpVersionInformation, bCheckUnderlying) && ((lpVersionInformation->dwSuiteMask & COSVERSION_SUITE_ENTERPRISE) != 0);
+}
+
+_Success_(return != FALSE) BOOL COSVersion::IsDatacenterWindowsServer2025(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
+{
+  return IsWindowsServer2025(lpVersionInformation, bCheckUnderlying) && ((lpVersionInformation->dwSuiteMask & COSVERSION_SUITE_DATACENTER) != 0);
+}
+
+_Success_(return != FALSE) BOOL COSVersion::IsDomainControllerWindowsServer2025(_In_ LPCOS_VERSION_INFO lpVersionInformation, _In_ BOOL bCheckUnderlying)
+{
+  return IsWindowsServer2025(lpVersionInformation, bCheckUnderlying) && (lpVersionInformation->OSType == DomainController);
+}
+
 _Success_(return != FALSE) BOOL COSVersion::IsMediaCenter(_In_ LPCOS_VERSION_INFO lpVersionInformation)
 {
   return ((lpVersionInformation->dwSuiteMask & COSVERSION_SUITE_MEDIACENTER) != 0);
@@ -5673,6 +5762,16 @@ _Success_(return != FALSE) BOOL COSVersion::IsWNC(_In_ LPCOS_VERSION_INFO lpVers
 _Success_(return != FALSE) BOOL COSVersion::IsValidation(_In_ LPCOS_VERSION_INFO lpVersionInformation)
 {
   return ((lpVersionInformation->dwSuiteMask4 & COSVERSION_SUITE4_VALIDATION) != 0);
+}
+
+_Success_(return != FALSE) BOOL COSVersion::IsAzureServerAgentBridge(_In_ LPCOS_VERSION_INFO lpVersionInformation)
+{
+  return ((lpVersionInformation->dwSuiteMask4 & COSVERSION_SUITE4_AZURE_SERVER_AGENTBRIDGE) != 0);
+}
+
+_Success_(return != FALSE) BOOL COSVersion::IsAzureServerNanoHost(_In_ LPCOS_VERSION_INFO lpVersionInformation)
+{
+  return ((lpVersionInformation->dwSuiteMask4 & COSVERSION_SUITE4_AZURE_SERVER_NANOHOST) != 0);
 }
 
 _Success_(return != FALSE) BOOL COSVersion::IsWindows10X(_In_ LPCOS_VERSION_INFO lpVersionInformation)
