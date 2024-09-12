@@ -1312,12 +1312,12 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 			HANDLE g_hChildStd_OUT_Rd = NULL;
 			HANDLE g_hChildStd_OUT_Wr = NULL;
 			if ( ! CreatePipe(&g_hChildStd_OUT_Rd, &g_hChildStd_OUT_Wr, &saAttr, 0x800000) ) 
-				std::cout << "[" << getTimeISO8601() << "] "  << __FUNCTION__ << "\t ERROR: StdoutRd CreatePipe" << endl;
+				std::cout << "[" << getTimeISO8601(true) << "] "  << __FUNCTION__ << "\t ERROR: StdoutRd CreatePipe" << endl;
 			else
 			{
 				// Ensure the read handle to the pipe for STDOUT is not inherited.
 				if ( ! SetHandleInformation(g_hChildStd_OUT_Rd, HANDLE_FLAG_INHERIT, 0) )
-					std::cout << "[" << getTimeISO8601() << "] "  << __FUNCTION__ << "\t ERROR: Stdout SetHandleInformation" << endl;
+					std::cout << "[" << getTimeISO8601(true) << "] "  << __FUNCTION__ << "\t ERROR: Stdout SetHandleInformation" << endl;
 				else
 				{
 					// http://msdn.microsoft.com/en-us/library/windows/desktop/ms682512(v=vs.85).aspx is the simple version of CreateProcess
@@ -1490,7 +1490,7 @@ int GetFile(SOCKET DataSocket, const char * InBuffer)
 						CloseHandle(piProcInfo.hThread);
 						auto TotalSeconds = ctsTotal.GetTotalSeconds();
 						std::wstringstream ss;
-						ss << "[" << getwTimeISO8601() << "][" << piProcInfo.dwProcessId << "." << piProcInfo.dwThreadId << "] Finished Sending: " << TiVoFileToSend.GetPathName().GetString() << std::endl;
+						ss << "[" << getwTimeISO8601(true) << "][" << piProcInfo.dwProcessId << "." << piProcInfo.dwThreadId << "] Finished Sending: " << TiVoFileToSend.GetPathName().GetString() << std::endl;
 						ss.imbue(std::locale(""));
 						if (TotalSeconds > 0)
 							ss << "[                   ] BytesSent: " << bytessent << " Speed: " << (CurrentFileSize / TotalSeconds) << " B/s, " << CStringA(ctsTotal.Format(_T("%H:%M:%S"))).GetString() << std::endl;
@@ -1673,7 +1673,7 @@ UINT HTTPMain(LPVOID lvp)
 								0,			// min size for buffer
 								NULL );		// 0, since getting message from system tables
 							std::stringstream ss;
-							ss << "[" << getTimeISO8601() << "] " << __FUNCTION__ << " RegSetValueEx() Error code: " << errCode << " " << CStringA(errString, size).Trim().GetString() << std::endl;
+							ss << "[" << getTimeISO8601(true) << "] " << __FUNCTION__ << " RegSetValueEx() Error code: " << errCode << " " << CStringA(errString, size).Trim().GetString() << std::endl;
 							LocalFree(errString);	// if you don't do this, you will get an
 													// ever so slight memory leak, since we asked
 													// FormatMessage to FORMAT_MESSAGE_ALLOCATE_BUFFER,
@@ -1704,7 +1704,7 @@ UINT HTTPMain(LPVOID lvp)
 							0,			// min size for buffer
 							NULL );		// 0, since getting message from system tables
 						std::stringstream ss;
-						ss << "[" << getTimeISO8601() << "] " << __FUNCTION__ << " RegCreateKeyEx() Error code: " << errCode << " " << CStringA(errString, size).Trim().GetString() << std::endl;
+						ss << "[" << getTimeISO8601(true) << "] " << __FUNCTION__ << " RegCreateKeyEx() Error code: " << errCode << " " << CStringA(errString, size).Trim().GetString() << std::endl;
 						LocalFree(errString);	// if you don't do this, you will get an
 												// ever so slight memory leak, since we asked
 												// FormatMessage to FORMAT_MESSAGE_ALLOCATE_BUFFER,
@@ -1902,7 +1902,7 @@ void DnsServiceRegisterComplete(DWORD Status, PVOID pQueryContext,PDNS_SERVICE_I
 {
 	if (bConsoleExists)
 	{
-		std::wcout << L"[" << getwTimeISO8601() << L"] DnsServiceRegisterComplete(" << Status << L") DNS_ERROR_RCODE_SERVER_FAILURE=" << DNS_ERROR_RCODE_SERVER_FAILURE << std::endl;
+		std::wcout << L"[" << getwTimeISO8601(true) << L"] DnsServiceRegisterComplete(" << Status << L") DNS_ERROR_RCODE_SERVER_FAILURE=" << DNS_ERROR_RCODE_SERVER_FAILURE << std::endl;
 		if (0 == Status)
 		{
 			std::wcout << L"[                   ] pInstance->pszInstanceName " << pInstance->pszInstanceName << std::endl;
@@ -1979,13 +1979,13 @@ void TiVomDNSRegister(bool enable = true)
 			{
 				auto mDNSReturn = DnsServiceRegister(&rd, nullptr);
 				if (bConsoleExists)
-					std::cout << "[" << getTimeISO8601() << "] DnsServiceRegister(" << mDNSReturn << ") DNS_REQUEST_PENDING=" << DNS_REQUEST_PENDING << std::endl;
+					std::cout << "[" << getTimeISO8601(true) << "] DnsServiceRegister(" << mDNSReturn << ") DNS_REQUEST_PENDING=" << DNS_REQUEST_PENDING << std::endl;
 			}
 			else
 			{
 				auto mDNSReturn = DnsServiceDeRegister(&rd, nullptr);
 				if (bConsoleExists)
-					std::cout << "[" << getTimeISO8601() << "] DnsServiceRegister(" << mDNSReturn << ") DNS_REQUEST_PENDING=" << DNS_REQUEST_PENDING << std::endl;
+					std::cout << "[" << getTimeISO8601(true) << "] DnsServiceRegister(" << mDNSReturn << ") DNS_REQUEST_PENDING=" << DNS_REQUEST_PENDING << std::endl;
 			}
 			DnsServiceFreeInstance(MyServiceInstancePtr);
 		}
@@ -2226,7 +2226,7 @@ UINT TiVoBeaconSendThread(LPVOID lvp)
 						0,			// min size for buffer
 						NULL );		// 0, since getting message from system tables
 					std::stringstream ss;
-					ss << "[" << getTimeISO8601() << "] " << __FUNCTION__ << " RegCloseKey() Error code: " << errCode << " " << CStringA(errString, size).Trim().GetString() << std::endl;
+					ss << "[" << getTimeISO8601(true) << "] " << __FUNCTION__ << " RegCloseKey() Error code: " << errCode << " " << CStringA(errString, size).Trim().GetString() << std::endl;
 					LocalFree(errString);	// if you don't do this, you will get an
 											// ever so slight memory leak, since we asked
 											// FormatMessage to FORMAT_MESSAGE_ALLOCATE_BUFFER,
@@ -2256,7 +2256,7 @@ UINT TiVoBeaconSendThread(LPVOID lvp)
 					0,			// min size for buffer
 					NULL );		// 0, since getting message from system tables
 				std::stringstream ss;
-				ss << "[" << getTimeISO8601() << "] " << __FUNCTION__ << " RegCreateKeyEx() Error code: " << errCode << " " << CStringA(errString, size).Trim().GetString() << std::endl;
+				ss << "[" << getTimeISO8601(true) << "] " << __FUNCTION__ << " RegCreateKeyEx() Error code: " << errCode << " " << CStringA(errString, size).Trim().GetString() << std::endl;
 				LocalFree(errString);	// if you don't do this, you will get an
 										// ever so slight memory leak, since we asked
 										// FormatMessage to FORMAT_MESSAGE_ALLOCATE_BUFFER,
