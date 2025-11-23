@@ -525,6 +525,8 @@ History: PJN / 24-02-1997 A number of updates including support for NT 3.1,
                           12. Renamed "IsWNC" method to "IsWindowsCPC".
                           13. Renamed "IsXBoxDurangoHostOS" method to "IsXBoxOneHostOS".
                           14. Renamed "IsXBoxScarlettHostOS" method to "IsXBoxSeriesXSHostOS".
+         PJN / 22-11-2025 1. Updated the code to return BuildLab and BuildLabEx strings
+                          2. Updated the code to support detecting ReactOS version details.
 
 Copyright (c) 1997 - 2025 by PJ Naughter (Web: www.naughter.com, Email: pjna@naughter.com)
 
@@ -1865,8 +1867,8 @@ _Success_(return != FALSE) BOOL COSVersion::GetVersion(_Inout_ LPOS_VERSION_INFO
     return FALSE;
 
   //Basic OS info
-  lpVersionInformation->dwEmulatedMajorVersion = osvi.dwMajorVersion; 
-  lpVersionInformation->dwEmulatedMinorVersion = osvi.dwMinorVersion; 
+  lpVersionInformation->dwEmulatedMajorVersion = osvi.dwMajorVersion;
+  lpVersionInformation->dwEmulatedMinorVersion = osvi.dwMinorVersion;
   lpVersionInformation->dwEmulatedBuildNumber = LOWORD(osvi.dwBuildNumber); //ignore HIWORD
   lpVersionInformation->EmulatedPlatform = WindowsCE;
   _tcscpy(lpVersionInformation->szEmulatedCSDVersion, osvi.szCSDVersion);
@@ -1979,7 +1981,7 @@ _Success_(return != FALSE) BOOL COSVersion::GetVersion(_Inout_ LPOS_VERSION_INFO
       //Get the Product Suites installed
       GetProductSuiteDetailsFromRegistry(lpVersionInformation);
 
-      //Determine if we are using the "Standard" version of the server  
+      //Determine if we are using the "Standard" version of the server
       if ((lpVersionInformation->OSType != Workstation) && ((osviex.wSuiteMask & COSVERSION_SUITE_ENTERPRISE) == 0) &&
           ((osviex.wSuiteMask & COSVERSION_SUITE_DATACENTER) == 0) && ((osviex.wSuiteMask & COSVERSION_SUITE_WEBEDITION) == 0))
         lpVersionInformation->dwSuiteMask2 |= COSVERSION_SUITE2_STANDARD;
@@ -2088,7 +2090,7 @@ _Success_(return != FALSE) BOOL COSVersion::GetVersion(_Inout_ LPOS_VERSION_INFO
       lpVersionInformation->dwUnderlyingMajorVersion = (DWORD)(LOBYTE(LOWORD(dwVersion)));
       lpVersionInformation->dwUnderlyingMinorVersion = (DWORD)(HIBYTE(LOWORD(dwVersion)));
       lpVersionInformation->dwUnderlyingBuildNumber  = 0;
-      lpVersionInformation->UnderlyingPlatform   = WindowsNT;
+      lpVersionInformation->UnderlyingPlatform = WindowsNT;
       _fstrcpy(lpVersionInformation->szUnderlyingCSDVersion, "");
 
       bFoundUnderlyingOS = TRUE;
@@ -2298,7 +2300,17 @@ BOOL COSVersion::GetInfoBySpawingWriteVer(COSVersion::LPOS_VERSION_INFO lpVersio
                                           lpVersionInformation->ulDeviceFamily = atoi(pszToken);
                                           pszToken = strtok(NULL, pszSeparators);
                                           if (pszToken)
+                                          {
                                             lpVersionInformation->ulDeviceForm = atoi(pszToken);
+                                            pszToken = strtok(NULL, pszSeparators);
+                                            if (pszToken)
+                                            {
+                                              strcpy(lpVersionInformation->szBuildLab, pszToken);
+                                              pszToken = strtok(NULL, pszSeparators);
+                                              if (pszToken)
+                                                strcpy(lpVersionInformation->szBuildLabEx, pszToken);
+                                            }
+                                          }
                                         }
                                       }
                                     }
@@ -2467,10 +2479,11 @@ void COSVersion::GetXPSP1aDetailsFromRegistry(_Inout_ LPOS_VERSION_INFO lpVersio
       sTemp[0] = _T('\0');
       DWORD dwBufLen = 1024 * sizeof(TCHAR);
 
+      DWORD dwType = 0;
 #if !defined(COSVERSION_WIN16)
-      if (::RegQueryValueEx(hKey, _T("SubVersionNumber"), NULL, NULL, (LPBYTE)sTemp, &dwBufLen) == ERROR_SUCCESS) //NOLINT(modernize-use-nullptr)
+      if ((::RegQueryValueEx(hKey, _T("SubVersionNumber"), NULL, &dwType, (LPBYTE)sTemp, &dwBufLen) == ERROR_SUCCESS) && (dwType == REG_SZ)) //NOLINT(modernize-use-nullptr)
 #else
-      if (RegQueryValueEx(hKey, _T("SubVersionNumber"), NULL, NULL, (LPBYTE)sTemp, &dwBufLen) == ERROR_SUCCESS)
+      if ((RegQueryValueEx(hKey, _T("SubVersionNumber"), NULL, &dwType, (LPBYTE)sTemp, &dwBufLen) == ERROR_SUCCESS) && (dwType == REG_SZ))
 #endif //#if !defined(COSVERSION_WIN16)
       {
         if (_tcsicmp(sTemp, _T("a")) == 0)
@@ -2488,6 +2501,100 @@ void COSVersion::GetXPSP1aDetailsFromRegistry(_Inout_ LPOS_VERSION_INFO lpVersio
 #endif //#if !defined(COSVERSION_CE)
 }
 
+void COSVersion::GetBuildLabDetails(_Inout_ LPOS_VERSION_INFO lpVersionInformation)
+{
+#if !defined(COSVERSION_CE)
+  HKEY hKey = NULL; //NOLINT(modernize-use-nullptr)
+#if !defined(COSVERSION_WIN16)
+  if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, _T("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion"), 0, KEY_QUERY_VALUE | KEY_WOW64_64KEY, &hKey) == ERROR_SUCCESS)
+#else
+  if (RegOpenKey(HKEY_LOCAL_MACHINE, _T("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion"), &hKey) == ERROR_SUCCESS)
+#endif //#if !defined(COSVERSION_WIN16)
+  {
+    TCHAR sTemp[1024]; //NOLINT(modernize-avoid-c-arrays)
+    sTemp[0] = _T('\0');
+    DWORD dwBufLen = 1024 * sizeof(TCHAR);
+
+    DWORD dwType = 0;
+#if !defined(COSVERSION_WIN16)
+    if ((::RegQueryValueEx(hKey, _T("BuildLab"), NULL, &dwType, (LPBYTE)sTemp, &dwBufLen) == ERROR_SUCCESS) && (dwType == REG_SZ)) //NOLINT(modernize-use-nullptr)
+#else
+    if ((RegQueryValueEx(hKey, _T("BuildLab"), NULL, &dwType, (LPBYTE)sTemp, &dwBufLen) == ERROR_SUCCESS) && (dwType == REG_SZ))
+#endif //#if !defined(COSVERSION_WIN16)
+    {
+#if defined(_tcscpy_s)
+      _tcscpy_s(lpVersionInformation->szBuildLab, sizeof(lpVersionInformation->szBuildLab) / sizeof(TCHAR), sTemp);
+#else
+      _tcscpy(lpVersionInformation->szBuildLab, sTemp);
+#endif //#if defined(_tcscpy_s)
+    }
+
+    sTemp[0] = _T('\0');
+    dwBufLen = 1024 * sizeof(TCHAR);
+    dwType = 0;
+#if !defined(COSVERSION_WIN16)
+    if ((::RegQueryValueEx(hKey, _T("BuildLabEx"), NULL, &dwType, (LPBYTE)sTemp, &dwBufLen) == ERROR_SUCCESS) && (dwType == REG_SZ)) //NOLINT(modernize-use-nullptr)
+#else
+    if ((RegQueryValueEx(hKey, _T("BuildLabEx"), NULL, &dwType, (LPBYTE)sTemp, &dwBufLen) == ERROR_SUCCESS) && (dwType == REG_SZ))
+#endif //#if !defined(COSVERSION_WIN16)
+    {
+#if defined(_tcscpy_s)
+      _tcscpy_s(lpVersionInformation->szBuildLabEx, sizeof(lpVersionInformation->szBuildLab) / sizeof(TCHAR), sTemp);
+#else
+      _tcscpy(lpVersionInformation->szBuildLabEx, sTemp);
+#endif //#if defined(_tcscpy_s)
+    }
+
+    //Check to see if we are running on ReactOS
+    sTemp[0] = _T('\0');
+    dwBufLen = 1024 * sizeof(TCHAR);
+    dwType = 0;
+#if !defined(COSVERSION_WIN16)
+    if ((::RegQueryValueEx(hKey, _T("ProductName"), NULL, &dwType, (LPBYTE)sTemp, &dwBufLen) == ERROR_SUCCESS) && (dwType == REG_SZ)) //NOLINT(modernize-use-nullptr)
+#else
+    if ((RegQueryValueEx(hKey, _T("ProductName"), NULL, &dwType, (LPBYTE)sTemp, &dwBufLen) == ERROR_SUCCESS) && (dwType == REG_SZ))
+#endif //#if !defined(COSVERSION_WIN16)
+    {
+      if (_tcsstr(sTemp, _T("ReactOS")) != NULL) //NOLINT(modernize-use-nullptr)
+      {
+        lpVersionInformation->UnderlyingPlatform = ReactOS;
+        //There is no concept of Service Pack on ReactOS, so reset these values
+        _tcscpy(lpVersionInformation->szUnderlyingCSDVersion, _T(""));
+        lpVersionInformation->wUnderlyingServicePackMajor = 0;
+        lpVersionInformation->wUnderlyingServicePackMinor = 0;
+
+        //Parse the lpVersionInformation->szBuildLab variable to extract the ReactOS build numbers
+        lpVersionInformation->dwUnderlyingMajorVersion = 0;
+        lpVersionInformation->dwUnderlyingMinorVersion = 0;
+        lpVersionInformation->dwUnderlyingBuildNumber = 0;
+        LPCTSTR pszSeparator = _tcsstr(lpVersionInformation->szBuildLab, _T("-"));
+        if (pszSeparator)
+        {
+          int nVersionMajor = 0;
+          int nVersionMinor = 0;
+          int nVersionPatchLevel = 0;
+#if defined(_stscanf_s)
+#pragma warning(suppress: 26481)
+          if (_stscanf_s(pszSeparator + 1, _T("%d.%d.%d"), &nVersionMajor, &nVersionMinor, &nVersionPatchLevel) == 3)
+#else
+#pragma warning(suppress: 26481)
+          if (_stscanf(pszSeparator + 1, _T("%d.%d.%d"), &nVersionMajor, &nVersionMinor, &nVersionPatchLevel) == 3)
+#endif //#if defined(_stscanf_s)
+          {
+            lpVersionInformation->dwUnderlyingMajorVersion = nVersionMajor;
+            lpVersionInformation->dwUnderlyingMinorVersion = nVersionMinor;
+            lpVersionInformation->dwUnderlyingBuildNumber = nVersionPatchLevel;
+          }
+        }
+      }
+    }
+
+    //Don't forget to close the registry key we were using
+    RegCloseKey(hKey);
+  }
+#endif //#if !defined(COSVERSION_CE)
+}
+
 void COSVersion::GetUBRFromRegistry(_Inout_ LPOS_VERSION_INFO lpVersionInformation)
 {
 #if !defined(COSVERSION_CE)
@@ -2501,12 +2608,15 @@ void COSVersion::GetUBRFromRegistry(_Inout_ LPOS_VERSION_INFO lpVersionInformati
   if (RegOpenKey(HKEY_LOCAL_MACHINE, _T("Software\\Microsoft\\Windows NT\\CurrentVersion"), &hKey) == ERROR_SUCCESS)
 #endif //#if (defined(COSVERSION_WIN32) || defined(COSVERSION_WIN64))
   {
-    DWORD dwBufLen = sizeof(lpVersionInformation->dwUBR);
+    DWORD dwType = 0;
+    DWORD dwUBR = 0;
+    DWORD dwBufLen = sizeof(dwUBR);
 #if !defined(COSVERSION_WIN16)
-    ::RegQueryValueEx(hKey, _T("UBR"), NULL, NULL, (LPBYTE)&lpVersionInformation->dwUBR, &dwBufLen); //NOLINT(modernize-use-nullptr)
+    if ((::RegQueryValueEx(hKey, _T("UBR"), NULL, &dwType, (LPBYTE)&dwUBR, &dwBufLen) == ERROR_SUCCESS) && (dwType == REG_DWORD)) //NOLINT(modernize-use-nullptr)
 #else
-    RegQueryValueEx(hKey, _T("UBR"), NULL, NULL, (LPBYTE)&lpVersionInformation->dwUBR, &dwBufLen);
+    if ((RegQueryValueEx(hKey, _T("UBR"), NULL, &dwType, (LPBYTE)&dwUBR, &dwBufLen) == ERROR_SUCCESS) && (dwType == REG_DWORD))
 #endif //#if !defined(COSVERSION_WIN16)
+      lpVersionInformation->dwUBR = dwUBR;
 
     //Don't forget to close the registry key we were using
     RegCloseKey(hKey);
@@ -2529,11 +2639,11 @@ void COSVersion::GetSemiAnnualFromRegistry(_Inout_ LPOS_VERSION_INFO lpVersionIn
     TCHAR sTemp[1024]; //NOLINT(modernize-avoid-c-arrays)
     sTemp[0] = _T('\0');
     DWORD dwBufLen = 1024 * sizeof(TCHAR);
-
+    DWORD dwType = 0;
 #if !defined(COSVERSION_WIN16)
-    if (::RegQueryValueEx(hKey, _T("EditionID"), NULL, NULL, (LPBYTE)sTemp, &dwBufLen) == ERROR_SUCCESS) //NOLINT(modernize-use-nullptr)
+    if ((::RegQueryValueEx(hKey, _T("EditionID"), NULL, &dwType, (LPBYTE)sTemp, &dwBufLen) == ERROR_SUCCESS) && (dwType == REG_SZ)) //NOLINT(modernize-use-nullptr)
 #else
-    if (RegQueryValueEx(hKey, _T("EditionID"), NULL, NULL, (LPBYTE)sTemp, &dwBufLen) == ERROR_SUCCESS)
+    if ((RegQueryValueEx(hKey, _T("EditionID"), NULL, &dwType, (LPBYTE)sTemp, &dwBufLen) == ERROR_SUCCESS) && (dwType == REG_SZ))
 #endif //#if !defined(COSVERSION_WIN16)
     {
       if (_tcsstr(sTemp, _T("ACor")) != NULL) //NOLINT(modernize-use-nullptr)
@@ -2576,11 +2686,11 @@ COSVersion::OS_TYPE COSVersion::GetNTOSTypeFromRegistry(_In_ HKEY hKeyProductOpt
   TCHAR sTemp[1024]; //NOLINT(modernize-avoid-c-arrays)
   sTemp[0] = _T('\0');
   DWORD dwBufLen = 1024 * sizeof(TCHAR);
-
+  DWORD dwType = 0;
 #if (defined(COSVERSION_WIN32) || defined(COSVERSION_WIN64))
-  if (::RegQueryValueEx(hKeyProductOptions, _T("ProductType"), NULL, NULL, (LPBYTE)sTemp, &dwBufLen) == ERROR_SUCCESS) //NOLINT(modernize-use-nullptr)
+  if ((::RegQueryValueEx(hKeyProductOptions, _T("ProductType"), NULL, &dwType, (LPBYTE)sTemp, &dwBufLen) == ERROR_SUCCESS) && (dwType == REG_SZ)) //NOLINT(modernize-use-nullptr)
 #else
-  if (RegQueryValueEx(hKeyProductOptions, _T("ProductType"), NULL, NULL, (LPBYTE)sTemp, &dwBufLen) == ERROR_SUCCESS)
+  if ((RegQueryValueEx(hKeyProductOptions, _T("ProductType"), NULL, &dwType, (LPBYTE)sTemp, &dwBufLen) == ERROR_SUCCESS) && (dwType == REG_SZ))
 #endif //#if (defined(COSVERSION_WIN32) || defined(COSVERSION_WIN64))
   {
     if (_tcsicmp(sTemp, _T("LANMANNT")) == 0)
@@ -2609,11 +2719,11 @@ void COSVersion::GetNTOSTypeFromRegistry(_Inout_ LPOS_VERSION_INFO lpVersionInfo
     TCHAR sTemp[1024]; //NOLINT(modernize-avoid-c-arrays)
     sTemp[0] = _T('\0');
     DWORD dwBufLen = 1024 * sizeof(TCHAR);
-
+    DWORD dwType = 0;
 #if (defined(COSVERSION_WIN32) || defined(COSVERSION_WIN64))
-    if (::RegQueryValueEx(hKey, _T("ProductType"), NULL, NULL, (LPBYTE)sTemp, &dwBufLen) == ERROR_SUCCESS) //NOLINT(modernize-use-nullptr)
+    if ((::RegQueryValueEx(hKey, _T("ProductType"), NULL, &dwType, (LPBYTE)sTemp, &dwBufLen) == ERROR_SUCCESS) && (dwType == REG_SZ)) //NOLINT(modernize-use-nullptr)
 #else
-    if (RegQueryValueEx(hKey, _T("ProductType"), NULL, NULL, (LPBYTE)sTemp, &dwBufLen) == ERROR_SUCCESS)
+    if ((RegQueryValueEx(hKey, _T("ProductType"), NULL, &dwType, (LPBYTE)sTemp, &dwBufLen) == ERROR_SUCCESS) && (dwType == REG_SZ))
 #endif //#if (defined(COSVERSION_WIN32) || defined(COSVERSION_WIN64))
     {
       if (bOnlyUpdateDCDetails)
@@ -2664,11 +2774,11 @@ void COSVersion::GetBingEditionIDFromRegistry(_Inout_ LPOS_VERSION_INFO lpVersio
     TCHAR sTemp[1024]; //NOLINT(modernize-avoid-c-arrays)
     sTemp[0] = _T('\0');
     DWORD dwBufLen = 1024 * sizeof(TCHAR);
-
+    DWORD dwType = 0;
 #if (defined(COSVERSION_WIN32) || defined(COSVERSION_WIN64))
-    if (::RegQueryValueEx(hKey, _T("EditionID"), NULL, NULL, (LPBYTE)sTemp, &dwBufLen) == ERROR_SUCCESS) //NOLINT(modernize-use-nullptr)
+    if ((::RegQueryValueEx(hKey, _T("EditionID"), NULL, &dwType, (LPBYTE)sTemp, &dwBufLen) == ERROR_SUCCESS) && (dwType == REG_SZ)) //NOLINT(modernize-use-nullptr)
 #else
-    if (RegQueryValueEx(hKey, _T("EditionID"), NULL, NULL, (LPBYTE)sTemp, &dwBufLen) == ERROR_SUCCESS)
+    if ((RegQueryValueEx(hKey, _T("EditionID"), NULL, &dwType, (LPBYTE)sTemp, &dwBufLen) == ERROR_SUCCESS) && (dwType == REG_SZ))
 #endif //#if (defined(COSVERSION_WIN32) || defined(COSVERSION_WIN64))
     {
     #if defined(_tcsupr_s)
@@ -2699,9 +2809,9 @@ void COSVersion::GetProductSuiteDetailsFromRegistry(_Inout_ LPOS_VERSION_INFO lp
     DWORD dwType = 0;
     DWORD dwSize = 0;
 #if defined(COSVERSION_WIN32) || defined(COSVERSION_WIN64)
-    if (::RegQueryValueEx(hKey, _T("ProductSuite"), NULL, &dwType, NULL, &dwSize) == ERROR_SUCCESS) //NOLINT(modernize-use-nullptr)
+    if ((::RegQueryValueEx(hKey, _T("ProductSuite"), NULL, &dwType, NULL, &dwSize) == ERROR_SUCCESS)) //NOLINT(modernize-use-nullptr)
 #else
-    if (RegQueryValueEx(hKey, _T("ProductSuite"), NULL, &dwType, NULL, &dwSize) == ERROR_SUCCESS)
+    if ((RegQueryValueEx(hKey, _T("ProductSuite"), NULL, &dwType, NULL, &dwSize) == ERROR_SUCCESS))
 #endif //#if defined(COSVERSION_WIN32) || defined(COSVERSION_WIN64)
     {
       //Allocate buffer.
@@ -2709,9 +2819,9 @@ void COSVersion::GetProductSuiteDetailsFromRegistry(_Inout_ LPOS_VERSION_INFO lp
 
       //Retrieve array of product suite strings.
 #if defined(COSVERSION_WIN32) || defined(COSVERSION_WIN64)
-      if (::RegQueryValueEx(hKey, _T("ProductSuite"), NULL, &dwType, (LPBYTE) lpszProductSuites, &dwSize) == ERROR_SUCCESS) //NOLINT(modernize-use-nullptr)
+      if ((::RegQueryValueEx(hKey, _T("ProductSuite"), NULL, &dwType, (LPBYTE)lpszProductSuites, &dwSize) == ERROR_SUCCESS) && (dwType == REG_MULTI_SZ))  //NOLINT(modernize-use-nullptr)
 #else
-      if (RegQueryValueEx(hKey, _T("ProductSuite"), NULL, &dwType, (LPBYTE) lpszProductSuites, &dwSize) == ERROR_SUCCESS)
+      if ((RegQueryValueEx(hKey, _T("ProductSuite"), NULL, &dwType, (LPBYTE)lpszProductSuites, &dwSize) == ERROR_SUCCESS) && (dwType == REG_MULTI_SZ))
 #endif //#if defined(COSVERSION_WIN32) || defined(COSVERSION_WIN64)
       {
         //Search for suite name in array of strings.
@@ -2768,9 +2878,9 @@ void COSVersion::GetTerminalServicesRemoteAdminModeDetailsFromRegistry(_Inout_ L
     DWORD dwType = 0;
     DWORD dwSize = sizeof(DWORD);
 #if defined(COSVERSION_WIN32) || defined(COSVERSION_WIN64)
-    if (::RegQueryValueEx(hKey, _T("TSAppCompat"), NULL, &dwType, (LPBYTE) &dwTSAppCompat, &dwSize) == ERROR_SUCCESS) //NOLINT(modernize-use-nullptr)
+    if ((::RegQueryValueEx(hKey, _T("TSAppCompat"), NULL, &dwType, (LPBYTE)&dwTSAppCompat, &dwSize) == ERROR_SUCCESS) && (dwType == REG_DWORD)) //NOLINT(modernize-use-nullptr)
 #else
-    if (RegQueryValueEx(hKey, _T("TSAppCompat"), NULL, &dwType, (LPBYTE) &dwTSAppCompat, &dwSize) == ERROR_SUCCESS)
+    if ((RegQueryValueEx(hKey, _T("TSAppCompat"), NULL, &dwType, (LPBYTE)&dwTSAppCompat, &dwSize) == ERROR_SUCCESS) && (dwType == REG_DWORD))
 #endif //#if defined(COSVERSION_WIN32) || defined(COSVERSION_WIN64) 
     {
       if (dwTSAppCompat == 0)
@@ -2799,9 +2909,9 @@ void COSVersion::GetMediaCenterDetails(_Inout_ LPOS_VERSION_INFO lpVersionInform
       DWORD dwType = 0;
       DWORD dwSize = sizeof(DWORD);
 #if defined(COSVERSION_WIN32) || defined(COSVERSION_WIN64)
-      if (::RegQueryValueEx(hKey, _T("Installed"), NULL, &dwType, (LPBYTE) &dwMCE, &dwSize) == ERROR_SUCCESS) //NOLINT(modernize-use-nullptr)
+      if ((::RegQueryValueEx(hKey, _T("Installed"), NULL, &dwType, (LPBYTE) &dwMCE, &dwSize) == ERROR_SUCCESS) && (dwType == REG_DWORD)) //NOLINT(modernize-use-nullptr)
 #else
-      if (RegQueryValueEx(hKey, _T("Installed"), NULL, &dwType, (LPBYTE) &dwMCE, &dwSize) == ERROR_SUCCESS)
+      if ((RegQueryValueEx(hKey, _T("Installed"), NULL, &dwType, (LPBYTE) &dwMCE, &dwSize) == ERROR_SUCCESS) && (dwType == REG_DWORD))
 #endif //#if defined(COSVERSION_WIN32) || defined(COSVERSION_WIN64) 
       {
         if (dwMCE)
@@ -3948,9 +4058,9 @@ void COSVersion::GetTabletPCDetails(_Inout_ LPOS_VERSION_INFO lpVersionInformati
       DWORD dwType = 0;
       DWORD dwSize = sizeof(DWORD);
 #if defined(COSVERSION_WIN32) || defined(COSVERSION_WIN64)
-      if (::RegQueryValueEx(hKey, _T("Installed"), NULL, &dwType, (LPBYTE)&dwMCE, &dwSize) == ERROR_SUCCESS) //NOLINT(modernize-use-nullptr)
+      if ((::RegQueryValueEx(hKey, _T("Installed"), NULL, &dwType, (LPBYTE)&dwMCE, &dwSize) == ERROR_SUCCESS) && (dwType == REG_DWORD)) //NOLINT(modernize-use-nullptr)
 #else
-      if (RegQueryValueEx(hKey, _T("Installed"), NULL, &dwType, (LPBYTE)&dwMCE, &dwSize) == ERROR_SUCCESS)
+      if ((RegQueryValueEx(hKey, _T("Installed"), NULL, &dwType, (LPBYTE)&dwMCE, &dwSize) == ERROR_SUCCESS) && (dwType == REG_DWORD))
 #endif //#if defined(COSVERSION_WIN32) || defined(COSVERSION_WIN64)
       {
         if (dwMCE)
@@ -3990,11 +4100,11 @@ void COSVersion::GetNTHALDetailsFromRegistry(_Inout_ LPOS_VERSION_INFO lpVersion
     TCHAR sTemp[1024]; //NOLINT(modernize-avoid-c-arrays)
     sTemp[0] = _T('\0');
     DWORD dwBufLen = 1024 * sizeof(TCHAR);
-
+    DWORD dwType = 0;
 #if (defined(COSVERSION_WIN32) || defined(COSVERSION_WIN64))
-    if (::RegQueryValueEx(hKey, _T("CurrentType"), NULL, NULL, (LPBYTE)sTemp, &dwBufLen) == ERROR_SUCCESS) //NOLINT(modernize-use-nullptr)
+    if ((::RegQueryValueEx(hKey, _T("CurrentType"), NULL, &dwType, (LPBYTE)sTemp, &dwBufLen) == ERROR_SUCCESS) && (dwType == REG_SZ)) //NOLINT(modernize-use-nullptr)
 #else
-    if (RegQueryValueEx(hKey, _T("CurrentType"), NULL, NULL, (LPBYTE)sTemp, &dwBufLen) == ERROR_SUCCESS)
+    if ((RegQueryValueEx(hKey, _T("CurrentType"), NULL, &dwType, (LPBYTE)sTemp, &dwBufLen) == ERROR_SUCCESS) && (dwType == REG_SZ))
 #endif //#if (defined(COSVERSION_WIN32) || defined(COSVERSION_WIN64))
     {
       if (_tcsicmp(sTemp, _T("Uniprocessor Free")) == 0)
@@ -4026,7 +4136,7 @@ DWORD COSVersion::GetNTCurrentBuildFromRegistry(_In_ HKEY hKeyCurrentVersion)
   memset(byData, 0, sizeof(byData));
   DWORD dwType = 0;
   DWORD dwSize = sizeof(byData);
-  if (::RegQueryValueEx(hKeyCurrentVersion, _T("CurrentBuildNumber"), NULL, &dwType, byData, &dwSize) == ERROR_SUCCESS) //NOLINT(modernize-use-nullptr)
+  if ((::RegQueryValueEx(hKeyCurrentVersion, _T("CurrentBuildNumber"), NULL, &dwType, byData, &dwSize) == ERROR_SUCCESS) && (dwType == REG_SZ)) //NOLINT(modernize-use-nullptr)
     dwCurrentBuild = _ttoi((TCHAR*) byData);
 
   return dwCurrentBuild;
@@ -4192,7 +4302,7 @@ void COSVersion::_GetVersion(_In_ DWORD dwMajorVersion, _In_ DWORD dwMinorVersio
 #endif //#if defined(_tcscpy_s)
   lpVersionInformation->wEmulatedServicePackMajor = wServicePackMajor;
   lpVersionInformation->wEmulatedServicePackMinor = wServicePackMinor;
-        
+
   //Determine the Domain Controller Type
   GetNTOSTypeFromRegistry(lpVersionInformation, bOnlyUpdateDCDetails);
 
@@ -4265,6 +4375,9 @@ void COSVersion::_GetVersion(_In_ DWORD dwMajorVersion, _In_ DWORD dwMinorVersio
 
   //Call "RtlGetDeviceFamilyInfo" to get device family details
   GetDeviceFamilyInfo(lpVersionInformation);
+
+  //Get the BuildLab/BuildLabEx details
+  GetBuildLabDetails(lpVersionInformation);
 
   //Also check if Windows 8.1 / Windows 2012 R2 Update is installed (Details at http://technet.microsoft.com/en-us/library/dn645472.aspx)
   const BOOL bIsWindows8Point1OrWindowsServer2012R2 = IsWindows8Point1OrWindowsServer2012R2(lpVersionInformation, TRUE);
@@ -5947,7 +6060,7 @@ _Success_(return != FALSE) BOOL COSVersion::IsEssentialBusinessServerAdditionalS
 _Success_(return != FALSE) BOOL COSVersion::IsProfessionalForStudent(_In_ LPCOS_VERSION_INFO lpVersionInformation)
 {
   return ((lpVersionInformation->dwSuiteMask2 & COSVERSION_SUITE2_PROFESSIONAL) != 0) &&
-         ((lpVersionInformation->dwSuiteMask2 & COSVERSION_SUITE2_STUDENT) != 0);
+          ((lpVersionInformation->dwSuiteMask2 & COSVERSION_SUITE2_STUDENT) != 0);
 }
 
 _Success_(return != FALSE) BOOL COSVersion::Is64Bit(_In_ LPCOS_VERSION_INFO /*lpVersionInformation*/, _In_ BOOL bCheckUnderlying)
