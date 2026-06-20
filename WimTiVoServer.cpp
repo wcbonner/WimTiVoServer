@@ -58,6 +58,26 @@
 #define new DEBUG_NEW
 #endif
 
+// Helper: UTF-8 to wstring using Windows API (avoids deprecated <codecvt>)
+#include <Windows.h>
+#include <Ws2tcpip.h>
+#include <winsock2.h>
+#include <string>
+
+static std::wstring Utf8ToWString(const std::string& utf8)
+{
+	if (utf8.empty())
+		return std::wstring();
+	int size_needed = MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), (int)utf8.size(), NULL, 0);
+	if (size_needed <= 0)
+		return std::wstring();
+	std::wstring wstr(size_needed, 0);
+	MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), (int)utf8.size(), &wstr[0], size_needed);
+	return wstr;
+}
+
+// InetAddrToString helper is provided via precompiled header (stdafx.h)
+
 // The one and only application object
 
 CWinApp theApp;
@@ -357,7 +377,7 @@ int GetTiVoQueryFormats(SOCKET DataSocket, const char* InBuffer)
 		struct sockaddr_in adr_inet;/* AF_INET */
 		int sa_len = sizeof(adr_inet);
 		getpeername(DataSocket, (struct sockaddr*)&adr_inet, &sa_len);
-		std::cout << "[" << getTimeISO8601(true) << "] " << __FUNCTION__ << "\t" << inet_ntoa(adr_inet.sin_addr) << " " << csInBuffer.GetString() << endl;
+		std::cout << "[" << getTimeISO8601(true) << "] " << __FUNCTION__ << "\t" << InetAddrToString(adr_inet.sin_addr) << " " << csInBuffer.GetString() << endl;
 	}
 	#endif // DEBUG
 	int rval = 0;
@@ -825,7 +845,7 @@ int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
 					pWriter->WriteElementString(NULL, _T("SourceFormat"), NULL, _T("x-tivo-container/folder"));
 					csTemporary.Format(_T("%d"), TiVoFileList.size());
 					pWriter->WriteElementString(NULL, L"TotalItems", NULL, csTemporary.GetString());
-					std::wstring MyVersion(std::wstring_convert<std::codecvt_utf8<wchar_t>>().from_bytes(myServer.m_swversion));
+					std::wstring MyVersion = Utf8ToWString(myServer.m_swversion);
 					pWriter->WriteElementString(NULL, _T("UniqueId"), NULL, MyVersion.c_str());
 				pWriter->WriteEndElement();	// Details
 				while ((pItem != TiVoFileList.end()) && (iItemCount > 0))
@@ -989,7 +1009,7 @@ int GetTiVoTVBusQuery(SOCKET DataSocket, const char * InBuffer)
 		struct sockaddr_in adr_inet;/* AF_INET */
 		int sa_len = sizeof(adr_inet);
 		getpeername(DataSocket, (struct sockaddr*)&adr_inet, &sa_len);
-		std::cout << "[" << getTimeISO8601(true) << "] " << __FUNCTION__ << "\t" << inet_ntoa(adr_inet.sin_addr) << " " << csInBuffer.GetString() << endl;
+		std::cout << "[" << getTimeISO8601(true) << "] " << __FUNCTION__ << "\t" << InetAddrToString(adr_inet.sin_addr) << " " << csInBuffer.GetString() << endl;
 	}
 	cTiVoFile TiVoFileToSend;
 	int curPos = 0;
@@ -1781,9 +1801,9 @@ UINT HTTPMain(LPVOID lvp)
 										IP_ADDR_STRING * ipAddr = &next->IpAddressList;
 										while (ipAddr)
 										{
-											auto check1 = ntohl(inet_addr(ipAddr->IpAddress.String));
-											auto check2 = ntohl(row.dwAddr);
-											if (ntohl(inet_addr(ipAddr->IpAddress.String)) == ntohl(row.dwAddr))
+							auto check1 = ntohl(InetAddrFromString(ipAddr->IpAddress.String).S_un.S_addr);
+							auto check2 = ntohl(row.dwAddr);
+							if (ntohl(InetAddrFromString(ipAddr->IpAddress.String).S_un.S_addr) == ntohl(row.dwAddr))
 											{
 												name = next->AdapterName;
 												desc = next->Description;
@@ -1806,9 +1826,9 @@ UINT HTTPMain(LPVOID lvp)
 								baddr.S_un.S_addr = ipAddr.S_un.S_addr & netmask.S_un.S_addr;
 								if (row.dwBCastAddr)
 									baddr.S_un.S_addr |= ~netmask.S_un.S_addr;
-								ss << " address=[" << inet_ntoa(ipAddr) << "]";
-								ss << " netmask=[" << inet_ntoa(netmask) << "]";
-								ss << " broadcastAddr=[" << inet_ntoa(baddr) << "]";
+			ss << " address=[" << InetAddrToString(ipAddr) << "]";
+			ss << " netmask=[" << InetAddrToString(netmask) << "]";
+			ss << " broadcastAddr=[" << InetAddrToString(baddr) << "]";
 								ss << " name=[" << name << "]";
 								ss << " desc=[" << (desc.empty() ? "unavailable" : desc) << "]";
 								ss << std::endl;
@@ -1824,7 +1844,7 @@ UINT HTTPMain(LPVOID lvp)
 							free(ipTable);
 						}
 
-						std::cout << "[                   ] Server Address: " << inet_ntoa(saServer->sin_addr) << std::endl;
+						std::cout << "[                   ] Server Address: " << InetAddrToString(saServer->sin_addr) << std::endl;
 						std::cout << "[                   ] Server Port: " << ntohs(saServer->sin_port) << std::endl;
 						// Open LogFile, write basic program details, and close it again.
 						std::wofstream m_LogFile(GetLogFileName().GetString(), std::ios_base::out | std::ios_base::app | std::ios_base::ate);
@@ -1912,7 +1932,7 @@ void DnsServiceRegisterComplete(DWORD Status, PVOID pQueryContext,PDNS_SERVICE_I
 			{
 				in_addr ipAddr;
 				ipAddr.S_un.S_addr = *pInstance->ip4Address;
-				std::wcout << L"[                   ] pInstance->ip4Address " << inet_ntoa(ipAddr) << std::endl;
+			std::wcout << L"[                   ] pInstance->ip4Address " << Utf8ToWString(InetAddrToString(ipAddr)).c_str() << std::endl;
 			}
 			auto index = pInstance->dwPropertyCount;
 			while (index-- > 0)
@@ -1944,9 +1964,9 @@ void TiVomDNSRegister(bool enable = true)
 			std::wstring MyServiceName(L"._tivo-videos._tcp.local"); MyServiceName.insert(0, szHostName);
 			std::wstring MyHostName(L".local"); MyHostName.insert(0, szHostName);
 			std::wstring MyPath(L"/TiVoConnect?Command=QueryContainer\&Container="); MyPath.append(szHostName);
-			std::wstring MyPlatform(std::wstring_convert<std::codecvt_utf8<wchar_t>>().from_bytes(myServer.m_platform));
-			std::wstring MyVersion(std::wstring_convert<std::codecvt_utf8<wchar_t>>().from_bytes(myServer.m_swversion));
-			std::wstring MyID(std::wstring_convert<std::codecvt_utf8<wchar_t>>().from_bytes(myServer.m_identity));
+			std::wstring MyPlatform = Utf8ToWString(myServer.m_platform);
+			std::wstring MyVersion = Utf8ToWString(myServer.m_swversion);
+			std::wstring MyID = Utf8ToWString(myServer.m_identity);
 			// These Keys are copied from what a real TiVo registers. These Values should be set based on the same Items I'm putting in the beacon
 			std::vector<PCWSTR> keys;
 			std::vector<PCWSTR> values;

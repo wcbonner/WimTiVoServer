@@ -19,6 +19,11 @@
       <Filter>Resource Files</Filter>
     </None>
     <None Include="README.md" />
+    <None Include=".github\upgrades\scenarios\cppbuildtoolsupgrade\scenario-instructions.md" />
+    <None Include=".github\upgrades\scenarios\cppbuildtoolsupgrade\assessment.md" />
+    <None Include=".github\upgrades\scenarios\cppbuildtoolsupgrade\plan.md" />
+    <None Include=".github\upgrades\scenarios\cppbuildtoolsupgrade\tasks\01-prepare-and-add-conversion-helper\progress-details.md" />
+    <None Include=".github\upgrades\scenarios\cppbuildtoolsupgrade\tasks\02-replace-deprecated-inet-ntoa-inet-addr-usages\progress-details.md" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stdafx.h">

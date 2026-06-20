@@ -425,9 +425,9 @@ int main(int argc,      // Number of strings in array argv
 							IP_ADDR_STRING * ipAddr = &next->IpAddressList;
 							while (ipAddr)
 							{
-								auto check1 = ntohl(inet_addr(ipAddr->IpAddress.String));
-								auto check2 = ntohl(row.dwAddr);
-								if (ntohl(inet_addr(ipAddr->IpAddress.String)) == ntohl(row.dwAddr))
+						auto check1 = ntohl(InetAddrFromString(ipAddr->IpAddress.String).S_un.S_addr);
+						auto check2 = ntohl(row.dwAddr);
+						if (ntohl(InetAddrFromString(ipAddr->IpAddress.String).S_un.S_addr) == ntohl(row.dwAddr))
 								{
 									name = next->AdapterName;
 									desc = next->Description;
