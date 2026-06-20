@@ -658,7 +658,7 @@ bool TiVoBeaconListen(SOCKADDR_IN &saServer)
 				CStringA csServerBroadcast(szBuf, nRet);
 				csServerBroadcast.Replace("\n", " ");
 				csServerBroadcast.Trim();
-				std::cout << "[" << getTimeISO8601() << "] " << inet_ntoa(saServer.sin_addr) << " " << csServerBroadcast.GetString() << endl;
+				std::cout << "[" << getTimeISO8601() << "] " << InetAddrToString(saServer.sin_addr) << " " << csServerBroadcast.GetString() << endl;
 //				printf("%s\t%s\n", inet_ntoa(saServer.sin_addr), csServerBroadcast.GetString());
 				rval = true;
 

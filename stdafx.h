@@ -58,6 +58,28 @@
 #pragma comment(lib, "crypt32.lib")
 #include <windns.h> // for mDNS functions related to Bonjour https://learn.microsoft.com/en-us/windows/win32/api/windns/nf-windns-dnsserviceregister
 #pragma comment(lib, "dnsapi.lib")
+#include <winsock2.h>
+#include <Ws2tcpip.h>
+#pragma comment(lib, "Ws2_32.lib")
+
+// Helper: convert in_addr to std::string using InetNtop (reentrant)
+static inline std::string InetAddrToString(const in_addr& addr)
+{
+	char buf[INET_ADDRSTRLEN] = {0};
+	if (InetNtopA(AF_INET, (void*)&addr, buf, sizeof(buf)) == NULL)
+		return std::string();
+	return std::string(buf);
+}
+
+// Helper: convert dotted IP string to in_addr using InetPton
+static inline in_addr InetAddrFromString(const char* s)
+{
+	in_addr addr = {0};
+	if (s && InetPtonA(AF_INET, s, &addr) == 1)
+		return addr;
+	addr.S_un.S_addr = INADDR_NONE;
+	return addr;
+}
 
 // FFMPEG Libraries
 //extern "C" {

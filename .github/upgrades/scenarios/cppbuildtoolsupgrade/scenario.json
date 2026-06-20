@@ -1,0 +1,15 @@
+{
+  "scenarioId": "CppBuildToolsUpgrade",
+  "operationId": "6a9096a1-f3c6-4ec6-ae8d-33c5a0bafbf3",
+  "description": "Upgrade MSVC (C\u002B\u002B) Build Tools to the latest version and/or resolve C/C\u002B\u002B build issues.",
+  "startTime": "2026-06-20T18:55:57.1469014Z",
+  "lastUpdateTime": "2026-06-20T19:23:55.0990731Z",
+  "properties": {
+    "taskStates": {
+      "01-prepare-and-add-conversion-helper": "Completed",
+      "02-replace-deprecated-inet-ntoa-inet-addr-usages": "Completed",
+      "03-verify-and-finalize": "Completed"
+    }
+  },
+  "folderPath": ""
+}
