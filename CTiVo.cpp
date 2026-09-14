@@ -980,9 +980,10 @@ const CString cTiVoFile::GetFFMPEGCommandLine(const CString & csFFMPEGPath, cons
 	if (0 == csFormat.Compare(_T("video/x-tivo-mpeg-ts")))
 	{
 		//rval.Append(_T(" -map 0:a?")); // copy all audio streams see https://superuser.com/questions/1273764/using-ffmpeg-on-how-do-i-copy-the-video-and-multiple-subtitle-streams-in-an-mkv Added 2022-02-28
-		rval.Append(_T(" -map 0:d?")); // copy all data streams see https://superuser.com/questions/1273764/using-ffmpeg-on-how-do-i-copy-the-video-and-multiple-subtitle-streams-in-an-mkv Added 2022-02-28
+		//rval.Append(_T(" -map 0:d?")); // copy all data streams see https://superuser.com/questions/1273764/using-ffmpeg-on-how-do-i-copy-the-video-and-multiple-subtitle-streams-in-an-mkv Added 2022-02-28
 		//rval.Append(_T(" -map 0:v -map 0:a?")); // copy all audio streams Added 2020-04-04
 		//rval.Append(_T(" -map_metadata -1"));
+		rval.Append(_T(" -map 0:v:0? -map 0:a:0? -map 0:d?")); // 2026-09-14 Copy first video stream, first audio stream, and all data streams.  This is to avoid copying multiple video streams which can cause problems with some players.
 		if (m_VideoCompatible)
 		{
 			rval.Append(_T(" -vcodec copy"));
