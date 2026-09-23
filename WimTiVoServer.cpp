@@ -63,6 +63,7 @@
 #include <Ws2tcpip.h>
 #include <winsock2.h>
 #include <string>
+#include <csignal>
 
 static std::wstring Utf8ToWString(const std::string& utf8)
 {
@@ -85,6 +86,7 @@ CWinApp theApp;
 using namespace std;
 
 //////////////////////////////////////////////////////////////////////////////
+HANDLE terminateEvent_Signal = NULL;
 HANDLE terminateEvent_http = NULL;
 HANDLE terminateEvent_beacon = NULL;
 HANDLE terminateEvent_populate = NULL;
@@ -105,6 +107,14 @@ enum TiVoFileListSortOrder {
 };
 TiVoFileListSortOrder CurrentTiVoFileListSortOrder = CaptureDateReverse;
 std::map<std::string, CString> TiVoSerialMap;
+/////////////////////////////////////////////////////////////////////////////
+void SignalHandlerSIGINT(int signal)
+{
+	std::cerr << "***************** SIGINT: Caught Ctrl-C, finishing loop and quitting. *****************" << std::endl;
+	if (terminateEvent_beacon) SetEvent(terminateEvent_beacon);
+	if (terminateEvent_populate) SetEvent(terminateEvent_populate);
+	if (terminateEvent_Signal) SetEvent(terminateEvent_Signal);
+}
 /////////////////////////////////////////////////////////////////////////////
 #pragma comment(lib, "version")
 CString GetFileVersion(const CString & filename, const int digits = 4)
@@ -2770,19 +2780,28 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 							csNewTitle.Append(CTime::GetCurrentTime().Format(_T(" [%Y-%m-%dT%H:%M:%S]")));
 							SetConsoleTitle(csNewTitle.GetString());
 						}
-						#ifdef _DEBUG
-						std::cout << "[" << getTimeISO8601(true) << "] Running for 30 minutes" << std::endl;
-						Sleep(30 * 60 * 1000); // Sleep 30 minutes
-						#else
-						std::cout << "[" << getTimeISO8601(true) << "] Running for 12 hours" << std::endl;
-						Sleep(12 * 60 * 60 * 1000); // Sleep 12 hours
-						#endif
-						SetEvent(terminateEvent_beacon);
-						SetEvent(terminateEvent_populate);
-						closesocket(ControlSocket);		// This is how I tell the HTTPMain function to end.
+						terminateEvent_Signal = CreateEvent(0, TRUE, FALSE, 0);
+						if (terminateEvent_Signal != NULL)
+						{
+							typedef void(*SignalHandlerPointer)(int);
+							SignalHandlerPointer previousHandlerSIGINT = std::signal(SIGINT, SignalHandlerSIGINT);	// Install CTR-C signal handler
+							#ifdef _DEBUG
+							std::cout << "[" << getTimeISO8601(true) << "] Running for 30 minutes" << std::endl;
+							DWORD TimeToWait = 30 * 60 * 1000; // 30 minutes in milliseconds
+							#else
+							std::cout << "[" << getTimeISO8601(true) << "] Running for 12 hours" << std::endl;
+							DWORD TimeToWait = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
+							#endif
+							WaitForSingleObject(terminateEvent_Signal, TimeToWait);
+							CloseHandle(terminateEvent_Signal);
+							std::signal(SIGINT, previousHandlerSIGINT);	// Restore original Ctrl-C signal handler
+						}
+						if (terminateEvent_beacon) SetEvent(terminateEvent_beacon);
+						if (terminateEvent_populate) SetEvent(terminateEvent_populate);
+						if (ControlSocket != INVALID_SOCKET) closesocket(ControlSocket);		// This is how I tell the HTTPMain function to end.
 						ControlSocket = INVALID_SOCKET;	// This is how I tell the HTTPMain function to end.
 						TRACE(__FUNCTION__ " Waiting for Thread to end\n");
-						WaitForSingleObject(terminateEvent_http,INFINITE);	// This is waiting for the HTTPMain function to end.
+						WaitForSingleObject(terminateEvent_http, INFINITE);	// This is waiting for the HTTPMain function to end.
 						if (terminateEvent_beacon)
 							CloseHandle(terminateEvent_beacon);
 						SetConsoleTitle(szOldTitle);
