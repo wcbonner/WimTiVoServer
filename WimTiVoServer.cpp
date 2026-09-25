@@ -1936,23 +1936,30 @@ void DnsServiceRegisterComplete(DWORD Status, PVOID pQueryContext,PDNS_SERVICE_I
 {
 	if (bConsoleExists)
 	{
-		std::wcout << L"[" << getwTimeISO8601(true) << L"] DnsServiceRegisterComplete(" << Status << L") DNS_ERROR_RCODE_SERVER_FAILURE=" << DNS_ERROR_RCODE_SERVER_FAILURE << std::endl;
+		std::wstringstream ss; // by using the stringstream I get around the current locale issues with std::wcout, and am more likely to have an atomic output to the console.
+		ss << L"[" << getwTimeISO8601(true) << L"] DnsServiceRegisterComplete(" << Status << L") DNS_ERROR_RCODE_NO_ERROR=" << NO_ERROR << L" DNS_ERROR_RCODE_SERVER_FAILURE=" << DNS_ERROR_RCODE_SERVER_FAILURE << std::endl;
 		if (0 == Status)
 		{
-			std::wcout << L"[                   ] pInstance->pszInstanceName " << pInstance->pszInstanceName << std::endl;
-			std::wcout << L"[                   ] pInstance->pszHostName " << pInstance->pszHostName << std::endl;
-			std::wcout << L"[                   ] pInstance->wPort " << pInstance->wPort << std::endl;
+			ss << L"[                   ] pInstance->pszInstanceName " << pInstance->pszInstanceName << std::endl;
+			ss << L"[                   ] pInstance->pszHostName " << pInstance->pszHostName << std::endl;
+			ss << L"[                   ] pInstance->wPort " << pInstance->wPort << std::endl;
 			if (pInstance->ip4Address != 0)
 			{
 				in_addr ipAddr;
 				ipAddr.S_un.S_addr = *pInstance->ip4Address;
-			std::wcout << L"[                   ] pInstance->ip4Address " << Utf8ToWString(InetAddrToString(ipAddr)).c_str() << std::endl;
+				ss << L"[                   ] pInstance->ip4Address " << Utf8ToWString(InetAddrToString(ipAddr)).c_str() << std::endl;
+			}
+			if (pInstance->ip6Address != 0)
+			{
+				//in6_addr ipAddr;
+				//ipAddr = *pInstance->ip6Address;
+				ss << L"[                   ] pInstance->ip6Address " << /* Utf8ToWString(InetAddrToString(*(pInstance->ip6Address))).c_str() << */ std::endl;
 			}
 			auto index = pInstance->dwPropertyCount;
 			while (index-- > 0)
-				std::wcout << L"[                   ] pInstance->keys[" << index << L"]=pInstance->values[" << index << L"] " << pInstance->keys[index] << L"=" << pInstance->values[index] << std::endl;
+				ss << L"[                   ] pInstance->keys[" << index << L"]=pInstance->values[" << index << L"] " << pInstance->keys[index] << L"=" << pInstance->values[index] << std::endl;
 		}
-		std::wcout.flush();
+		std::wcout << ss.str() << std::flush;
 	}
 	return;
 }
@@ -2014,13 +2021,21 @@ void TiVomDNSRegister(bool enable = true)
 			{
 				auto mDNSReturn = DnsServiceRegister(&rd, nullptr);
 				if (bConsoleExists)
-					std::cout << "[" << getTimeISO8601(true) << "] DnsServiceRegister(" << mDNSReturn << ") DNS_REQUEST_PENDING=" << DNS_REQUEST_PENDING << std::endl;
+				{
+					std::stringstream ss; // by using the stringstream I get around the current locale issues with std::wcout
+					ss << "[" << getTimeISO8601(true) << "] DnsServiceRegister(" << mDNSReturn << ") DNS_ERROR_RCODE_NO_ERROR=" << NO_ERROR << " DNS_REQUEST_PENDING=" << DNS_REQUEST_PENDING << std::endl;
+					std::cout << ss.str() << std::flush;
+				}
 			}
 			else
 			{
 				auto mDNSReturn = DnsServiceDeRegister(&rd, nullptr);
 				if (bConsoleExists)
-					std::cout << "[" << getTimeISO8601(true) << "] DnsServiceRegister(" << mDNSReturn << ") DNS_REQUEST_PENDING=" << DNS_REQUEST_PENDING << std::endl;
+				{
+					std::stringstream ss; // by using the stringstream I get around the current locale issues with std::wcout
+					ss << "[" << getTimeISO8601(true) << "] DnsServiceDeRegister(" << mDNSReturn << ") DNS_ERROR_RCODE_NO_ERROR=" << NO_ERROR << " DNS_REQUEST_PENDING=" << DNS_REQUEST_PENDING << std::endl;
+					std::cout << ss.str() << std::flush;
+				}
 			}
 			DnsServiceFreeInstance(MyServiceInstancePtr);
 		}
@@ -2325,11 +2340,10 @@ UINT TiVoBeaconSendThread(LPVOID lvp)
 	do {
 		TiVoBeaconSend(myServer.WriteTXT('\n'));
 		#ifdef DEBUG
+		// The reason I don't write this in release mode is because the line is long and it will scroll off the screen, 
+		// and I don't want to have to scroll back to see the last line of useful output.
 		if (bConsoleExists)
-		{
-			//std::cout << "[                   ] " << myServer.WriteTXT(' ') << "\r";
 			std::cout << "[" << getTimeISO8601() << "] " << myServer.WriteTXT(' ') << "\r";
-		}
 		#endif // DEBUG
 	} while (WAIT_TIMEOUT == WaitForSingleObject(LocalTerminationEventHandle, 60*1000));
 
@@ -2385,11 +2399,10 @@ DWORD WINAPI ServiceCtrlHandler(
 		currentState = SERVICE_STOP_PENDING;
 		success = SendStatusToSCM(SERVICE_STOP_PENDING, NO_ERROR, 0, 1, 5000);
 		csSubstitutionText.Format(_T("Service %s is stopping"),theApp.m_pszAppName);
-		closesocket(ControlSocket);
-		ControlSocket = INVALID_SOCKET;
-		//		SetEvent(terminateEvent_http);
-		SetEvent(terminateEvent_populate);
-		SetEvent(terminateEvent_beacon);
+		if (terminateEvent_beacon) SetEvent(terminateEvent_beacon);
+		if (terminateEvent_populate) SetEvent(terminateEvent_populate);
+		if (ControlSocket != INVALID_SOCKET) closesocket(ControlSocket);		// This is how I tell the HTTPMain function to end.
+		ControlSocket = INVALID_SOCKET;	// This is how I tell the HTTPMain function to end.
 		break;
 	case SERVICE_CONTROL_PAUSE:
 		if (pauseService == false)
@@ -2466,15 +2479,12 @@ VOID ServiceMain(DWORD argc, LPTSTR * argv)
 					#endif
 					ApplicationLogHandle = RegisterEventSource(NULL, theApp.m_pszAppName);
 					terminateEvent_populate = CreateEvent(0,TRUE,FALSE,0);
-					AfxBeginThread(PopulateTiVoFileList, terminateEvent_populate);
+					auto threadHandle_populate = AfxBeginThread(PopulateTiVoFileList, terminateEvent_populate);
 					terminateEvent_beacon = CreateEvent(0,TRUE,FALSE,0);
-					AfxBeginThread(TiVoBeaconSendThread, terminateEvent_beacon);
-					//threadHandle = AfxBeginThread(HTTPMain, NULL, THREAD_PRIORITY_NORMAL, 0, CREATE_SUSPENDED);
+					auto threadHandle_beacon = AfxBeginThread(TiVoBeaconSendThread, terminateEvent_beacon);
 					threadHandle = AfxBeginThread(HTTPMain, terminateEvent_http);
-					if (threadHandle != NULL)
+					if ((threadHandle != NULL) && (threadHandle_populate != NULL) && (threadHandle_beacon != NULL))
 					{
-						//threadHandle->m_bAutoDelete = false;
-						//threadHandle->ResumeThread();
 						success = SendStatusToSCM(SERVICE_RUNNING, NO_ERROR, 0, 0, 0);
 						if (success != FALSE) 
 						{
@@ -2488,15 +2498,9 @@ VOID ServiceMain(DWORD argc, LPTSTR * argv)
 								LPCTSTR lpStrings[] = { csSubstitutionText.GetString(), NULL };
 								ReportEvent(ApplicationLogHandle, EVENTLOG_INFORMATION_TYPE, 0, WIMSWORLD_EVENT_GENERIC, NULL, 1, 0, lpStrings, NULL);
 							}
-							WaitForSingleObject(terminateEvent_http, INFINITE);
-							SetEvent(terminateEvent_populate);
-							SetEvent(terminateEvent_beacon);
+							HANDLE hThreads[] = { threadHandle->m_hThread, threadHandle_populate->m_hThread, threadHandle_beacon->m_hThread };
+							WaitForMultipleObjects(3, hThreads, TRUE, INFINITE);	// This is waiting for the threads to end.
 						}
-						//if (threadHandle)
-						//{
-						//	delete threadHandle;
-						//	threadHandle = NULL;
-						//}
 						if (serviceStatusHandle)
 							SendStatusToSCM(SERVICE_STOPPED,GetLastError(),0,0,500);
 					}

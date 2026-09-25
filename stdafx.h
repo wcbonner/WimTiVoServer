@@ -70,6 +70,13 @@ static inline std::string InetAddrToString(const in_addr& addr)
 		return std::string();
 	return std::string(buf);
 }
+static inline std::string InetAddrToString(const in6_addr& addr)
+{
+	char buf[INET_ADDRSTRLEN] = { 0 };
+	if (InetNtopA(AF_INET, (void*)&addr, buf, sizeof(buf)) == NULL)
+		return std::string();
+	return std::string(buf);
+}
 
 // Helper: convert dotted IP string to in_addr using InetPton
 static inline in_addr InetAddrFromString(const char* s)
