@@ -86,13 +86,11 @@ CWinApp theApp;
 using namespace std;
 
 //////////////////////////////////////////////////////////////////////////////
-HANDLE terminateEvent_Signal = NULL;
-HANDLE terminateEvent_http = NULL;
 HANDLE terminateEvent_beacon = NULL;
 HANDLE terminateEvent_populate = NULL;
 SERVICE_STATUS_HANDLE serviceStatusHandle = NULL;
 bool pauseService = false;
-CWinThread * threadHandle = NULL;
+CWinThread * threadHandle_http = NULL;
 SOCKET ControlSocket = INVALID_SOCKET;
 bool bConsoleExists = false;
 HANDLE ApplicationLogHandle = NULL;
@@ -113,7 +111,8 @@ void SignalHandlerSIGINT(int signal)
 	std::cerr << "***************** SIGINT: Caught Ctrl-C, finishing loop and quitting. *****************" << std::endl;
 	if (terminateEvent_beacon) SetEvent(terminateEvent_beacon);
 	if (terminateEvent_populate) SetEvent(terminateEvent_populate);
-	if (terminateEvent_Signal) SetEvent(terminateEvent_Signal);
+	if (ControlSocket != INVALID_SOCKET) closesocket(ControlSocket);		// This is how I tell the HTTPMain function to end.
+	ControlSocket = INVALID_SOCKET;	// This is how I tell the HTTPMain function to end.
 }
 /////////////////////////////////////////////////////////////////////////////
 #pragma comment(lib, "version")
@@ -1607,7 +1606,6 @@ UINT HTTPChild(LPVOID lvp)
 }
 UINT HTTPMain(LPVOID lvp)
 {
-	HANDLE LocalTerminationEventHandle = lvp;
 	if (ApplicationLogHandle != NULL) 
 	{
 		CString csSubstitutionText(__FUNCTION__);
@@ -1926,7 +1924,6 @@ UINT HTTPMain(LPVOID lvp)
 		LPCTSTR lpStrings[] = { csSubstitutionText.GetString(), NULL };
 		ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
 	}
-	SetEvent(LocalTerminationEventHandle); // this signals any waiting function that HTTPMain function is ending.
 	if (bConsoleExists)
 		std::cout << "[" << getTimeISO8601() << "] " __FUNCTION__ " Has Stopped." << std::endl << std::flush;
 	return(0);
@@ -2410,7 +2407,7 @@ DWORD WINAPI ServiceCtrlHandler(
 			SendStatusToSCM(SERVICE_PAUSE_PENDING, NO_ERROR, 0, 0, 0);
 			currentState = SERVICE_PAUSED;
 			pauseService = true;
-			threadHandle->SuspendThread();
+			threadHandle_http->SuspendThread();
 			csSubstitutionText.Format(_T("Service %s is paused"),theApp.m_pszAppName);
 		}
 		SendStatusToSCM(currentState,NO_ERROR,0,0,0);
@@ -2421,7 +2418,7 @@ DWORD WINAPI ServiceCtrlHandler(
 			SendStatusToSCM(SERVICE_CONTINUE_PENDING,NO_ERROR,0,1,1000);
 			currentState = SERVICE_RUNNING;
 			pauseService = false;
-			threadHandle->ResumeThread();
+			threadHandle_http->ResumeThread();
 			csSubstitutionText.Format(_T("Service %s has resumed"),theApp.m_pszAppName);
 		}
 		SendStatusToSCM(currentState,NO_ERROR,0,0,0);
@@ -2461,56 +2458,47 @@ VOID ServiceMain(DWORD argc, LPTSTR * argv)
 			SendStatusToSCM(SERVICE_STOPPED,GetLastError(),0,0,0);
 		else
 		{
-			terminateEvent_http = CreateEvent(0,TRUE,FALSE,0);
-			if (terminateEvent_http == NULL) // error
-				SendStatusToSCM(SERVICE_STOPPED,GetLastError(),0,0,0);
+			success = SendStatusToSCM(SERVICE_START_PENDING, NO_ERROR, 0, 2, 1000);
+			if (success == FALSE) // error
+			{
+				SendStatusToSCM(SERVICE_STOPPED, GetLastError(), 0, 0, 0);
+			}
 			else
 			{
-				success = SendStatusToSCM(SERVICE_START_PENDING, NO_ERROR, 0, 2, 1000);
-				if (success == FALSE) // error
+				#ifdef AVCODEC_AVCODEC_H
+				av_register_all(); // FFMPEG initialization
+				#endif
+				ApplicationLogHandle = RegisterEventSource(NULL, theApp.m_pszAppName);
+				terminateEvent_populate = CreateEvent(0,TRUE,FALSE,0);
+				auto threadHandle_populate = AfxBeginThread(PopulateTiVoFileList, terminateEvent_populate);
+				terminateEvent_beacon = CreateEvent(0,TRUE,FALSE,0);
+				auto threadHandle_beacon = AfxBeginThread(TiVoBeaconSendThread, terminateEvent_beacon);
+				threadHandle_http = AfxBeginThread(HTTPMain, NULL);
+				if ((threadHandle_http != NULL) && (threadHandle_populate != NULL) && (threadHandle_beacon != NULL))
 				{
-					CloseHandle(terminateEvent_http);
-					SendStatusToSCM(SERVICE_STOPPED, GetLastError(), 0, 0, 0);
-				}
-				else
-				{
-					#ifdef AVCODEC_AVCODEC_H
-					av_register_all(); // FFMPEG initialization
-					#endif
-					ApplicationLogHandle = RegisterEventSource(NULL, theApp.m_pszAppName);
-					terminateEvent_populate = CreateEvent(0,TRUE,FALSE,0);
-					auto threadHandle_populate = AfxBeginThread(PopulateTiVoFileList, terminateEvent_populate);
-					terminateEvent_beacon = CreateEvent(0,TRUE,FALSE,0);
-					auto threadHandle_beacon = AfxBeginThread(TiVoBeaconSendThread, terminateEvent_beacon);
-					threadHandle = AfxBeginThread(HTTPMain, terminateEvent_http);
-					if ((threadHandle != NULL) && (threadHandle_populate != NULL) && (threadHandle_beacon != NULL))
+					success = SendStatusToSCM(SERVICE_RUNNING, NO_ERROR, 0, 0, 0);
+					if (success != FALSE) 
 					{
-						success = SendStatusToSCM(SERVICE_RUNNING, NO_ERROR, 0, 0, 0);
-						if (success != FALSE) 
+						if (ApplicationLogHandle != NULL) 
 						{
-							if (ApplicationLogHandle != NULL) 
-							{
-								TCHAR UserNameBuff[256];
-								DWORD UserNameSize = sizeof(UserNameBuff)/sizeof(TCHAR);
-								GetUserName(UserNameBuff,&UserNameSize); // this is "wim" when I run it.
-								CString csSubstitutionText;
-								csSubstitutionText.Format(_T("Service %s has been started by %s"), theApp.m_pszAppName, UserNameBuff);
-								LPCTSTR lpStrings[] = { csSubstitutionText.GetString(), NULL };
-								ReportEvent(ApplicationLogHandle, EVENTLOG_INFORMATION_TYPE, 0, WIMSWORLD_EVENT_GENERIC, NULL, 1, 0, lpStrings, NULL);
-							}
-							HANDLE hThreads[] = { threadHandle->m_hThread, threadHandle_populate->m_hThread, threadHandle_beacon->m_hThread };
-							WaitForMultipleObjects(3, hThreads, TRUE, INFINITE);	// This is waiting for the threads to end.
+							TCHAR UserNameBuff[256];
+							DWORD UserNameSize = sizeof(UserNameBuff)/sizeof(TCHAR);
+							GetUserName(UserNameBuff,&UserNameSize); // this is "wim" when I run it.
+							CString csSubstitutionText;
+							csSubstitutionText.Format(_T("Service %s has been started by %s"), theApp.m_pszAppName, UserNameBuff);
+							LPCTSTR lpStrings[] = { csSubstitutionText.GetString(), NULL };
+							ReportEvent(ApplicationLogHandle, EVENTLOG_INFORMATION_TYPE, 0, WIMSWORLD_EVENT_GENERIC, NULL, 1, 0, lpStrings, NULL);
 						}
-						if (serviceStatusHandle)
-							SendStatusToSCM(SERVICE_STOPPED,GetLastError(),0,0,500);
+						HANDLE hThreads[] = { threadHandle_http->m_hThread, threadHandle_populate->m_hThread, threadHandle_beacon->m_hThread };
+						WaitForMultipleObjects(3, hThreads, TRUE, INFINITE);	// This is waiting for the threads to end.
 					}
-					if (terminateEvent_populate)
-						CloseHandle(terminateEvent_populate);
-					if (terminateEvent_beacon)
-						CloseHandle(terminateEvent_beacon);
+					if (serviceStatusHandle)
+						SendStatusToSCM(SERVICE_STOPPED,GetLastError(),0,0,500);
 				}
-				if (terminateEvent_http)
-					CloseHandle(terminateEvent_http);
+				if (terminateEvent_populate)
+					CloseHandle(terminateEvent_populate);
+				if (terminateEvent_beacon)
+					CloseHandle(terminateEvent_beacon);
 			}
 		}
 	}
@@ -2776,50 +2764,43 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 				std::cout << "[" << getTimeISO8601(true) << "] TiVoFileList Size: " << TiVoFileList.size() << std::endl;
 				ccTiVoFileListCritSec.Unlock();
 
-				terminateEvent_http = CreateEvent(0,TRUE,FALSE,0);
-				if (terminateEvent_http != NULL) 
+				threadHandle_http = AfxBeginThread(HTTPMain, NULL);
+				if (threadHandle_http != NULL)
 				{
-					threadHandle = AfxBeginThread(HTTPMain, terminateEvent_http);
-					if (threadHandle != NULL)
+					terminateEvent_beacon = CreateEvent(0,TRUE,FALSE,0);
+					auto threadHandle_beacon = AfxBeginThread(TiVoBeaconSendThread, terminateEvent_beacon);
+					TCHAR szOldTitle[MAX_PATH] = _T("");
+					if (GetConsoleTitle(szOldTitle, MAX_PATH))
 					{
-						terminateEvent_beacon = CreateEvent(0,TRUE,FALSE,0);
-						auto threadHandle_beacon = AfxBeginThread(TiVoBeaconSendThread, terminateEvent_beacon);
-						TCHAR szOldTitle[MAX_PATH] = _T("");
-						if (GetConsoleTitle(szOldTitle, MAX_PATH))
-						{
-							CString csNewTitle(szOldTitle);
-							csNewTitle.Append(CTime::GetCurrentTime().Format(_T(" [%Y-%m-%dT%H:%M:%S]")));
-							SetConsoleTitle(csNewTitle.GetString());
-						}
-						terminateEvent_Signal = CreateEvent(0, TRUE, FALSE, 0);
-						if (terminateEvent_Signal != NULL)
-						{
-							typedef void(*SignalHandlerPointer)(int);
-							SignalHandlerPointer previousHandlerSIGINT = std::signal(SIGINT, SignalHandlerSIGINT);	// Install CTR-C signal handler
-							#ifdef _DEBUG
-							std::cout << "[" << getTimeISO8601(true) << "] Running for 30 minutes" << std::endl;
-							DWORD TimeToWait = 30 * 60 * 1000; // 30 minutes in milliseconds
-							#else
-							std::cout << "[" << getTimeISO8601(true) << "] Running for 12 hours" << std::endl;
-							DWORD TimeToWait = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
-							#endif
-							WaitForSingleObject(terminateEvent_Signal, TimeToWait);
-							CloseHandle(terminateEvent_Signal);
-							std::signal(SIGINT, previousHandlerSIGINT);	// Restore original Ctrl-C signal handler
-						}
+						CString csNewTitle(szOldTitle);
+						csNewTitle.Append(CTime::GetCurrentTime().Format(_T(" [%Y-%m-%dT%H:%M:%S]")));
+						SetConsoleTitle(csNewTitle.GetString());
+					}
+
+					typedef void(*SignalHandlerPointer)(int);
+					SignalHandlerPointer previousHandlerSIGINT = std::signal(SIGINT, SignalHandlerSIGINT);	// Install CTR-C signal handler
+					#ifdef _DEBUG
+					std::cout << "[" << getTimeISO8601(true) << "] Running for 30 minutes" << std::endl;
+					DWORD TimeToWait = 30 * 60 * 1000; // 30 minutes in milliseconds
+					#else
+					std::cout << "[" << getTimeISO8601(true) << "] Running for 12 hours" << std::endl;
+					DWORD TimeToWait = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
+					#endif
+					HANDLE hThreads[] = { threadHandle_http->m_hThread, threadHandle_populate->m_hThread, threadHandle_beacon->m_hThread };
+					TRACE(__FUNCTION__ " Waiting for Threads to end or timeout\n");
+					if (WAIT_TIMEOUT == WaitForMultipleObjects(3, hThreads, TRUE, TimeToWait))	// This is waiting for the threads to end.
+					{
 						if (terminateEvent_beacon) SetEvent(terminateEvent_beacon);
 						if (terminateEvent_populate) SetEvent(terminateEvent_populate);
 						if (ControlSocket != INVALID_SOCKET) closesocket(ControlSocket);		// This is how I tell the HTTPMain function to end.
 						ControlSocket = INVALID_SOCKET;	// This is how I tell the HTTPMain function to end.
-						TRACE(__FUNCTION__ " Waiting for Thread to end\n");
-						HANDLE hThreads[] = { threadHandle->m_hThread, threadHandle_populate->m_hThread, threadHandle_beacon->m_hThread };
-						WaitForMultipleObjects(3, hThreads, TRUE, INFINITE);	// This is waiting for the threads to end.
-						if (terminateEvent_beacon)
-							CloseHandle(terminateEvent_beacon);
-						SetConsoleTitle(szOldTitle);
 					}
-					if (terminateEvent_http)
-						CloseHandle(terminateEvent_http);
+					std::signal(SIGINT, previousHandlerSIGINT);	// Restore original Ctrl-C signal handler
+					TRACE(__FUNCTION__ " Waiting for Threads to end\n");
+					WaitForMultipleObjects(3, hThreads, TRUE, INFINITE);	// This is waiting for the threads to end.
+					if (terminateEvent_beacon)
+						CloseHandle(terminateEvent_beacon);
+					SetConsoleTitle(szOldTitle);
 				}
 				if (terminateEvent_populate)
 					CloseHandle(terminateEvent_populate);
