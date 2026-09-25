@@ -578,6 +578,8 @@ UINT PopulateTiVoFileList(LPVOID lvp)
 		LPCTSTR lpStrings[] = { csSubstitutionText.GetString(), NULL };
 		ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
 	}
+	if (bConsoleExists)
+		std::cout << "[" << getTimeISO8601() << "] " __FUNCTION__ " Has Stopped." << std::endl << std::flush;
 	return(0);
 }
 int GetTivoQueryContainer(SOCKET DataSocket, const char * InBuffer)
@@ -1925,6 +1927,8 @@ UINT HTTPMain(LPVOID lvp)
 		ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
 	}
 	SetEvent(LocalTerminationEventHandle); // this signals any waiting function that HTTPMain function is ending.
+	if (bConsoleExists)
+		std::cout << "[" << getTimeISO8601() << "] " __FUNCTION__ " Has Stopped." << std::endl << std::flush;
 	return(0);
 }
 // My callback function https://learn.microsoft.com/en-us/windows/win32/api/windns/nc-windns-dns_service_register_complete
@@ -1948,6 +1952,7 @@ void DnsServiceRegisterComplete(DWORD Status, PVOID pQueryContext,PDNS_SERVICE_I
 			while (index-- > 0)
 				std::wcout << L"[                   ] pInstance->keys[" << index << L"]=pInstance->values[" << index << L"] " << pInstance->keys[index] << L"=" << pInstance->values[index] << std::endl;
 		}
+		std::wcout.flush();
 	}
 	return;
 }
@@ -2337,6 +2342,8 @@ UINT TiVoBeaconSendThread(LPVOID lvp)
 		LPCTSTR lpStrings[] = { csSubstitutionText.GetString(), NULL };
 		ReportEvent(ApplicationLogHandle,EVENTLOG_INFORMATION_TYPE,0,WIMSWORLD_EVENT_GENERIC,NULL,1,0,lpStrings,NULL);
 	}
+	if (bConsoleExists)
+		std::cout << "[" << getTimeISO8601() << "] " __FUNCTION__ " Has Stopped." << std::endl << std::flush;
 	return(0);
 }
 /////////////////////////////////////////////////////////////////////////////
@@ -2758,7 +2765,7 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 				#endif
 
 				terminateEvent_populate = CreateEvent(0,TRUE,FALSE,0);
-				AfxBeginThread(PopulateTiVoFileList, terminateEvent_populate);
+				auto threadHandle_populate = AfxBeginThread(PopulateTiVoFileList, terminateEvent_populate);
 
 				ccTiVoFileListCritSec.Lock();
 				std::sort(TiVoFileList.begin(),TiVoFileList.end(),cTiVoFileCompareDate);
@@ -2772,7 +2779,7 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 					if (threadHandle != NULL)
 					{
 						terminateEvent_beacon = CreateEvent(0,TRUE,FALSE,0);
-						AfxBeginThread(TiVoBeaconSendThread, terminateEvent_beacon);
+						auto threadHandle_beacon = AfxBeginThread(TiVoBeaconSendThread, terminateEvent_beacon);
 						TCHAR szOldTitle[MAX_PATH] = _T("");
 						if (GetConsoleTitle(szOldTitle, MAX_PATH))
 						{
@@ -2801,7 +2808,8 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 						if (ControlSocket != INVALID_SOCKET) closesocket(ControlSocket);		// This is how I tell the HTTPMain function to end.
 						ControlSocket = INVALID_SOCKET;	// This is how I tell the HTTPMain function to end.
 						TRACE(__FUNCTION__ " Waiting for Thread to end\n");
-						WaitForSingleObject(terminateEvent_http, INFINITE);	// This is waiting for the HTTPMain function to end.
+						HANDLE hThreads[] = { threadHandle->m_hThread, threadHandle_populate->m_hThread, threadHandle_beacon->m_hThread };
+						WaitForMultipleObjects(3, hThreads, TRUE, INFINITE);	// This is waiting for the threads to end.
 						if (terminateEvent_beacon)
 							CloseHandle(terminateEvent_beacon);
 						SetConsoleTitle(szOldTitle);
